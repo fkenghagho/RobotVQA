@@ -19,5 +19,5 @@ class Dataset(object):
             p=self.client.request('vget /camera/0/object_mask '+a)
             print p
         except Exception,e:
-            print 'Image not saved: error occured, '+str(e)
+            print 'Image could not be saved not saved: error occured, '+str(e)
     
