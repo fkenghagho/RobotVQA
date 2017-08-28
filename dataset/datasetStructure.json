@@ -1,0 +1,48 @@
+In this file we present the structure of our dataset
+
+Each Image has 3# copies namely:
+
+-A RGB Image: colorImageName.png
+-A Depth Image: depthImageName.png
+-A Segmentation Image: segmentationImageName.png
+
+Each Image has a Json-file holding its annotation with the format:
+
+{
+ imageId: imageName,
+ questionId: questionid,              //not yet in use
+ cameraGlobalOrientation: cgOrientation,
+ cameraGlobalPosition: cgPosition,
+ objects: [
+		    {
+				objectId: id1,
+				objectName: name1,
+				objectShape: shape1,
+				objectColor: color1,
+				objectExternMaterial: eMaterial1,
+				objectInternMaterial: iMaterial1,
+				objectHardness: hardness1,
+				objectLocation: location1,
+				objectPickeability: True,
+				objectOpenability: False,
+				objectGlobalOrientation: ogOrientation1,
+				objectGlobalPosition: ogPosition1,
+				objectLocalPosition: olPosition1,
+				objectLocalOrientation: olOrientation1,
+				objectCuboid: [(x1,y1), .., (x8,y8)],
+				objectSegmentationColor: [R,G,B],
+				objectSegmentationPixels: [(x1,y1), .., (xn,yn)]
+				
+				
+			},
+			
+			.
+			.
+			.,
+			{
+				objectId: idm,
+				...
+			}
+ 
+          ]
+}
