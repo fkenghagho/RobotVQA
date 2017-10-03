@@ -46,3 +46,13 @@ Each Image has a Json-file holding its annotation with the format:
  
           ]
 }
+
+
+Some definitions
+
+objectShape: cubic, pyramidal,conic, spherical, cylindrical
+objectExternMaterial:  plastic, woody, glass, steel, cartoon, ceramic  
+objectInternMaterial:  fluid, solid,
+objectHardness: strong,soft
+objectPickeability: true,false
+objectOpenability: false,true
