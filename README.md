@@ -8,4 +8,5 @@
 - **Relationships description:** we design and train a markov logic network to provide a relevant description of relationships among objects in the scene. Markov logic networks are suitable for reasoning about relationships among objects, very flexible(few rules for so many behaviors) and the separation of this module from the object description module enables modularity(changes in the one module does not affect the other module).
 
 The following figure briefly illustrates the concept:
-!Objects and Relationships description(https://github.com/fkenghagho/RobotVQA/tree/master/images/illustration.png "Objects and Relationships description")
+
+![Objects and Relationships description](https://github.com/fkenghagho/RobotVQA/tree/master/images/illustration.png "Objects and Relationships description")
