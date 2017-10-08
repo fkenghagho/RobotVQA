@@ -7,5 +7,5 @@
 - **Objects description:** we design and train an end-to-end deep network to provide a dense description of objects in the scene. Since context-independent annotation of objects in the scene can be done almost automatically, we can easily generate a big dataset and take advantage of deep learning.
 - **Relationships description:** we design and train a markov logic network to provide a relevant description of relationships among objects in the scene. Markov logic networks are suitable for reasoning about relationships among objects, very flexible(few rules for so many behaviors) and the separation of this module from the object description module enables modularity(changes in the one module does not affect the other module).
 
-The following figure briefly illustrates the concept
-![Objects and Relationships description](https://github.com/fkenghagho/RobotVQA/tree/master/images/illustration.png "Objects and Relationships description")
+The following figure briefly illustrates the concept:
+!Objects and Relationships description(https://github.com/fkenghagho/RobotVQA/tree/master/images/illustration.png "Objects and Relationships description")
