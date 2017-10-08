@@ -1,7 +1,8 @@
+
 # RobotVQA
 
    Robohow is the European Research Project that aims at enabling robots to competently perform human-scale daily manipulation activities such as cooking in an ordinary kitchen. However, to complete such tasks, robots should not only exhibit standard visual perception capabilities such as captioning, detection, localization or recognition, but also demonstrate some cognitive vision, in which all these capabilities including considerable reasoning are integrated together, so that semantically deep understanding of the unstructured and dynamic scene can be reached. 
    
-   In this thesis, we formulate the underlying general perception problem as the problem of Visual Question Answering, however with a strong focus on the subproblem of dense captioning, which indeed refers to the open-ended question "what do you see?" and which is central to tackling the problem of general perception. Then, we address the VQA problem by implementing a Deep-Learning-based module, that initially segments the input image into meaningfull regions, encodes the question and the regions, then maps them onto the same vector space. Following the projection, the system initializes an episodic memory to the question vector and progressively decodes the question by selectively paying attention to the facts actually corresponding to the input image. Finally, the natural language generation of the answer followed by the computation of coordinates of regions of concern takes place. Unlike most of the existing solutions to the VQA problem, this module does not merely generate answers as natural language sentences, which would still be untructured for the robot, but also cares for their structure.
-   
-  To demonstrate the system, a mini-kitchen was set up and modelled in Unreal Engine 4.16. From Unreal Engine 4.16, a large dataset was then semi-automatically generated  for system training.
+   In this thesis, we formulate the underlying perception problem of scene understanding in two subproblems:
+:Objects description: we design and train an end-to-end deep network to provide a dense description of objects in the scene
+:Objects' relationships description: we design and train a markov logic network to provide a relevant description of relationships among objects in the scene.
