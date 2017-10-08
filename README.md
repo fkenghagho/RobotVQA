@@ -9,4 +9,4 @@
 
 The following figure briefly illustrates the concept:
 
-![Objects and Relationships description](https://github.com/fkenghagho/RobotVQA/tree/master/images/illustration.png "Objects and Relationships description")
+![Objects](https://github.com/fkenghagho/RobotVQA/tree/master/images/illustration.png "Objects and Relationships description")
