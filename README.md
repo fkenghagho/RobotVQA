@@ -1,8 +1,6 @@
 
 # RobotVQA
 
-
-![Objects and Relationships description](images/illustration.png?raw=true)
    Robohow is the European Research Project that aims at enabling robots to competently perform human-scale daily manipulation activities such as cooking in an ordinary kitchen. However, to complete such tasks, robots should not only exhibit standard visual perception capabilities such as captioning, detection, localization or recognition, but also demonstrate some cognitive vision, in which all these capabilities including considerable reasoning are integrated together, so that semantically deep understanding of the unstructured and dynamic scene can be reached. 
    
    In this thesis, we formulate the underlying perception problem of scene understanding in two subproblems:
@@ -11,4 +9,4 @@
 
 The following figure briefly illustrates the concept:
 
-![Objects and Relationships description](https://github.com/fkenghagho/RobotVQA/tree/master/images/illustration.png?raw=true)
+![Objects and Relationships description](images/illustration.png "Objects and Relationships description")
