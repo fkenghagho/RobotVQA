@@ -50,9 +50,9 @@ Each Image has a Json-file holding its annotation with the format:
 
 Some definitions
 
-objectShape: cubic, pyramidal,conic, spherical, cylindrical, filiform
-objectExternMaterial:  plastic, woody, glass, steel, cartoon, ceramic  
+objectShape: cubic, pyramidal,conic, spherical, cylindrical, filiform, flat
+objectExternMaterial:  plastic, wood, glass, steel, cartoon, ceramic  
 objectInternMaterial:  liquid, gaz, solid,
-objectHardness: strong,soft
+objectHardness: strong, soft
 objectPickeability: true,false
 objectOpenability: false,true
