@@ -26,4 +26,36 @@
 - **Pracmln and Alchemy:** to build the markov logic network, train it and make inferences 
 
 
-**5.** The structure of the visual dataset can be fount at [dataset's structure](https://github.com/fkenghagho/RobotVQA/blob/master/dataset/datasetStructure.txt).
+**5.** The structure of the visual dataset can be found at [dataset's structure](https://github.com/fkenghagho/RobotVQA/blob/master/dataset/datasetStructure.txt).
+
+
+**6.** An illustrative markov logic network for consistent description of objects as ell as relationships among them follows:
+
+**Types declaration**
+
+*object*={1,2,3,...}
+*name*={SPATULA, BOWL, SPOON, KNIFE, MUG,...}
+*pickability*={true, false}
+*inMaterial*={solid, liquid, gaz}
+*outMaterial*={ceramic, wood, glass, steel, plastic, cartoon}
+*shape*={cubic, cylindrical, conical, flat, filiform, sphericial, pyramidal}
+
+**Predicates declaration**
+
+*objectName(object,name)*
+*objectShape(object,shape)*
+*objectPickability(object, pickability)*
+*objectOutMaterial(object, outMaterial)*
+*objectInMaterial(object, inMaterial)*
+*object(object)*
+*container(object)*
+*throw(object,object)*
+
+**Rules declaration**
+
+*Vx(objectName(x, SPATULA) => (objectOutMaterial(x, WOOD) v (objectOutMaterial(x, STEEL) v (objectOutMaterial(x, PLASTIC))* , **weight=?**
+*Vx(objectName(x, SPATULA) => (objectInMaterial(x, SOLID))* , **weight=?**
+*Vx,y,m,n(objectName(x, m) ^ objectName(x, n) ^ (n=m) => (m=n))* , **weight=+infinity (hard constraint)**
+*Vx((objectName(x, MUG) v objectName(x, BOWL) v objectName(x, GLASS)) => container(x))* , **weight=?**
+*Vx,y(container(x) ^ objectInMaterial(y, LIQUID) ^ (x=/=y) => throw(y,x))* ,  **weight=?**
+
