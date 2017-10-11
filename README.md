@@ -34,10 +34,15 @@
 **Types declaration**
 
 *object*={1,2,3,...}
+
 *name*={SPATULA, BOWL, SPOON, KNIFE, MUG,...}
+
 *pickability*={true, false}
+
 *inMaterial*={solid, liquid, gaz}
+
 *outMaterial*={ceramic, wood, glass, steel, plastic, cartoon}
+
 *shape*={cubic, cylindrical, conical, flat, filiform, sphericial, pyramidal}
 
 **Predicates declaration**
@@ -61,8 +66,12 @@
 **Rules declaration**
 
 *Vx(objectName(x, SPATULA) => (objectOutMaterial(x, WOOD) v (objectOutMaterial(x, STEEL) v (objectOutMaterial(x, PLASTIC))* , **weight=?**
+
 *Vx(objectName(x, SPATULA) => (objectInMaterial(x, SOLID))* , **weight=?**
+
 *Vx,y,m,n(objectName(x, m) ^ objectName(x, n) ^ (n=m) => (m=n))* , **weight=+infinity (hard constraint)**
+
 *Vx((objectName(x, MUG) v objectName(x, BOWL) v objectName(x, GLASS)) => container(x))* , **weight=?**
+
 *Vx,y(container(x) ^ objectInMaterial(y, LIQUID) ^ (x=/=y) => throw(y,x))* ,  **weight=?**
 
