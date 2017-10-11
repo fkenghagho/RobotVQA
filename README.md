@@ -43,12 +43,19 @@
 **Predicates declaration**
 
 *objectName(object,name)*
+
 *objectShape(object,shape)*
+
 *objectPickability(object, pickability)*
+
 *objectOutMaterial(object, outMaterial)*
+
 *objectInMaterial(object, inMaterial)*
+
 *object(object)*
+
 *container(object)*
+
 *throw(object,object)*
 
 **Rules declaration**
