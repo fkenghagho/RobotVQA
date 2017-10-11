@@ -65,11 +65,11 @@
 
 **Rules declaration**
 
-*Vx(objectName(x, SPATULA) => (objectOutMaterial(x, WOOD) v (objectOutMaterial(x, STEEL) v (objectOutMaterial(x, PLASTIC))* , **weight=?**
+*Vx(objectName(x, SPATULA) => (objectOutMaterial(x, WOOD) v objectOutMaterial(x, STEEL) v objectOutMaterial(x, PLASTIC))* , **weight=?**
 
-*Vx(objectName(x, SPATULA) => (objectInMaterial(x, SOLID))* , **weight=?**
+*Vx(objectName(x, SPATULA) => objectInMaterial(x, SOLID))* , **weight=?**
 
-*Vx,y,m,n(objectName(x, m) ^ objectName(x, n) ^ (n=m) => (m=n))* , **weight=+infinity (hard constraint)**
+*Vx,y,m,n(objectName(x, m) ^ objectName(x, n) ^ (n=m) => (x=y))* , **weight=+infinity (hard constraint)**
 
 *Vx((objectName(x, MUG) v objectName(x, BOWL) v objectName(x, GLASS)) => container(x))* , **weight=?**
 
