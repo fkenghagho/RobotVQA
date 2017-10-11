@@ -33,17 +33,17 @@
 
 **Types declaration**
 
-*object*={1,2,3,...}
+*object={1,2,3,...}
 
-*name*={SPATULA, BOWL, SPOON, KNIFE, MUG,...}
+*name={SPATULA, BOWL, SPOON, KNIFE, MUG,...}
 
-*pickability*={TRUE, FALSE}
+*pickability={TRUE, FALSE}
 
-*inMaterial*={SOLID, LIQUID, GAZ}
+*inMaterial={SOLID, LIQUID, GAZ}
 
-*outMaterial*={CERAMIC, WOOD, GLASS, STEEL, PLASTIC, CARTOON}
+*outMaterial={CERAMIC, WOOD, GLASS, STEEL, PLASTIC, CARTOON}
 
-*shape*={CUBIC, CYLINDRICAL, CONICAL, FLAT, FILIFORM, SPHERICAL, PYRAMIDAL}
+*shape={CUBIC, CYLINDRICAL, CONICAL, FLAT, FILIFORM, SPHERICAL, PYRAMIDAL}
 
 **Predicates declaration**
 
