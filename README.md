@@ -37,13 +37,13 @@
 
 *name*={SPATULA, BOWL, SPOON, KNIFE, MUG,...}
 
-*pickability*={true, false}
+*pickability*={TRUE, FALSE}
 
-*inMaterial*={solid, liquid, gaz}
+*inMaterial*={SOLID, LIQUID, GAZ}
 
-*outMaterial*={ceramic, wood, glass, steel, plastic, cartoon}
+*outMaterial*={CERAMIC, WOOD, GLASS, STEEL, PLASTIC, CARTOON}
 
-*shape*={cubic, cylindrical, conical, flat, filiform, sphericial, pyramidal}
+*shape*={CUBIC, CYLINDRICAL, CONICAL, FLAT, FILIFORM, SPHERICAL, PYRAMIDAL}
 
 **Predicates declaration**
 
