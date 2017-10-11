@@ -10,3 +10,13 @@
 The following figure briefly illustrates the concept:
 
 ![Objects and Relationships description](images/illustration.png "Objects and Relationships description")
+
+Our model works as follows:
+
+![Objects and Relationships description](images/architecture.png "Model description")
+
+We make use of the following Frameworks:
+
+- **Unreal Engine and UnrealCV:** to partially build the visual datasets
+- **TensorFlow and Caffe:** to build the deep convo-neural network, train it and make inferences
+- **Pracmln and Alchemy:** to build the markov logic, train it and make inferences 
