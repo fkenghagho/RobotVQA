@@ -24,6 +24,7 @@ Each Image has a Json-file holding its annotation with the format:
 				objectHardness: hardness1,
 				objectLocation: location1,
 				objectPickeability: True,
+				objectStackability: False,
 				objectOpenability: False,
 				objectGlobalOrientation: ogOrientation1,
 				objectGlobalPosition: ogPosition1,
@@ -54,5 +55,6 @@ objectShape: cubic, pyramidal,conic, spherical, cylindrical, filiform, flat
 objectExternMaterial:  plastic, wood, glass, steel, cartoon, ceramic  
 objectInternMaterial:  liquid, gaz, solid,
 objectHardness: strong, soft
-objectPickeability: true,false
-objectOpenability: false,true
+objectPickeability: true, false
+objectStackability: true, false
+objectOpenability: false, true
