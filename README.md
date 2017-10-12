@@ -39,7 +39,7 @@
 
 *pickability={TRUE, FALSE}*
 
-*inMaterial={SOLID, LIQUID, GAZ}*
+*inMaterial={SOLID, LIQUID, GAZ, POWDER}*
 
 *outMaterial={CERAMIC, WOOD, GLASS, STEEL, PLASTIC, CARTOON}*
 
