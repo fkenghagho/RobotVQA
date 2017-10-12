@@ -24,6 +24,7 @@ Each Image has a Json-file holding its annotation with the format:
 				objectHardness: hardness1,
 				objectLocation: location1,
 				objectPickeability: True,
+				objectGraspability: False,
 				objectStackability: False,
 				objectOpenability: False,
 				objectGlobalOrientation: ogOrientation1,
@@ -58,3 +59,4 @@ objectHardness: strong, soft
 objectPickeability: true, false
 objectStackability: true, false
 objectOpenability: false, true
+objectGraspability: false, true
