@@ -54,7 +54,7 @@ Some definitions
 
 objectShape: cubic, pyramidal,conic, spherical, cylindrical, filiform, flat
 objectExternMaterial:  plastic, wood, glass, steel, cartoon, ceramic  
-objectInternMaterial:  liquid, gaz, solid,
+objectInternMaterial:  liquid, gaz, solid, powder
 objectHardness: strong, soft
 objectPickeability: true, false
 objectStackability: true, false
