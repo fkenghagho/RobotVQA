@@ -182,7 +182,7 @@ class Dataset(object):
             jsonImage=json.loads(jsonImage)
             #write json annotation to file
             with open(os.path.join(self.folder,self.annotation+str(self.index)+'.'+self.annotExtension),'w') as outfile:
-                json.dump(outfile,indent=5)
+                json.dump(jsonImage,outfile,indent=5)
             print('Annotation saved successfully.')
         except Exception,e:
             print('Annotation failed. '+str(e))
