@@ -4,6 +4,7 @@ import sys
 import time
 import StringIO, PIL.Image
 from unrealcv import client
+import json
 import cv2
 class Dataset(object):
     def __init__(self,folder,nberOfImages,cameraId):
@@ -13,6 +14,7 @@ class Dataset(object):
         self.depthImage='depthImage'
         self.maskImage='maskImage'
         self.annotation='annotation'
+        self.annotExtension='json'
         self.index=0
         self.extension='jpg'
         self.nberOfImages=nberOfImages
@@ -73,14 +75,118 @@ class Dataset(object):
             for j in range(m):
                 key=self.getKey(list(img[i][j]))
                 if key in self.listObjects.keys():
-                    self.listObjects[key].append(list(img[i][j]))
+                    self.listObjects[key].append((i,j))
                 else:
-                    self.listObjects[key]=[list(img[i][j])]
+                    self.listObjects[key]=[(i,j)]
+        
+    #object name from id
+    def getName(self,objectId):
+        return objectId
         
     #annotate images
     def annotate(self):
-        pass
+        #build json object
+        jsonArray=[]
+        #image and question ids. Question id is not used for now
+        imageId=str(self.index)
+        questionId=""
+        try:
+            #get camera Position x,y,z
+            camPosition=client.request('vget /camera/'+self.cameraId+'/location').split(' ')
+            camPosition=[float(camPosition[0]),float(camPosition[1]),float(camPosition[2])]
+            #get camera orientation teta,beta,phi
+            camOrientation=client.request('vget /camera/'+self.cameraId+'/rotation').split(' ')
+            camOrientation=[float(camOrientation[0]),float(camOrientation[1]),float(camOrientation[2])]
+        except Exception,e:
+            print('Error occured when requesting camera properties. '+str(e))
         
+        for objId in self.listObjects.keys():
+            #get object tags template
+            objTagTemp={"objectShape":"","objectExternMaterial":"","objectInternMaterial":"","objectHardness":"",
+                        "objectPickability":"","objectGraspability":"","objectStackability":"","objectOpenability":""}
+            #get object color
+            objColor=""
+            #get object Location
+            objLocation=""
+            #get object segmentation color
+            objSegColor=self.objectColor[objId]
+            #get object segmentation pixels
+            objSegPixels=self.listObjects[objId]
+            #get object cuboid
+            objCuboid=[]
+            #get object local orientation
+            objLocalOrientation=[]
+            #get object local Position: with camera as reference
+            objLocalPosition=[]
+            #get object tags,global Position and orientation
+            try:
+                objTags=client.request('vget /object/'+objId+'/tags')
+                #split tags
+                objTags=objTags.split(';')
+                for elt in objTags:
+                    try:
+                        elt=elt.split(':')
+                        objTagTemp[elt[0]]=elt[1]
+                    except Exception,e:
+                         print('Error occured when parsing object tags. '+str(e))
+                #get object Position x,y,z
+                objPosition=client.request('vget /object/'+objId+'/location').split(' ')
+                objPosition=[float(objPosition[0]),float(objPosition[1]),float(objPosition[2])]
+                #get object orientation teta,beta,phi
+                objOrientation=client.request('vget /object/'+objId+'/rotation').split(' ')
+                objOrientation=[float(objOrientation[0]),float(objOrientation[1]),float(objOrientation[2])]
+            except Exception,e:
+                print('Error occured when requesting object properties. '+str(e))
+                
+             
+            jsonArray.append(
+                              '{"objectId":"'+objId+'",'+
+                                '"objectName":"'+self.getName(objId)+'",'+
+                                '"objectShape":"'+objTagTemp["objectShape"]+'",'+
+                                '"objectColor":"'+objColor+'",'+
+                                '"objectExternMaterial":"'+str(objTagTemp["objectExternMaterial"])+'",'+
+                                '"objectInternMaterial":"'+str(objTagTemp["objectInternMaterial"])+'",'+
+                                '"objectHardness":"'+str(objTagTemp["objectHardness"])+'",'+
+                                '"objectLocation":"'+str(objLocation+)'",'+
+                                '"objectPickability":"'+str(objTagTemp["objectPickability"]+)'",'+
+                                '"objectGraspability":"'+str(objTagTemp["objectGraspability"])+'",'+
+                                '"objectStackability":"'+str(objTagTemp["objectStackability"])+'",'+
+                                '"objectOpenability":"'+str(objTagTemp["objectOpenability"])+'",'+
+                                '"objectGlobalOrientation":"'+str(objOrientation)+'",'+
+                                '"objectGlobalPosition":"'+str(objPosition)+'",'+
+                                '"objectLocalPosition":"'+str(objLocalPosition)+'",'+
+                                '"objectLocalOrientation":"'+str(objLocalOrientation)+'",'+
+                                '"objectCuboid":"'+str(objCuboid)+'",'+
+                                '"objectSegmentationColor":"'+str(objSegColor)+'",'+
+                                '"objectSegmentationPixels":"'+str(objSegPixels)+'",'+
+                                '}'
+                            )
+        
+        
+        listObj='['
+        for i in range(len(jsonArray)):
+            listObj=listObj+jsonArray[i]
+            if i==len(jsonArray)-1:
+                listObj=listObj+']'
+            else:
+                listObj=listObj+','
+        jsonImage='{'+
+                    '"imageId":"'+str(imageId)+'",'+
+                    '"questionId":"'+str(questionId)+'",'+
+                    '"cameraGlobalOrientation":"'+str(camOrientation)+'",'+
+                    '"cameraGlobalPosition":"'+str(camPosition)+'",'+
+                    '"objects":"'+str(listObj)+'"'+
+                  '}'
+        try:
+            #convert from plain to json
+            jsonImage=json.loads(jsonImage)
+            #write json annotation to file
+            with open(os.path.join(self.folder,self.annotation+str(self.index)+'.'+self.annotExtension),'w') as outfile:
+                json.dump(outfile,indent=5)
+            print('Annotation saved successfully.')
+        except Exception,e:
+            print('Annotation failed. '+str(e))
+            
     #save nberOfImages images
     def scan(self):
         for i in range(self.nberOfImages):
@@ -108,6 +214,9 @@ class Dataset(object):
                     img=client.request('vget /camera/'+str(self.cameraId)+'/object_mask png')
                     img=self.read_png(img)
                     self.getCurrentObjects(img)
+                    #build annotation
+                    self.index=i
+                    self.annotate()
                     print(self.listObjects)  
                     img=cv2.cvtColor(img,cv2.COLOR_RGBA2BGRA)
                     if not(cv2.imwrite(os.path.join(self.folder,self.maskImage)+str(i)+'.'+self.extension,img)):
