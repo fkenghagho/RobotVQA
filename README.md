@@ -94,5 +94,5 @@
    
    The following images depict a typical scene:
    
-![Typical scene](images/dataset.png "Typical scene")   
+![Typical scene](images/dataset1.png "Typical scene")   
 
