@@ -75,9 +75,9 @@ class Dataset(object):
             for j in range(m):
                 key=self.getKey(list(img[i][j]))
                 if key in self.listObjects.keys():
-                    self.listObjects[key].append((i,j))
+                    self.listObjects[key].append([i,j])
                 else:
-                    self.listObjects[key]=[(i,j)]
+                    self.listObjects[key]=[[i,j]]
         
     #object name from id
     def getName(self,objectId):
@@ -92,17 +92,17 @@ class Dataset(object):
         questionId=""
         try:
             #get camera Position x,y,z
-            camPosition=client.request('vget /camera/'+self.cameraId+'/location').split(' ')
+            camPosition=client.request('vget /camera/'+str(self.cameraId)+'/location').split(' ')
             camPosition=[float(camPosition[0]),float(camPosition[1]),float(camPosition[2])]
             #get camera orientation teta,beta,phi
-            camOrientation=client.request('vget /camera/'+self.cameraId+'/rotation').split(' ')
+            camOrientation=client.request('vget /camera/'+str(self.cameraId)+'/rotation').split(' ')
             camOrientation=[float(camOrientation[0]),float(camOrientation[1]),float(camOrientation[2])]
         except Exception,e:
             print('Error occured when requesting camera properties. '+str(e))
-        
+        #objId is the object Id
         for objId in self.listObjects.keys():
             #get object tags template
-            objTagTemp={"objectShape":"","objectExternMaterial":"","objectInternMaterial":"","objectHardness":"",
+            objTagTemp={"objectShape":"","objectExternalMaterial":"","objectInternalMaterial":"","objectHardness":"",
                         "objectPickability":"","objectGraspability":"","objectStackability":"","objectOpenability":""}
             #get object color
             objColor=""
@@ -112,6 +112,8 @@ class Dataset(object):
             objSegColor=self.objectColor[objId]
             #get object segmentation pixels
             objSegPixels=self.listObjects[objId]
+            if len(objSegPixels)<=0:
+                raise ValueError()
             #get object cuboid
             objCuboid=[]
             #get object local orientation
@@ -144,21 +146,21 @@ class Dataset(object):
                                 '"objectName":"'+self.getName(objId)+'",'+
                                 '"objectShape":"'+objTagTemp["objectShape"]+'",'+
                                 '"objectColor":"'+objColor+'",'+
-                                '"objectExternMaterial":"'+str(objTagTemp["objectExternMaterial"])+'",'+
-                                '"objectInternMaterial":"'+str(objTagTemp["objectInternMaterial"])+'",'+
+                                '"objectExternMaterial":"'+str(objTagTemp["objectExternalMaterial"])+'",'+
+                                '"objectInternMaterial":"'+str(objTagTemp["objectInternalMaterial"])+'",'+
                                 '"objectHardness":"'+str(objTagTemp["objectHardness"])+'",'+
-                                '"objectLocation":"'+str(objLocation+)'",'+
-                                '"objectPickability":"'+str(objTagTemp["objectPickability"]+)'",'+
+                                '"objectLocation":"'+str(objLocation)+'",'+
+                                '"objectPickability":"'+str(objTagTemp["objectPickability"])+'",'+
                                 '"objectGraspability":"'+str(objTagTemp["objectGraspability"])+'",'+
                                 '"objectStackability":"'+str(objTagTemp["objectStackability"])+'",'+
                                 '"objectOpenability":"'+str(objTagTemp["objectOpenability"])+'",'+
-                                '"objectGlobalOrientation":"'+str(objOrientation)+'",'+
-                                '"objectGlobalPosition":"'+str(objPosition)+'",'+
-                                '"objectLocalPosition":"'+str(objLocalPosition)+'",'+
-                                '"objectLocalOrientation":"'+str(objLocalOrientation)+'",'+
-                                '"objectCuboid":"'+str(objCuboid)+'",'+
-                                '"objectSegmentationColor":"'+str(objSegColor)+'",'+
-                                '"objectSegmentationPixels":"'+str(objSegPixels)+'",'+
+                                '"objectGlobalOrientation":'+str(objOrientation)+','+
+                                '"objectGlobalPosition":'+str(objPosition)+','+
+                                '"objectLocalPosition":'+str(objLocalPosition)+','+
+                                '"objectLocalOrientation":'+str(objLocalOrientation)+','+
+                                '"objectCuboid":'+str(objCuboid)+','+
+                                '"objectSegmentationColor":'+str(objSegColor)+','+
+                                '"objectSegmentationPixels":'+str(objSegPixels)+''+
                                 '}'
                             )
         
@@ -170,13 +172,7 @@ class Dataset(object):
                 listObj=listObj+']'
             else:
                 listObj=listObj+','
-        jsonImage='{'+
-                    '"imageId":"'+str(imageId)+'",'+
-                    '"questionId":"'+str(questionId)+'",'+
-                    '"cameraGlobalOrientation":"'+str(camOrientation)+'",'+
-                    '"cameraGlobalPosition":"'+str(camPosition)+'",'+
-                    '"objects":"'+str(listObj)+'"'+
-                  '}'
+        jsonImage='{'+'"imageId":"'+str(imageId)+'",'+'"questionId":"'+str(questionId)+'",'+'"cameraGlobalOrientation":'+str(camOrientation)+','+'"cameraGlobalPosition":'+str(camPosition)+','+'"objects":'+str(listObj)+''+'}'
         try:
             #convert from plain to json
             jsonImage=json.loads(jsonImage)
@@ -184,6 +180,7 @@ class Dataset(object):
             with open(os.path.join(self.folder,self.annotation+str(self.index)+'.'+self.annotExtension),'w') as outfile:
                 json.dump(jsonImage,outfile,indent=5)
             print('Annotation saved successfully.')
+            del jsonArray[:]
         except Exception,e:
             print('Annotation failed. '+str(e))
             
@@ -217,7 +214,7 @@ class Dataset(object):
                     #build annotation
                     self.index=i
                     self.annotate()
-                    print(self.listObjects)  
+                    #print(self.listObjects)  
                     img=cv2.cvtColor(img,cv2.COLOR_RGBA2BGRA)
                     if not(cv2.imwrite(os.path.join(self.folder,self.maskImage)+str(i)+'.'+self.extension,img)):
                         print('Failed to save maskimage!!!')
