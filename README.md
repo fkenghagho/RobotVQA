@@ -2,7 +2,7 @@
 # RobotVQA
 
 # 1. Introduction 
------------------
+
 
    Robohow is the European Research Project that aims at enabling robots to competently perform human-scale daily manipulation activities such as cooking in an ordinary kitchen. However, to complete such tasks, robots should not only exhibit standard visual perception capabilities such as captioning, detection, localization or recognition, but also demonstrate some cognitive vision, in which all these capabilities including considerable reasoning are integrated together, so that semantically deep understanding of the unstructured and dynamic scene can be reached.
    
@@ -10,19 +10,28 @@
 - **Objects description:** we design and train a deep convo-neural network to provide an end-to-end dense description of objects in the scene. Since context-independent annotation of objects in the scene can be done almost automatically, we can easily generate a big dataset and take advantage of deep learning.
 - **Relationships description:** we design and train a markov logic network to provide a relevant and consistent description of relationships among objects in the scene. Markov logic networks are suitable for reasoning about relationships among objects, very flexible(few rules for so many behaviors) and the separation of this module from the object description module enables modularity(changes in the one module does not affect the other module).
 
-**2. The following figure briefly illustrates the concept:**
+
+# 2. Typical Scene 
+
+  
+   The following figure briefly illustrates the concept:
 
 ![Objects and Relationships description](images/illustration.png "Objects and Relationships description")
 
 
+# 3. Deep Network
 
-**3. Our model works as follows:**
+
+   Our model works as follows:
 
 ![Objects and Relationships description](images/architecture.png "Model description")
 
 
 
-**4. An illustrative markov logic network for consistent description of objects as ell as relationships among them follows:**
+# 4. Markov Logic Network 
+
+
+   An illustrative markov logic network for consistent description of objects as ell as relationships among them follows:
 
 **Types declaration**
 
@@ -54,7 +63,7 @@
 
 *container(object)*
 
-*throw(object,object)*
+*throw(object,object)
 
 **Rules declaration**
 
@@ -70,12 +79,16 @@
 
 
 
-**5. We make use of the following Frameworks:**
+# 5. Frameworks
+
+   We make use of the following Frameworks:
 
 - **Unreal Engine and UnrealCV:** to partially build the visual datasets
 - **TensorFlow and Caffe:** to build the deep convo-neural network, train it and make inferences
 - **Pracmln and Alchemy:** to build the markov logic network, train it and make inferences 
 
 
-**6. The structure of the visual dataset can be found at [dataset's structure]**(https://github.com/fkenghagho/RobotVQA/blob/master/dataset/datasetStructure.txt). And an example of annotation can be downloaded from [example of annotation](https://github.com/fkenghagho/RobotVQA/blob/master/dataset/datasetExample.zip)
+# 6. Dataset 
+
+   The structure of the visual dataset can be found at [dataset's structure](https://github.com/fkenghagho/RobotVQA/blob/master/dataset/datasetStructure.txt). This file deeply specifies the structure of objects in the scene and the image and information types needed to learn the structure of objects. Then, we modeled the environment of the target robot in Unreal Engine4.16 and wrote a software for an end-to-end construction of the dataset starting from the automatic camera navigation in the virtual environment till the saving of scene images and annotations. The software can be found at [dataset generator](https://github.com/fkenghagho/RobotVQA/blob/master/tools/generateDataset.py). An example of annotation can be downloaded from [example of annotation](https://github.com/fkenghagho/RobotVQA/blob/master/dataset/datasetExample.zip)
 
