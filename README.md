@@ -26,7 +26,7 @@
 - **Pracmln and Alchemy:** to build the markov logic network, train it and make inferences 
 
 
-**5.** The structure of the visual dataset can be found at [dataset's structure](https://github.com/fkenghagho/RobotVQA/blob/master/dataset/datasetStructure.txt).
+**5.** The structure of the visual dataset can be found at [dataset's structure](https://github.com/fkenghagho/RobotVQA/blob/master/dataset/datasetStructure.txt). And an example of annotation can be downloaded from [example of annotation](https://github.com/fkenghagho/RobotVQA/blob/master/dataset/datasetExample.zip)
 
 
 **6.** An illustrative markov logic network for consistent description of objects as ell as relationships among them follows:
