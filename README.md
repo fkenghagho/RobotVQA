@@ -19,7 +19,7 @@
 ![Objects and Relationships description](images/illustration.png "Objects and Relationships description")
 
 
-# 3. Deep Network
+# 3. Deep Convo-Neural Network
 
 
    Our model works as follows:
@@ -90,5 +90,9 @@
 
 # 6. Dataset 
 
-   The structure of the visual dataset can be found at [dataset's structure](https://github.com/fkenghagho/RobotVQA/blob/master/dataset/datasetStructure.txt). This file deeply specifies the structure of objects in the scene and the image and information types needed to learn the structure of objects. Then, we modeled the environment of the target robot in Unreal Engine4.16 and wrote a software for an end-to-end construction of the dataset starting from the automatic camera navigation in the virtual environment till the saving of scene images and annotations. The software can be found at [dataset generator](https://github.com/fkenghagho/RobotVQA/blob/master/tools/generateDataset.py). An example of annotation can be downloaded from [example of annotation](https://github.com/fkenghagho/RobotVQA/blob/master/dataset/datasetExample.zip)
+   The structure of the visual dataset can be found at [dataset's structure](https://github.com/fkenghagho/RobotVQA/blob/master/dataset/datasetStructure.txt). This file deeply specifies the structure of objects in the scene and the image and information types needed to learn the structure of objects. Then, we modeled the environment of the target robot in Unreal Engine4.16 and wrote a software for an end-to-end construction of the dataset starting from the automatic camera navigation in the virtual environment till the saving of scene images and annotations. The software can be found at [dataset generator](https://github.com/fkenghagho/RobotVQA/blob/master/tools/generateDataset.py). An example of annotation can be downloaded from [example of annotation](https://github.com/fkenghagho/RobotVQA/blob/master/dataset/datasetExample.zip)(**zip file**).
+   
+   The following images depict of a typical scene:
+   
+![Typical scene](images/dataset.png "Typical scene")   
 
