@@ -2,9 +2,10 @@ In this file we present the structure of our dataset
 
 Each Image has 3# copies namely:
 
--A RGB Image: colorImageName.png
--A Depth Image: depthImageName.png
--A Segmentation Image: segmentationImageName.png
+-A RGB Image: colorImageName.jpg
+-A Depth Image: depthImageName.jpg
+-A Segmentation Image: segmentationImageName.jpg
+-A normal Image: normalImageName.jpg
 
 Each Image has a Json-file holding its annotation with the format:
 
