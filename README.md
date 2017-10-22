@@ -96,3 +96,5 @@
    
 ![Typical scene](images/dataset1.png "Typical scene")   
 
+![Objects in the scene](images/objects.png "Objects in the scene")   
+
