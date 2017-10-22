@@ -183,31 +183,70 @@ class Dataset(object):
             del jsonArray[:]
         except Exception,e:
             print('Annotation failed. '+str(e))
+    
+    def cleanup(self):
+        client.disconnect()
+    
+    def saveObject(self, jsonFile,objName,imageName,outImageName):
+        try:
+            with open(jsonFile,'r') as infile:
+                jsonImage=json.load(infile)
+            for a in jsonImage['objects']:
+                if a['objectName']==objName:
+                    e=a
+                    break
+            if e==None:
+                raise ValueError('Unknown object with name: '+objName)
+            lign=[]
+            col=[]
+            obj=e
+            for e in obj['objectSegmentationPixels']:
+                lign.append(e[0])
+                col.append(e[1])
             
+            xmin=min(lign)
+            ymin=min(col)
+            xmax=max(lign)
+            ymax=max(col)
+            
+            img=np.ones([xmax-xmin+1,ymax-ymin+1,3],dtype='uint8')*255
+            im=cv2.imread(imageName)
+            for e in obj['objectSegmentationPixels']:
+                img[e[0]-xmin][e[1]-ymin][0]=im[e[0]][e[1]][0]
+                img[e[0]-xmin][e[1]-ymin][1]=im[e[0]][e[1]][1]
+                img[e[0]-xmin][e[1]-ymin][2]=im[e[0]][e[1]][2]
+            cv2.imwrite(outImageName,img)
+            print('Object saved successfully.')
+        except Exception,e:
+            print('Failed to save object. '+str(e))
+        
     #save nberOfImages images
     def scan(self):
         for i in range(self.nberOfImages):
                 try:
+                    
+                    
                     img=client.request('vget /camera/'+str(self.cameraId)+'/lit png')
                     img=self.read_png(img)
-                    img=cv2.cvtColor(img,cv2.COLOR_RGBA2BGRA)
+                    img=cv2.cvtColor(img,cv2.COLOR_RGB2BGR)
                     if not(cv2.imwrite(os.path.join(self.folder,self.litImage)+str(i)+'.'+self.extension,img)):
                         print('Failed to save lit image!!!')
                         
-                        
+                       
                     img=client.request('vget /camera/'+str(self.cameraId)+'/normal png')
                     img=self.read_png(img)
-                    img=cv2.cvtColor(img,cv2.COLOR_RGBA2BGRA)
+                    img=cv2.cvtColor(img,cv2.COLOR_RGB2BGR)
                     if not(cv2.imwrite(os.path.join(self.folder,self.normalImage)+str(i)+'.'+self.extension,img)):
                         print('Failed to save normal image!!!')
                     
                    
                     img=client.request('vget /camera/'+str(self.cameraId)+'/depth png')
                     img=self.read_png(img)
-                    img=cv2.cvtColor(img,cv2.COLOR_RGBA2BGRA)
+                    img=cv2.cvtColor(img,cv2.COLOR_RGB2BGR)
                     if not(cv2.imwrite(os.path.join(self.folder,self.depthImage)+str(i)+'.'+self.extension,img)):
                         print('Failed to save depth image!!!')
                         
+                   
                     img=client.request('vget /camera/'+str(self.cameraId)+'/object_mask png')
                     img=self.read_png(img)
                     self.getCurrentObjects(img)
@@ -215,11 +254,10 @@ class Dataset(object):
                     self.index=i
                     self.annotate()
                     #print(self.listObjects)  
-                    img=cv2.cvtColor(img,cv2.COLOR_RGBA2BGRA)
+                    img=cv2.cvtColor(img,cv2.COLOR_RGB2BGR)
                     if not(cv2.imwrite(os.path.join(self.folder,self.maskImage)+str(i)+'.'+self.extension,img)):
                         print('Failed to save maskimage!!!')
-                        
-                   
+
                  
                 except Exception,e:
                     print('Image could not be saved not saved: error occured .'+str(e))
