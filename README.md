@@ -111,7 +111,7 @@
 
 **Learning approach:** By building the dataset for learning, we objectively assign color classes to objects and after the training, the network is able to qualitatively appreciate the color of objects in the scene.
 - Very powerful: end-to-end rational color estimation only based on objective description of data
-- Qualitatively matches human vision
+- Qualitatively matches human vision **(color constancy)**
 - More complicated and costlier: objective description of data, network, training and estimation.
                  
    
