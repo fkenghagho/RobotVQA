@@ -6,6 +6,8 @@ import StringIO, PIL.Image
 from unrealcv import client
 import json
 import cv2
+
+objectColor=['pink','red','orange','brown','yellow','olive','green','blue','purple','white','gray','black']
 class Dataset(object):
     def __init__(self,folder,nberOfImages,cameraId):
         self.folder=folder
@@ -186,6 +188,41 @@ class Dataset(object):
     
     def cleanup(self):
         client.disconnect()
+        
+    #get object pixels
+    def getObjectColor(self, jsonFile,objName,imageName):
+        try:
+            with open(jsonFile,'r') as infile:
+                jsonImage=json.load(infile)
+            for a in jsonImage['objects']:
+                if a['objectName']==objName:
+                    e=a
+                    break
+            if e==None:
+                raise ValueError('Unknown object with name: '+objName)
+            lign=[]
+            col=[]
+            obj=e
+            img=cv2.imread(imageName)
+            histo=np.zeros([256,256,256],dtype='uint')
+            for elt in obj['objectSegmentationPixels']:
+                histo[img[elt[0]][elt[1]][0]][img[elt[0]][elt[1]][1]][img[elt[0]][elt[1]][2]]+=1
+            imax=0
+            jmax=0
+            kmax=0
+            max=0
+            for i in range(255):
+                for j in range(255):
+                    for k in range(255):
+                        if  histo[i][j][k]>=max:
+                            max= histo[i][j][k]
+                            [imax,jmax,kmax]=[i,j,k]
+            
+            print('Color computed successfully: '+str(objName))
+            return [imax,jmax,kmax,max]
+        except Exception,e:
+            print('Failed to compute object color. '+str(e))
+            return []
     
     def saveObject(self, jsonFile,objName,imageName,outImageName):
         try:
@@ -219,6 +256,37 @@ class Dataset(object):
             print('Object saved successfully.')
         except Exception,e:
             print('Failed to save object. '+str(e))
+     
+    #compute  RGB-color of an image
+    def computeRGBColor(self, imageName):
+        #weighted sum of pixels' RGB color
+        length=0
+        try:
+            sum=np.array([256,256,256],dtype='uint')
+            img=cv2.imread(imageName)
+            histo=np.zeros([256,256,256],dtype='uint')
+            for i in range(img.shape[0]):
+                for j in range(img.shape[1]):
+                   histo[img[i][j][0]][img[i][j][1]][img[i][j][2]]+=1
+            imax=0
+            jmax=0
+            kmax=0
+            max=0
+            for i in range(255):
+                for j in range(255):
+                    for k in range(255):
+                        if  histo[i][j][k]>=max:
+                            max= histo[i][j][k]
+                            [imax,jmax,kmax]=[i,j,k]
+            
+            print('Color computed successfully: '+str(imageName))
+            return [imax,jmax,kmax,max]
+        except Exception,e:
+            print('Failed to compute color: '+str(imageName)+' .'+str(e))
+            return None
+            
+            
+            
         
     #save nberOfImages images
     def scan(self):

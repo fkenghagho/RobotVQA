@@ -53,6 +53,7 @@ Each Image has a Json-file holding its annotation with the format:
 
 Some definitions
 
+objectColor: {pink, red, orange, brown, yellow, olive, yellow green, green, blue, purple, white, gray, black}
 objectShape: cubic, pyramidal,conic, spherical, cylindrical, filiform, flat
 objectExternMaterial:  plastic, wood, glass, steel, cartoon, ceramic  
 objectInternMaterial:  liquid, gaz, solid,  powder
