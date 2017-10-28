@@ -104,7 +104,7 @@
 
    In this thesis, we identify 12 classes of colors which are the basic/standard colors set up by the **ISCC–NBS System**. These colors are **red**, **blue**, **green**, **yellow** ...
    
-**Engineering approach:** we assume that the pixels's colors are normally distributed. We find the most frequent pixel color(RGB) and compute the nearest color class to the most frequent pixel color. The color class is then considered as the color of the object. By modeling colors as 3D-vectors/points, we define a consistent distance between two colors, which typically considers the euclidean distance between the color points as well as the angle between the color vectors. 
+**Engineering approach:** we assume that the pixels's colors are normally distributed as it usually seems to be the case for natural images(Gaussian mixtures). We find the most frequent pixel color(RGB) and compute the nearest color class to the most frequent pixel color. The color class is then considered as the color of the object. By modeling colors as 3D-vectors/points, we define a consistent distance between two colors, which typically considers the euclidean distance between the color points as well as the angle between the color vectors. 
 - Quantitatively more precise than human vision, however fails to capture quality: **too few qualitative classes(only 12) and very low features(Gaussian mean of pixel values)**
 - Very sensitive to noise: **shadow, very strong mixture of colors**
 - Very simple and fast.
