@@ -115,7 +115,7 @@
 - More complicated and costlier: objective description of data, network, training and estimation.
 
 
-# 7. Object Pose Estimation: Position, Orientation and Cuboid
+# 8. Object Pose Estimation: Position, Orientation and Cuboid
                  
    
    
