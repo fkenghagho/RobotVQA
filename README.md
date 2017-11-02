@@ -119,7 +119,7 @@
                  
 Refering to the best of our knowledge, we are the first to design an **end-to-end object pose estimator** based on Deep-Learning. From Unreal Engine, we sample images annotated with objets and cameras' poses within the virtual world coordinate system. Then we refine the annotation by mapping the objects' poses  from the world's coordinate system into the camera's coordinate system. The end-to-end object pose estimator takes as input an image and outputs the poses of objects on the image. Futhermore, the estimator also outputs the minimal cuboid enclosing an object.
    
-A brief comparison of our learning approach and other traditional approaches to pose estimation follows:
+A brief comparison of our learning approach to other traditional approaches on pose estimation follows:
 
 **Traditional approach:** state of the art as PCL requires a lot of engineering
 - A 3D-Model for each objects, explicit features extraction: almost manually
