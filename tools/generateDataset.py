@@ -331,3 +331,94 @@ class Dataset(object):
                     print('Image could not be saved not saved: error occured .'+str(e))
             
         print('Scan terminated with success.')
+
+    # Calculates translation Matrix given translation vector.
+    def vectorToTranslationMatrix(self,vector) :
+        
+        T = np.array([[1,         0,                  0,               vector[0]    ],
+                        [0,         1,                  0,               vector[1]    ],
+                        [0,         0,                  1,               vector[2]    ],
+                        [0,         0,                  0,               1    ]
+                        ])
+        return T
+        
+    # Calculates Rotation Matrix given euler angles.
+    def eulerAnglesToRotationMatrix(self,theta) :
+        
+        R_x = np.array([[1,         0,                  0                   ],
+                        [0,         np.cos(theta[0]), -np.sin(theta[0]) ],
+                        [0,         np.sin(theta[0]), np.cos(theta[0])  ]
+                        ])
+            
+            
+                        
+        R_y = np.array([[np.cos(theta[1]),    0,      np.sin(theta[1])  ],
+                        [0,                     1,      0                   ],
+                        [-np.sin(theta[1]),   0,      np.cos(theta[1])  ]
+                        ])
+                    
+        R_z = np.array([[np.cos(theta[2]),    -np.sin(theta[2]),    0],
+                        [np.sin(theta[2]),    np.cos(theta[2]),     0],
+                        [0,                     0,                      1]
+                        ])
+                        
+                        
+        R = np.dot(R_z, np.dot( R_y, R_x ))
+    
+        return R
+    
+    # Checks if a matrix is a valid translation matrix.
+    def isTranslationMatrix(self,R) :
+        if R.shape[0]!=R.shape[1]:
+            return False
+        for i in range(R.shape[0]):
+            if R[i][i]!=1:
+                return False
+            for j in range(R.shape[1]-1):
+                if j!=i and R[i][j]!=0:
+                    return False
+        return True
+    
+        
+    # Checks if a matrix is a valid rotation matrix.
+    def isRotationMatrix(self,R) :
+        if R.shape[0]!=R.shape[1]:
+            return False
+        Rt = np.transpose(R)
+        shouldBeIdentity = np.dot(Rt, R)
+        I = np.identity(3, dtype = R.dtype)
+        n = np.linalg.norm(I - shouldBeIdentity)
+        return n < 1e-6
+
+     
+    # Calculates translation matrix to translation vector
+    def translationMatrixToVector(self,R) :
+        assert(self.isTranslationMatrix(R))
+        vector=[]
+        for i in range(R.shape[0]):
+            vector.append(R[i][R.shape[1]-1])
+        return vector
+        
+    # Calculates rotation matrix to euler angles
+    # The result is the same as MATLAB except the order
+    # of the euler angles ( x and z are swapped ).
+    def rotationMatrixToEulerAngles(self,R) :
+    
+        assert(self.isRotationMatrix(R))
+        
+        sy = np.sqrt(R[0,0] * R[0,0] +  R[1,0] * R[1,0])
+        
+        singular = sy < 1e-6
+    
+        if  not singular :
+            x = np.atan2(R[2,1] , R[2,2])
+            y = np.atan2(-R[2,0], sy)
+            z = np.atan2(R[1,0], R[0,0])
+        else :
+            x = np.atan2(-R[1,2], R[1,1])
+            y = np.atan2(-R[2,0], sy)
+            z = 0
+    
+        return np.array([x, y, z])    
+    
+    #radian to    
