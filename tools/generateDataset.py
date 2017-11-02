@@ -411,14 +411,19 @@ class Dataset(object):
         singular = sy < 1e-6
     
         if  not singular :
-            x = np.atan2(R[2,1] , R[2,2])
-            y = np.atan2(-R[2,0], sy)
-            z = np.atan2(R[1,0], R[0,0])
+            x = np.arctan2(R[2,1] , R[2,2])
+            y = np.arctan2(-R[2,0], sy)
+            z = np.arctan2(R[1,0], R[0,0])
         else :
-            x = np.atan2(-R[1,2], R[1,1])
-            y = np.atan2(-R[2,0], sy)
+            x = np.arctan2(-R[1,2], R[1,1])
+            y = np.arctan2(-R[2,0], sy)
             z = 0
     
         return np.array([x, y, z])    
     
-    #radian to    
+    #degree to radian
+    def dToR(self,degree):
+        return np.pi*degree/180.0
+    #radian to degree
+    def rToD(self,radian):
+        return radian*180.0/np.pi
