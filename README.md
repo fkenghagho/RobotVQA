@@ -124,11 +124,12 @@ A brief comparison of our learning approach and other traditional approaches to 
 **Traditional approach:** state of the art as PCL requires a lot of engineering
 - A 3D-Model for each objects, explicit features extraction: almost manually
 - Calibration(camera)
-- Clustering-based scene parsing: imposes some restrictions on the scene conficuration(colorfulness, sparsity, ...)
+- Clustering-based scene parsing: imposes some restrictions on the scene configuration(colorfulness, sparseness, ...)
 
 **Learning approach:**
 - very natural: only based on data
 - No engineering effort: end to end
-- Almost no restriction on the scene configuration(colorfulness, sparsity)
+- Almost no restriction on the scene configuration(colorfulness, sparseness)
 - Huge dataset: no problem, we do it almost automatically
+
 
