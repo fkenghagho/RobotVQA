@@ -134,5 +134,5 @@ A brief comparison of our learning approach to other traditional approaches on p
 
 The following figure illustrates how we compute the objects' poses for annotation/learning:
 
-![Pose estimation](images/poseEstimation.png "Pose estimation")
+![Pose estimation](images/poseEstimation1.png "Pose estimation")
 
