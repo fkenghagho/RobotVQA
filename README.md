@@ -132,4 +132,7 @@ A brief comparison of our learning approach to other traditional approaches on p
 - Almost no restriction on the scene configuration(colorfulness, sparseness)
 - Huge dataset: no problem, we do it almost automatically
 
+The following figure illustrates how we compute the objects' poses for annotation/learning:
+
+![Pose estimation](images/poseEstimation.png "Pose estimation")
 
