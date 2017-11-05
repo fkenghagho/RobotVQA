@@ -136,3 +136,4 @@ The following figure illustrates how we compute the objects' poses for annotatio
 
 ![Pose estimation](images/poseEstimation2.png "Pose estimation")
 
+# 9. Object Shape Estimation
