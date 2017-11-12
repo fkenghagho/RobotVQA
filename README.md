@@ -144,4 +144,4 @@ However, to reach an efficient(speed and accuracy) deep learning, it is recommen
 
 Given an RGB-D image in our context, we design a Sobel/Scharr-like convolution layer at the entry of the network to compute from the Depth(D)-map a normal map, which seems to convey more information about the shape to the Human visual system. The following figure illustrates the idea.
 
-![Shape recognitionimages/shaperecognition.png "Shape recognition")
+![Shape recognition](images/shaperecognition.png "Shape recognition")
