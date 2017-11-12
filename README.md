@@ -150,10 +150,10 @@ Given an RGB-D image in our context, we design a Sobel/Scharr-like convolution l
 
 As cleary stated in the introduction, we aim at developing a cognitive vision module for human-like manipulation activities. Therefore, one of our goal is to design a mechanism being also able to track non-standard visual properties namely the material, the graspability, the stackability and the openability of objects in the scene, which actually play a crucial role for reasoning about how to handle the objects during the manipulation phase.
 
-- Materials:  we further distinguish external material from internal material of an object. For instance a bottle of juice can be externally seen as plastic but internally as liquid. While the external material may inform about the pressure the object should undergo and what can be put inside the object, the internal material may inform about how to carry, empty and fill a particular object(container). As far as the computation of this feature is concerned, the object surface's behavior faced to light is determinant.
+- **Materials:**  we further distinguish external material from internal material of an object. For instance a bottle of juice can be externally seen as plastic but internally as liquid. While the external material may inform about how much pressure the object should undergo and what can be put inside the object, the internal material may inform about how to carry, empty and fill a particular object(container). As far as the computation of this feature is concerned, the object surface's behavior faced to light is determinant.
 
-- Graspability:
+- **Graspability:**
 
-- Stackability:
+- **Stackability:**
 
-- Openability:
+- **Openability:**
