@@ -136,7 +136,7 @@ The following figure illustrates how we compute the objects' poses for annotatio
 
 ![Pose estimation](images/poseEstimation2.png "Pose estimation")
 
-# 9. Object Shape Estimation
+# 9. Object Shape Recognition
 
 As far as 3D-shape recognition in Computer Vision is concerned, our main contribution in this thesis is the setup of a pure learning-based or data-driven 3D-shape recognizer, which was not at least deeply conducted so far. In contrast to most existing methods, which are subjects to multiple restrictions such as object orientations, lighting and colors due to engineered feature extraction such as shape descriptors, our method naturally establishes a context-free correlation between objects and 3D-shapes. 
 
