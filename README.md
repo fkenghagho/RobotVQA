@@ -160,3 +160,10 @@ size or material.
 - **Stackability:**  an object is stackable if and only if another similar object can be placed on top of it. This is very important when tryng to free the place occupied by objects. Determinants for this feature can be the object's shape, flatness or openness.
 
 - **Openability:** this feature informs us about whether or not an object can be openned. This is very important for getting into objects such as a bottle or fridge 
+
+
+# 11. Location and Relationships
+
+Some information, that we would like to get from the scene such as the semantic location(in the pot , on the table...) of objects or the possible  relationships(**cut(Knife,Cake)**) between them can be also computed by our deep convo-neural network, however a very big set of manually annotated images would be required. A manual annotation because those properties in contrast to the ones mentioned earlier cannot be dynamically estimated during the data sampling from the simulated virtual world of the robot.
+In this thesis, we address the problem of location and relationships determination with a markov logic network, which takes as evidences the output of the convo-neural networks and make some inferences to determine where an object is located and how it is related to other objects.
+
