@@ -6,7 +6,7 @@ import StringIO, PIL.Image
 from unrealcv import client
 import json
 import cv2
-
+R=[]
 objectColor=['pink','red','orange','brown','yellow','olive','green','blue','purple','white','gray','black']
 class Dataset(object):
     def __init__(self,folder,nberOfImages,cameraId):
@@ -246,7 +246,8 @@ class Dataset(object):
             xmax=max(lign)
             ymax=max(col)
             
-            img=np.ones([xmax-xmin+1,ymax-ymin+1,3],dtype='uint8')*255
+            img=np.zeros([xmax-xmin+1,ymax-ymin+1,3],dtype='uint8')
+            #img=np.ones([xmax-xmin+1,ymax-ymin+1,3],dtype='uint8')*255
             im=cv2.imread(imageName)
             for e in obj['objectSegmentationPixels']:
                 img[e[0]-xmin][e[1]-ymin][0]=im[e[0]][e[1]][0]
@@ -343,18 +344,20 @@ class Dataset(object):
         return T
         
     # Calculates Rotation Matrix given euler angles.
-    def eulerAnglesToRotationMatrix(self,theta) :
-        
+    #mode='inv' for inverse rotation 
+    def eulerAnglesToRotationMatrix(self,theta,mode='normal') :
+        if mode=='inv':
+            theta=-theta
         R_x = np.array([[1,         0,                  0                   ],
-                        [0,         np.cos(theta[0]), -np.sin(theta[0]) ],
-                        [0,         np.sin(theta[0]), np.cos(theta[0])  ]
+                        [0,         np.cos(-theta[0]), -np.sin(-theta[0]) ],
+                        [0,         np.sin(-theta[0]), np.cos(-theta[0])  ]
                         ])
             
             
                         
-        R_y = np.array([[np.cos(theta[1]),    0,      np.sin(theta[1])  ],
+        R_y = np.array([[np.cos(-theta[1]),    0,      np.sin(-theta[1])  ],
                         [0,                     1,      0                   ],
-                        [-np.sin(theta[1]),   0,      np.cos(theta[1])  ]
+                        [-np.sin(-theta[1]),   0,      np.cos(-theta[1])  ]
                         ])
                     
         R_z = np.array([[np.cos(theta[2]),    -np.sin(theta[2]),    0],
@@ -363,8 +366,11 @@ class Dataset(object):
                         ])
                         
                         
-        R = np.dot(R_z, np.dot( R_y, R_x ))
-    
+        
+        if mode=='inv':
+            R=np.dot(R_x,np.dot(R_y,R_z))
+        else:
+            R=np.dot(R_z,np.dot(R_y,R_x))
         return R
     
     # Checks if a matrix is a valid translation matrix.
@@ -419,11 +425,44 @@ class Dataset(object):
             y = np.arctan2(-R[2,0], sy)
             z = 0
     
-        return np.array([x, y, z])    
+        return np.array([-x, -y, z])    
     
     #degree to radian
     def dToR(self,degree):
         return np.pi*degree/180.0
     #radian to degree
     def rToD(self,radian):
+        
         return radian*180.0/np.pi
+        
+    #normal surface from depth
+    #typ='raw' for matrice images
+    def normalSurface(self, depth,outputfile,typ='file'):
+        global R
+        if typ=='file':
+            depth=cv2.imread(depth)
+        #we assume depth is of type CV_8UC3
+        depthImg=((np.array(depth[:,:,0],dtype='float64')/127.5)-1.0)
+        #sobel x
+        sobelx=cv2.Sobel(depthImg,cv2.CV_64F,1,0,ksize=7)
+        sobely=cv2.Sobel(depthImg,cv2.CV_64F,0,1,ksize=7)
+        normalImg=np.zeros([depthImg.shape[0],depthImg.shape[1],3],dtype='float64')
+        cols=depthImg.shape[1]
+        rows=depthImg.shape[0]
+        for y in range(rows):
+            for x in range(cols):
+                normalImg[y][x][2]=-sobely[y][x]
+                normalImg[y][x][1]=-sobelx[y][x]
+                normalImg[y][x][0]=1
+                normalImg[y][x]=normalImg[y][x]/np.linalg.norm(normalImg[y][x])
+                normalImg[y][x]=(0.5*normalImg[y][x]+0.5)*255.0
+                
+             
+       
+        R=normalImg 
+        normalImg=np.array(normalImg,dtype='uint8')     
+        cv2.imshow('normal',normalImg)
+        k=cv2.waitKey(0) & 0xFF
+        if k==27:
+            cv2.destroyAllWindows()
+        cv2.imwrite(outputfile,np.array(normalImg,dtype='uint8'))
