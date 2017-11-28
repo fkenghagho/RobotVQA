@@ -102,7 +102,7 @@ class Dataset(object):
         except Exception,e:
             print('Error occured when requesting camera properties. '+str(e))
         #objId is the object Id
-        print 'I like you'
+    
         print self.listObjects.keys()
         for objId in self.listObjects.keys():
             #get object tags template
@@ -381,7 +381,7 @@ class Dataset(object):
                   
                     #create annotation
                     #not
-                    if  not self.annotate():
+                    if not self.annotate():
                         raise Exception('Annotation failed!!!')
                     print('Image saved with success.')
                 except Exception,e:
