@@ -6,6 +6,7 @@ import StringIO, PIL.Image
 from unrealcv import client
 import json
 import cv2
+ 
 R=[]
 objectColor=['pink','red','orange','brown','yellow','olive','green','blue','purple','white','gray','black']
 class Dataset(object):
@@ -63,8 +64,7 @@ class Dataset(object):
         for key in self.objectColor.keys():
             if(self.objectColor[key][0]<=val[0]+3 and self.objectColor[key][0]>=val[0]-3 and
                 self.objectColor[key][1]<=val[1]+3 and self.objectColor[key][1]>=val[1]-3 and
-                self.objectColor[key][2]<=val[2]+3 and self.objectColor[key][2]>=val[2]-3 and
-                self.objectColor[key][3]<=val[3]+3 and self.objectColor[key][3]>=val[3]-3 ):
+                self.objectColor[key][2]<=val[2]+3 and self.objectColor[key][2]>=val[2]-3):
                 return key
         return None
     #get objects     
@@ -98,10 +98,12 @@ class Dataset(object):
             camPosition=[float(camPosition[0]),float(camPosition[1]),float(camPosition[2])]
             #get camera orientation teta,beta,phi
             camOrientation=client.request('vget /camera/'+str(self.cameraId)+'/rotation').split(' ')
-            camOrientation=[float(camOrientation[0]),float(camOrientation[1]),float(camOrientation[2])]
+            camOrientation=[float(camOrientation[2]),float(camOrientation[0]),float(camOrientation[1])]
         except Exception,e:
             print('Error occured when requesting camera properties. '+str(e))
         #objId is the object Id
+        print 'I like you'
+        print self.listObjects.keys()
         for objId in self.listObjects.keys():
             #get object tags template
             objTagTemp={"objectShape":"","objectExternalMaterial":"","objectInternalMaterial":"","objectHardness":"",
@@ -138,7 +140,11 @@ class Dataset(object):
                 objPosition=[float(objPosition[0]),float(objPosition[1]),float(objPosition[2])]
                 #get object orientation teta,beta,phi
                 objOrientation=client.request('vget /object/'+objId+'/rotation').split(' ')
-                objOrientation=[float(objOrientation[0]),float(objOrientation[1]),float(objOrientation[2])]
+                objOrientation=[float(objOrientation[2]),float(objOrientation[0]),float(objOrientation[1])]
+                #compute object pose in camera coordinate system
+                [objLocalPosition,objLocalOrientation]=self.getCameraObjectPose(np.array(camPosition),self.dToR(np.array(camOrientation)),np.array(objPosition),self.dToR(np.array(objOrientation)))
+                objLocalPosition=list(objLocalPosition)
+                objLocalOrientation=list(self.rToD(objLocalOrientation))
             except Exception,e:
                 print('Error occured when requesting object properties. '+str(e))
                 
@@ -183,8 +189,10 @@ class Dataset(object):
                 json.dump(jsonImage,outfile,indent=5)
             print('Annotation saved successfully.')
             del jsonArray[:]
+            return True
         except Exception,e:
             print('Annotation failed. '+str(e))
+            return False
     
     def cleanup(self):
         client.disconnect()
@@ -237,6 +245,14 @@ class Dataset(object):
             lign=[]
             col=[]
             obj=e
+            
+            print  jsonImage['cameraGlobalOrientation']
+            print  jsonImage['cameraGlobalPosition']
+            print  obj['objectGlobalOrientation']
+            print  obj['objectGlobalPosition']
+            print  obj['objectLocalOrientation']
+            print  obj['objectLocalPosition']
+            
             for e in obj['objectSegmentationPixels']:
                 lign.append(e[0])
                 col.append(e[1])
@@ -291,47 +307,103 @@ class Dataset(object):
         
     #save nberOfImages images
     def scan(self):
+        imgLit=''
+        imgDepth=''
+        imgNormal=''
+        imgMask=''
         for i in range(self.nberOfImages):
+                imgLit=''
+                imgDepth=''
+                imgNormal=''
+                imgMask=''
                 try:
                     
-                    
-                    img=client.request('vget /camera/'+str(self.cameraId)+'/lit png')
-                    img=self.read_png(img)
-                    img=cv2.cvtColor(img,cv2.COLOR_RGB2BGR)
+                    #set lit mode
+                    client.request('vset /viewmode lit')
+                    #take lit screenshot
+                    imgLit=client.request('vget /camera/'+str(self.cameraId)+'/screenshot')
+                    if imgLit=='':
+                        raise Exception('Screenshot failed!!!')
+                    #read image    
+                    img=cv2.imread(imgLit)
+                    #delete file
+                    os.unlink(imgLit)
+                    #save image
                     if not(cv2.imwrite(os.path.join(self.folder,self.litImage)+str(i)+'.'+self.extension,img)):
-                        print('Failed to save lit image!!!')
+                        raise Exception('Failed to save lit image!!!')
                         
-                       
-                    img=client.request('vget /camera/'+str(self.cameraId)+'/normal png')
-                    img=self.read_png(img)
-                    img=cv2.cvtColor(img,cv2.COLOR_RGB2BGR)
-                    if not(cv2.imwrite(os.path.join(self.folder,self.normalImage)+str(i)+'.'+self.extension,img)):
-                        print('Failed to save normal image!!!')
-                    
-                   
-                    img=client.request('vget /camera/'+str(self.cameraId)+'/depth png')
-                    img=self.read_png(img)
-                    img=cv2.cvtColor(img,cv2.COLOR_RGB2BGR)
+                    #set depth mode
+                    client.request('vset /viewmode depth')
+                    #take depth screenshot
+                    imgDepth=client.request('vget /camera/'+str(self.cameraId)+'/screenshot')
+                    if imgDepth=='':
+                        raise Exception('Screenshot failed!!!')
+                    #read image    
+                    img=cv2.imread(imgDepth)
+                    #delete file
+                    os.unlink(imgDepth)
+                    #save image
                     if not(cv2.imwrite(os.path.join(self.folder,self.depthImage)+str(i)+'.'+self.extension,img)):
-                        print('Failed to save depth image!!!')
-                        
+                        raise Exception('Failed to save depth image!!!')
                    
-                    img=client.request('vget /camera/'+str(self.cameraId)+'/object_mask png')
-                    img=self.read_png(img)
-                    self.getCurrentObjects(img)
-                    #build annotation
-                    self.index=i
-                    self.annotate()
-                    #print(self.listObjects)  
-                    img=cv2.cvtColor(img,cv2.COLOR_RGB2BGR)
+                   
+                    #set normal mode
+                    client.request('vset /viewmode normal')
+                    #take normal screenshot
+                    imgNormal=client.request('vget /camera/'+str(self.cameraId)+'/screenshot')
+                    if imgNormal=='':
+                        raise Exception('Screenshot failed!!!')
+                    #read image    
+                    img=cv2.imread(imgNormal)
+                    #delete file
+                    os.unlink(imgNormal)
+                    #save image
+                    if not(cv2.imwrite(os.path.join(self.folder,self.normalImage)+str(i)+'.'+self.extension,img)):
+                        raise Exception('Failed to save normal image!!!')
+                    
+                    #set mask mode
+                    client.request('vset /viewmode object_mask')
+                    #take mask screenshot
+                    imgMask=client.request('vget /camera/'+str(self.cameraId)+'/screenshot')
+                    if imgMask=='':
+                        raise Exception('Screenshot failed!!!')
+                    #read image    
+                    img=cv2.imread(imgMask)
+                    #delete file
+                    os.unlink(imgMask)
+                    #save image
                     if not(cv2.imwrite(os.path.join(self.folder,self.maskImage)+str(i)+'.'+self.extension,img)):
-                        print('Failed to save maskimage!!!')
+                        raise Exception('Failed to save mask image!!!')
+                        
 
-                 
+                    #get current objects
+                    self.getCurrentObjects(img)
+                  
+                    #create annotation
+                    #not
+                    if  not self.annotate():
+                        raise Exception('Annotation failed!!!')
+                    print('Image saved with success.')
                 except Exception,e:
+                    if  os.path.exists(os.path.join(self.folder,self.litImage)+str(i)+'.'+self.extension):
+                        os.unlink(os.path.join(self.folder,self.litImage)+str(i)+'.'+self.extension)
+                       
+                        
+                    if os.path.exists(os.path.join(self.folder,self.maskImage)+str(i)+'.'+self.extension):
+                        os.unlink(os.path.join(self.folder,self.maskImage)+str(i)+'.'+self.extension)
+                        
+                        
+                    if os.path.exists(os.path.join(self.folder,self.depthImage)+str(i)+'.'+self.extension):
+                        os.unlink(os.path.join(self.folder,self.depthImage)+str(i)+'.'+self.extension)
+                        
+                        
+                    if os.path.exists(os.path.join(self.folder,self.normalImage)+str(i)+'.'+self.extension):
+                        os.unlink(os.path.join(self.folder,self.normalImage)+str(i)+'.'+self.extension)
+                    
                     print('Image could not be saved not saved: error occured .'+str(e))
+                  
             
-        print('Scan terminated with success.')
+       
 
     # Calculates translation Matrix given translation vector.
     def vectorToTranslationMatrix(self,vector) :
@@ -348,21 +420,21 @@ class Dataset(object):
     def eulerAnglesToRotationMatrix(self,theta,mode='normal') :
         if mode=='inv':
             theta=-theta
-        R_x = np.array([[1,         0,                  0                   ],
-                        [0,         np.cos(-theta[0]), -np.sin(-theta[0]) ],
-                        [0,         np.sin(-theta[0]), np.cos(-theta[0])  ]
+        R_x = np.array([[(1.),         (0.0),                  (0.0)                   ],
+                        [(0.0),        ( np.cos(-theta[0])), (-np.sin(-theta[0])) ],
+                        [(0.0),         (np.sin(-theta[0])), (np.cos(-theta[0]))  ]
                         ])
             
             
                         
-        R_y = np.array([[np.cos(-theta[1]),    0,      np.sin(-theta[1])  ],
-                        [0,                     1,      0                   ],
-                        [-np.sin(-theta[1]),   0,      np.cos(-theta[1])  ]
+        R_y = np.array([[(np.cos(-theta[1])),    (0.0),     ( np.sin(-theta[1]))  ],
+                        [(0.0),                     (1.0),      (0.0)                   ],
+                        [(-np.sin(-theta[1])),   (0.0),     (np.cos(-theta[1]))  ]
                         ])
                     
-        R_z = np.array([[np.cos(theta[2]),    -np.sin(theta[2]),    0],
-                        [np.sin(theta[2]),    np.cos(theta[2]),     0],
-                        [0,                     0,                      1]
+        R_z = np.array([[np.cos(theta[2]),    (-np.sin(theta[2])),    (0.0)],
+                        [(np.sin(theta[2])),   ( np.cos(theta[2])),     (0.0)],
+                        [(0.0),                     (0.0),   (1.0)]
                         ])
                         
                         
@@ -466,3 +538,26 @@ class Dataset(object):
         if k==27:
             cv2.destroyAllWindows()
         cv2.imwrite(outputfile,np.array(normalImg,dtype='uint8'))
+        
+    #return object pose in camera coordinate system   
+    def getCameraObjectPose(self, camPos, camOri,objPos,objOri):
+        Rin1=self.eulerAnglesToRotationMatrix(camOri,mode='inv')
+        R2=self.eulerAnglesToRotationMatrix(objOri,mode='normal')
+        T2=objPos
+        Ti1=-camPos
+        newPos=np.dot(Rin1,T2+Ti1)
+        newOri=self.rotationMatrixToEulerAngles(np.dot(Rin1,R2))
+        return [newPos[0:3],newOri[0:3]]
+    
+    def depthConversion(self,PointDepth, f):
+        H = PointDepth.shape[0]
+        W = PointDepth.shape[1]
+        i_c = np.float(H) / 2 - 1
+        j_c = np.float(W) / 2 - 1
+        columns, rows = np.meshgrid(np.linspace(0, W-1, num=W), np.linspace(0, H-1, num=H))
+        DistanceFromCenter = ((rows - i_c)**2 + (columns - j_c)**2)**(0.5)
+        PlaneDepth = PointDepth / (1 + (DistanceFromCenter / f)**2)**(0.5)
+        return PlaneDepth
+    
+    def BigNum(self,x):
+        return (x)
