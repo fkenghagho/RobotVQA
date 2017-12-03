@@ -6,6 +6,8 @@ import StringIO, PIL.Image
 from unrealcv import client
 import json
 import cv2
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
  
 R=[]
 objectColor=['pink','red','orange','brown','yellow','olive','green','blue','purple','white','gray','black']
@@ -20,6 +22,7 @@ class Dataset(object):
         self.annotExtension='json'
         self.index=0
         self.extension='jpg'
+        self.depthExtension='exr'
         self.nberOfImages=nberOfImages
         self.cameraId=cameraId
         self.objectColor={}
@@ -54,10 +57,16 @@ class Dataset(object):
         except Exception,e:
             print('Error: Problem with unrealcv .'+str(e))
         
-    #convert from raw to RGB image matrice
+    #convert from raw to RGB image matrix
     def read_png(self,res):
         img = PIL.Image.open(StringIO.StringIO(res))
         return np.asarray(img)
+        
+    #convert from raw to  float depth image matrix
+    def read_npy(self,res):
+        import StringIO
+        return np.load(StringIO.StringIO(res))
+        
     #get key from dictionnary given value
     def getKey(self,val):
         res=None
@@ -66,6 +75,7 @@ class Dataset(object):
                 self.objectColor[key][1]<=val[1]+3 and self.objectColor[key][1]>=val[1]-3 and
                 self.objectColor[key][2]<=val[2]+3 and self.objectColor[key][2]>=val[2]-3):
                 return key
+        print ('key failed',val)
         return None
     #get objects     
     def getCurrentObjects(self,img):
@@ -102,7 +112,6 @@ class Dataset(object):
         except Exception,e:
             print('Error occured when requesting camera properties. '+str(e))
         #objId is the object Id
-    
         print self.listObjects.keys()
         for objId in self.listObjects.keys():
             #get object tags template
@@ -262,8 +271,8 @@ class Dataset(object):
             xmax=max(lign)
             ymax=max(col)
             
-            img=np.zeros([xmax-xmin+1,ymax-ymin+1,3],dtype='uint8')
-            #img=np.ones([xmax-xmin+1,ymax-ymin+1,3],dtype='uint8')*255
+            #img=np.zeros([xmax-xmin+1,ymax-ymin+1,3],dtype='uint8')
+            img=np.ones([xmax-xmin+1,ymax-ymin+1,3],dtype='uint8')*255
             im=cv2.imread(imageName)
             for e in obj['objectSegmentationPixels']:
                 img[e[0]-xmin][e[1]-ymin][0]=im[e[0]][e[1]][0]
@@ -307,77 +316,69 @@ class Dataset(object):
         
     #save nberOfImages images
     def scan(self):
-        imgLit=''
-        imgDepth=''
-        imgNormal=''
-        imgMask=''
+        
         for i in range(self.nberOfImages):
-                imgLit=''
-                imgDepth=''
-                imgNormal=''
-                imgMask=''
                 try:
-                    
-                    #set lit mode
+                
+                    #take lit image
                     client.request('vset /viewmode lit')
-                    #take lit screenshot
-                    imgLit=client.request('vget /camera/'+str(self.cameraId)+'/screenshot')
-                    if imgLit=='':
-                        raise Exception('Screenshot failed!!!')
-                    #read image    
-                    img=cv2.imread(imgLit)
-                    #delete file
-                    os.unlink(imgLit)
+                    img=client.request('vget /camera/'+str(self.cameraId)+'/lit png')
+                    #convert image properly . remove unused A channel  
+                    img=cv2.cvtColor(self.read_png(img),cv2.COLOR_RGBA2BGR)
                     #save image
                     if not(cv2.imwrite(os.path.join(self.folder,self.litImage)+str(i)+'.'+self.extension,img)):
                         raise Exception('Failed to save lit image!!!')
-                        
-                    #set depth mode
-                    client.request('vset /viewmode depth')
-                    #take depth screenshot
-                    imgDepth=client.request('vget /camera/'+str(self.cameraId)+'/screenshot')
-                    if imgDepth=='':
-                        raise Exception('Screenshot failed!!!')
-                    #read image    
-                    img=cv2.imread(imgDepth)
-                    #delete file
-                    os.unlink(imgDepth)
+                    
+                    #take depth Float32
+                    img=client.request('vget /camera/'+str(self.cameraId)+'/depth npy')
+                    #convert image properly .  
+                    img=self.read_npy(img)
                     #save image
-                    if not(cv2.imwrite(os.path.join(self.folder,self.depthImage)+str(i)+'.'+self.extension,img)):
+                    if not(cv2.imwrite(os.path.join(self.folder,self.depthImage)+str(i)+'.'+self.depthExtension,img)):
+                        raise Exception('Failed to save depth float32!!!')    
+                    
+                    #take depth image    
+                    img=255.*(1.-pow(np.exp(-img),0.2))
+                    imgc=np.zeros([img.shape[0],img.shape[1],3])
+                    imgc[:,:,0]=img
+                    imgc[:,:,1]=img
+                    imgc[:,:,2]=img
+                    imgc=np.array(imgc,dtype='uint8')
+                    #take depth image
+                    #client.request('vset /viewmode depth') 
+                    #img=client.request('vget /camera/'+str(self.cameraId)+'/depth png')
+                    #img=self.read_png(img)
+                    #convert image properly . remove unused A channel  
+                    #print img
+                    #img=cv2.cvtColor(img,cv2.COLOR_RGBA2BGR)
+                    #save image
+                    if not(cv2.imwrite(os.path.join(self.folder,self.depthImage)+str(i)+'.'+self.extension,imgc)):
                         raise Exception('Failed to save depth image!!!')
+                    
                    
-                   
-                    #set normal mode
+                    #take normal image 
                     client.request('vset /viewmode normal')
-                    #take normal screenshot
-                    imgNormal=client.request('vget /camera/'+str(self.cameraId)+'/screenshot')
-                    if imgNormal=='':
-                        raise Exception('Screenshot failed!!!')
-                    #read image    
-                    img=cv2.imread(imgNormal)
-                    #delete file
-                    os.unlink(imgNormal)
+                    img=client.request('vget /camera/'+str(self.cameraId)+'/normal png')
+                    #convert image properly . remove unused A channel  
+                    img=cv2.cvtColor(self.read_png(img),cv2.COLOR_RGBA2BGR)
                     #save image
                     if not(cv2.imwrite(os.path.join(self.folder,self.normalImage)+str(i)+'.'+self.extension,img)):
                         raise Exception('Failed to save normal image!!!')
-                    
-                    #set mask mode
+                        
+                        
+                    #take mask image 
                     client.request('vset /viewmode object_mask')
-                    #take mask screenshot
-                    imgMask=client.request('vget /camera/'+str(self.cameraId)+'/screenshot')
-                    if imgMask=='':
-                        raise Exception('Screenshot failed!!!')
-                    #read image    
-                    img=cv2.imread(imgMask)
-                    #delete file
-                    os.unlink(imgMask)
+                    img=client.request('vget /camera/'+str(self.cameraId)+'/object_mask png')
+                    img=self.read_png(img)
+                    imgc=img.copy()
+                    #convert image properly . remove unused A channel  
+                    img=cv2.cvtColor(img,cv2.COLOR_RGBA2BGR)
                     #save image
                     if not(cv2.imwrite(os.path.join(self.folder,self.maskImage)+str(i)+'.'+self.extension,img)):
-                        raise Exception('Failed to save mask image!!!')
-                        
-
+                        raise Exception('Failed to save mask image!!!') 
+                    
                     #get current objects
-                    self.getCurrentObjects(img)
+                    self.getCurrentObjects(imgc)
                   
                     #create annotation
                     #not
@@ -395,7 +396,10 @@ class Dataset(object):
                         
                     if os.path.exists(os.path.join(self.folder,self.depthImage)+str(i)+'.'+self.extension):
                         os.unlink(os.path.join(self.folder,self.depthImage)+str(i)+'.'+self.extension)
-                        
+                    
+                    if os.path.exists(os.path.join(self.folder,self.depthImage)+str(i)+'.'+self.depthExtension):
+                        os.unlink(os.path.join(self.folder,self.depthImage)+str(i)+'.'+self.depthExtension)
+                    
                         
                     if os.path.exists(os.path.join(self.folder,self.normalImage)+str(i)+'.'+self.extension):
                         os.unlink(os.path.join(self.folder,self.normalImage)+str(i)+'.'+self.extension)
@@ -516,8 +520,8 @@ class Dataset(object):
         #we assume depth is of type CV_8UC3
         depthImg=((np.array(depth[:,:,0],dtype='float64')/127.5)-1.0)
         #sobel x
-        sobelx=cv2.Sobel(depthImg,cv2.CV_64F,1,0,ksize=7)
-        sobely=cv2.Sobel(depthImg,cv2.CV_64F,0,1,ksize=7)
+        sobelx=cv2.Sobel(depthImg,cv2.CV_64F,1,0,ksize=5)
+        sobely=cv2.Sobel(depthImg,cv2.CV_64F,0,1,ksize=5)
         normalImg=np.zeros([depthImg.shape[0],depthImg.shape[1],3],dtype='float64')
         cols=depthImg.shape[1]
         rows=depthImg.shape[0]

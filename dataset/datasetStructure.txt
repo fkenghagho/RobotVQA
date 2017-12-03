@@ -1,11 +1,12 @@
 In this file we present the structure of our dataset
 
-Each Image has 3# copies namely:
+Each Image has 5# copies namely:
 
 -A RGB Image: colorImageName.jpg
 -A Depth Image: depthImageName.jpg
 -A Segmentation Image: segmentationImageName.jpg
 -A normal Image: normalImageName.jpg
+-A EXR Depth Image: depthImageName.exr
 
 Each Image has a Json-file holding its annotation with the format:
 
@@ -51,7 +52,30 @@ Each Image has a Json-file holding its annotation with the format:
 }
 
 
-Some definitions
+Some complementary informations:
+
+COORDINATE SYSTEM
+
+Orientations(angles) in degrees. 
+Z axis is upward and positive rotation around it is clockwise,
+X axis is frontward(toward the observer) and positive rotation around it is counterclockwise,
+Y axis is leftward and positive rotation around it is  counterclockwise.
+Positions(X,Y,Z) are in cm
+
+
+CAMERA INFO:
+WidthxHeight: 640*480px ->102.5cm x 76.875cm
+Horizontal Field of View: 35 degree
+Aspect Ratio: 4/3
+Intrinsic Projection Matrix in cm: 
+[
+	[162.55   0     51.25],
+	[0     162.5  38.4375],
+	[0       0          1],
+
+]
+
+CUSTOM PROPERTIES:
 
 objectColor: {pink, red, orange, brown, yellow, olive, yellow green, green, blue, purple, white, gray, black}
 objectShape: cubic, pyramidal,conic, spherical, cylindrical, filiform, flat
