@@ -553,15 +553,19 @@ class Dataset(object):
         newOri=self.rotationMatrixToEulerAngles(np.dot(Rin1,R2))
         return [newPos[0:3],newOri[0:3]]
     
-    def depthConversion(self,PointDepth, f):
+    def depthConversion(self,PointDepth,f,pixelsToCm):
         H = PointDepth.shape[0]
         W = PointDepth.shape[1]
-        i_c = np.float(H) / 2 - 1
-        j_c = np.float(W) / 2 - 1
+        i_c = pixelsToCm*(np.float(H) / 2 - 1)
+        j_c = pixelsToCm*(np.float(W) / 2 - 1)
         columns, rows = np.meshgrid(np.linspace(0, W-1, num=W), np.linspace(0, H-1, num=H))
+        columns=pixelsToCm*columns
+        rows=pixelsToCm*rows
         DistanceFromCenter = ((rows - i_c)**2 + (columns - j_c)**2)**(0.5)
-        PlaneDepth = PointDepth / (1 + (DistanceFromCenter / f)**2)**(0.5)
-        return PlaneDepth
+        DistanceCameraImage=(DistanceFromCenter**2 + f**2)**0.5
+        DistanceObjectImage=(PointDepth+DistanceCameraImage)
+        PlaneDepth = DistanceObjectImage / (1 + (DistanceFromCenter / f)**2)**(0.5)
+        return PlaneDepth-f
     
     def BigNum(self,x):
         return (x)
