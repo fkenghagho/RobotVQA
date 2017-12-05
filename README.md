@@ -137,7 +137,9 @@ The following figure illustrates how we compute the objects' poses for annotatio
 ![Pose estimation](images/poseEstimation3.png "Pose estimation")
 
 Given that the dataset sampling camera's intrinsic matrix might be different from the ones of the robot camera, we evaluate the
-intrisic matrices *R1,R2* respectively of the sampling camera and the robot camera once and properly map the outputted position *(X,Y,Z)* by the network as *inverse(R2)xR1x(X,Y,Z)*.
+intrisic matrices *R1,R2* respectively of the sampling camera and the robot camera once and properly map the outputted position *(X,Y,Z)* by the network as *inverse(R2)xR1x(X,Y,Z)*. The following figures depicts a demonstration of the camera projection.
+
+![Camera Projection](images/TestCamProj.png "Camera Projection")
 
 
 # 9. Object Shape Recognition
