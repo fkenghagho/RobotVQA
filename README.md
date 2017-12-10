@@ -102,7 +102,7 @@
 
 # 7. Object Color Estimation: Learning vs Engineering
 
-   In this thesis, we identify 12 classes of colors which are the basic/standard colors set up by the **ISCC–NBS System**. These colors are **red**, **blue**, **green**, **yellow** ...
+   In this thesis, we semantically select as many color classes as needed, which are the basic/standard colors set up by the **ISCC–NBS System**, to colourfully label the robot environment. These colors are **red**, **blue**, **green**, **yellow** ...
    
 **Engineering approach:** we assume that the pixels's colors are normally distributed as it usually seems to be the case for natural images(Gaussian mixtures). We find the most frequent pixel color(RGB) and compute the nearest color class to the most frequent pixel color. The color class is then considered as the color of the object. By modeling colors as 3D-vectors/points in the **Lab-Color space**, we define a consistent distance between two colors, which captures human visual ability for color similarity and dissimilarity. 
 - Quantitatively more precise than human vision, however fails to capture quality: **too few qualitative classes(only 12) and very low features(Gaussian mean of pixel values)**
@@ -137,7 +137,9 @@ The following figure illustrates how we compute the objects' poses for annotatio
 ![Pose estimation](images/poseEstimation3.png "Pose estimation")
 
 Given that the dataset sampling camera's intrinsic matrix might be different from the ones of the robot camera, we evaluate the
-intrisic matrices *R1,R2* respectively of the sampling camera and the robot camera once and properly map the outputted position *(X,Y,Z)* by the network as *inverse(R2)xR1x(X,Y,Z)*.
+intrisic matrices *R1,R2* respectively of the sampling camera and the robot camera once and properly map the outputted position *(X,Y,Z)* by the network as *inverse(R2)xR1x(X,Y,Z)*. The following figures depicts a demonstration of the camera projection.
+
+![Camera Projection](images/TestCamProj.png "Camera Projection")
 
 
 # 9. Object Shape Recognition
