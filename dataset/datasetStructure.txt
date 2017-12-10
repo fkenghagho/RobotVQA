@@ -64,20 +64,32 @@ Positions(X,Y,Z) are in cm
 
 
 CAMERA INFO:
-WidthxHeight: 640*480px ->102.5cm x 76.875cm
-Horizontal Field of View: 35 degree
+
+Quarre pixels
+WidthxHeight: 640*480px ->99.52cm x 74.64cm
+Horizontal Field of View: 70 degree
 Aspect Ratio: 4/3
 Intrinsic Projection Matrix in cm: 
 [
-	[162.55   0     51.25],
-	[0     162.5  38.4375],
+	[71.06   0      49.76],
+	[0     71.06    37.32],
 	[0       0          1],
 
 ]
 
+Intrinsic Projection Matrix in px: 
+[
+	[457   0     320],
+	[0     457   240],
+	[0       0     1],
+
+]
+
+1 Pixel= 0.1555cm
+
 CUSTOM PROPERTIES:
 
-objectColor: {pink, red, orange, brown, yellow, olive, yellow green, green, blue, purple, white, gray, black}
+objectColor: {red, orange, brown, yellow, green, blue, white, gray, black, transparent}
 objectShape: cubic, pyramidal,conic, spherical, cylindrical, filiform, flat
 objectExternMaterial:  plastic, wood, glass, steel, cartoon, ceramic  
 objectInternMaterial:  liquid, gaz, solid,  powder

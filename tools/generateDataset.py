@@ -27,6 +27,8 @@ class Dataset(object):
         self.cameraId=cameraId
         self.objectColor={}
         self.listObjects={}
+        self.objectIndex={}
+        self.objectColorMatch=np.ones([256,256,256],dtype='int')*(-1)
         #make dataset directory
         try:
             if not os.path.exists(self.folder):
@@ -48,12 +50,23 @@ class Dataset(object):
             #map object to color
             for i in range(len(objects)):
                 #convert '(R=127,G=191,B=127,A=255)' to [127, 191, 127, 255]
+                self.objectIndex[i]=objects[i]
                 e=client.request('vget /object/'+objects[i]+'/color')
                 t=e.split('(')[1].split(')')[0].split(',')
                 t=[int(t[0].split('=')[1]),int(t[1].split('=')[1]),int(t[2].split('=')[1]),int(t[3].split('=')[1])]
                 #t=np.array(t,dtype='uint8')
                 self.objectColor[objects[i]]=t
+                [j,k,l,s]=t
+                self.objectColorMatch[l][k][j]=i
+                for u in range(j-3,j+4):
+                        for v in range(k-3,k+4):
+                            for w in range(l-3,l+4):
+                                if u>=0 and v>=0 and w>=0 and u<=255 and v<=255 and w<=255:
+                                    if self.objectColorMatch[u][v][w]<0:
+                                       self.objectColorMatch[u][v][w]=i 
             print(self.objectColor)
+            print(self.objectColorMatch)
+                        
         except Exception,e:
             print('Error: Problem with unrealcv .'+str(e))
         
@@ -85,7 +98,8 @@ class Dataset(object):
         m=sh[1]
         for i in range(n):
             for j in range(m):
-                key=self.getKey(list(img[i][j]))
+                color=list(img[i][j])
+                key=self.objectIndex[self.objectColorMatch[color[0]][color[1]][color[2]]]
                 if key in self.listObjects.keys():
                     self.listObjects[key].append([i,j])
                 else:
@@ -116,9 +130,8 @@ class Dataset(object):
         for objId in self.listObjects.keys():
             #get object tags template
             objTagTemp={"objectShape":"","objectExternalMaterial":"","objectInternalMaterial":"","objectHardness":"",
-                        "objectPickability":"","objectGraspability":"","objectStackability":"","objectOpenability":""}
-            #get object color
-            objColor=""
+                        "objectPickability":"","objectGraspability":"","objectStackability":"","objectOpenability":"","objectColor":"","objectName":""}
+           
             #get object Location
             objLocation=""
             #get object segmentation color
@@ -160,9 +173,9 @@ class Dataset(object):
              
             jsonArray.append(
                               '{"objectId":"'+objId+'",'+
-                                '"objectName":"'+self.getName(objId)+'",'+
-                                '"objectShape":"'+objTagTemp["objectShape"]+'",'+
-                                '"objectColor":"'+objColor+'",'+
+                                '"objectName":"'+str(objTagTemp["objectName"])+'",'+
+                                '"objectShape":"'+str(objTagTemp["objectShape"])+'",'+
+                                '"objectColor":"'+str(objTagTemp["objectColor"])+'",'+
                                 '"objectExternMaterial":"'+str(objTagTemp["objectExternalMaterial"])+'",'+
                                 '"objectInternMaterial":"'+str(objTagTemp["objectInternalMaterial"])+'",'+
                                 '"objectHardness":"'+str(objTagTemp["objectHardness"])+'",'+
@@ -316,8 +329,7 @@ class Dataset(object):
         
     #save nberOfImages images
     def scan(self):
-        
-        for i in range(self.nberOfImages):
+        for i in range(self.index,self.nberOfImages):
                 try:
                 
                     #take lit image
