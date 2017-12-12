@@ -10,13 +10,16 @@
 - **Objects description:** we design and train a deep convo-neural network to provide an end-to-end dense description of objects in the scene. Since context-independent annotation of objects in the scene can be done almost automatically, we can easily generate a big dataset and take advantage of deep learning.
 - **Relationships description:** we design and train a relational network to provide a relevant and consistent description of relationships among objects in the scene. Relationships among scene objects essentially encode scale-invariant spatial positioning (in-the, on-the, left-of, front-of, behind-of, ...) as well as composition (has-a). This description can be regarded as a soft and more semantic variant of the hard pose estimation performed by the objects descriptor mentioned above. The separation of this module from the object description module enables modularity (changes in the one module does not affect the other module).
 
+As output, the system returns a scene graph. A scene graph is a directed graph, whose nodes and edges respectively encode objects and relationships among objects in the scene.  
+
+
 
 # 2. Typical Scene 
 
   
-   The following figure briefly illustrates the concept:
+   The following figure briefly illustrates the concept of scene graph:
 
-![Objects and Relationships description](images/illustration.png "Objects and Relationships description")
+![Objects and Relationships description](images/Scenegraph.png "Objects and Relationships description")
 
 
 # 3. Deep Convo-Neural Network
