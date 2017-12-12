@@ -8,7 +8,7 @@
    
    In this thesis, we formulate the underlying perception problem of scene understanding as two subproblems:
 - **Objects description:** we design and train a deep convo-neural network to provide an end-to-end dense description of objects in the scene. Since context-independent annotation of objects in the scene can be done almost automatically, we can easily generate a big dataset and take advantage of deep learning.
-- **Relationships description:** we design and train a relational network to provide a relevant and consistent description of relationships among objects in the scene. Relationships among scene objects essentially encode scale-invariant spatial positioning(in-the,on-the,left-of, front-of, behind-of, ...) as well as composition(has-a).This description can be regarded as a soft and more semantic variant of the hard pose estimation performed by the objects descriptor mentioned above. The separation of this module from the object description module enables modularity(changes in the one module does not affect the other module).
+- **Relationships description:** we design and train a relational network to provide a relevant and consistent description of relationships among objects in the scene. Relationships among scene objects essentially encode scale-invariant spatial positioning (in-the,on-the,left-of, front-of, behind-of, ...) as well as composition (has-a). This description can be regarded as a soft and more semantic variant of the hard pose estimation performed by the objects descriptor mentioned above. The separation of this module from the object description module enables modularity (changes in the one module does not affect the other module).
 
 
 # 2. Typical Scene 
