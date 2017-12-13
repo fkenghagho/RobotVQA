@@ -19,7 +19,7 @@ As output, the system returns a scene graph. A scene graph is a directed graph, 
   
    The following figure briefly illustrates the concept of scene graph:
 
-![Objects and Relationships description](images/scenegraph.png "Objects and Relationships description")
+![Objects and Relationships description](images/scenegraphFinal.png "Objects and Relationships description")
 
 
 # 3. Deep Convo-Neural Network
