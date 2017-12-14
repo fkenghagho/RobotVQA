@@ -36,9 +36,8 @@ As output, the system returns a scene graph. A scene graph is a directed graph, 
 
    We make use of the following Frameworks:
 
-- **Unreal Engine and UnrealCV:** to partially build the visual datasets for the object description module
-- **LabelMe:** to build the dataset for the relational network. 
-- **TensorFlow and Caffe:** to build the deep convo-neural and relational networks, train them and make inferences
+- **PythonLibs, Unreal Engine and UnrealCV:** to build the dataset 
+- **PythonLibs, TensorFlow and Caffe:** to build the deep convo-neural and relational networks, train them and make inferences
 
 
 
