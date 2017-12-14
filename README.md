@@ -8,10 +8,10 @@
    
    In this thesis, we formulate the underlying perception problem of scene understanding as two subproblems:
 - **Objects description:** we design and train a deep convo-neural network to provide an end-to-end dense description of objects in the scene. Since context-independent annotation of objects in the scene can be done almost automatically, we can easily generate a big dataset and take advantage of deep learning.
-- **Relationships description:** we design and train a markov logic network to provide a relevant and consistent description of relationships among objects in the scene. Markov logic networks are suitable for reasoning about relationships among objects, very flexible(few rules for so many behaviors) and the separation of this module from the object description module enables modularity(changes in the one module does not affect the other module).
+- **Relationships description:** we design and train a relational network for computing relationships among objects in the scene. Relationships essentially encode scale-invariant relative positioning (on-the, in-the, left-of, under-the, ...) as well as composition (has-a). The network takes as inputs the input image code, the codes of two objects in the image and then outputs the most likely relationships between both objects. Note that this can be regarded as a soft or more semantic variant of the hard object pose estimation performed by the object descriptor mentioned above. The separation of this module from the object description module enables modularity(changes in the one module does not affect the other module).
 
-
-As output, the system returns a scene graph. A scene graph is a directed graph, whose nodes and edges respectively encode objects and relationships among objects in the scene.  
+As far as the system training and inference are concerned, both networks are separately however dependendly trained and inferences take place in pipeline. That is, the outputs of the object descriptor are partially duplicated and redirected to the inputs of the relational network.
+As output, the system returns a scene graph. A scene graph is a directed graph, whose nodes and edges respectively encode objects description and relationships among objects in the scene.  
 
 
 
@@ -23,7 +23,7 @@ As output, the system returns a scene graph. A scene graph is a directed graph, 
 ![Objects and Relationships description](images/scenegraphFinal.png "Objects and Relationships description")
 
 
-# 3. Deep Convo-Neural Network
+# 3. Deep Convo-Neural and relational Networks
 
 
    Our model works as follows:
@@ -32,69 +32,19 @@ As output, the system returns a scene graph. A scene graph is a directed graph, 
 
 
 
-# 4. Markov Logic Network 
-
-
-   An illustrative markov logic network for consistent description of objects as ell as relationships among them follows:
-
-**Types declaration**
-
-*object={BOWL_1,SPOON_2,MUG_3,...}*
-
-*name={SPATULA, BOWL, SPOON, KNIFE, MUG,...}*
-
-*pickability={TRUE, FALSE}*
-
-*inMaterial={SOLID, LIQUID, GAZ, POWDER}*
-
-*outMaterial={CERAMIC, WOOD, GLASS, STEEL, PLASTIC, CARTOON}*
-
-*shape={CUBIC, CYLINDRICAL, CONICAL, FLAT, FILIFORM, SPHERICAL, PYRAMIDAL}*
-
-**Predicates declaration**
-
-*objectName(object,name)*
-
-*objectShape(object,shape)*
-
-*objectPickability(object, pickability)*
-
-*objectOutMaterial(object, outMaterial)*
-
-*objectInMaterial(object, inMaterial)*
-
-*object(object)*
-
-*container(object)*
-
-*throw(object,object)
-
-**Rules declaration**
-
-*Vx(objectName(x, SPATULA) => (objectOutMaterial(x, WOOD) v objectOutMaterial(x, STEEL) v objectOutMaterial(x, PLASTIC))* , **weight=?**
-
-*Vx(objectName(x, SPATULA) => objectInMaterial(x, SOLID))* , **weight=?**
-
-*Vx,y,m,n(objectName(x, m) ^ objectName(x, n) ^ (n=m) => (x=y))* , **weight=+infinity (hard constraint)**
-
-*Vx((objectName(x, MUG) v objectName(x, BOWL) v objectName(x, GLASS)) => container(x))* , **weight=?**
-
-*Vx,y(container(x) ^ objectInMaterial(y, LIQUID) ^ (x=/=y) => throw(y,x))* ,  **weight=?**
-
-
-
 # 5. Frameworks
 
    We make use of the following Frameworks:
 
-- **Unreal Engine and UnrealCV:** to partially build the visual datasets
-- **TensorFlow and Caffe:** to build the deep convo-neural network, train it and make inferences
-- **Pracmln and Alchemy:** to build the markov logic network, train it and make inferences 
+- **Unreal Engine and UnrealCV:** to partially build the visual datasets for the object description module
+- **LabelMe:** to build the dataset for the relational network. 
+- **TensorFlow and Caffe:** to build the deep convo-neural and relational networks, train them and make inferences
+
 
 
 # 6. Dataset 
 
-   The structure of the visual dataset can be found at [dataset's structure](https://github.com/fkenghagho/RobotVQA/blob/master/dataset/datasetStructure.txt). This file deeply specifies the structure of objects in the scene and the image and information types needed to learn the structure of objects. Then, we modeled the environment of the target robot in Unreal Engine4.16 and wrote a software for an end-to-end construction of the dataset starting from the automatic camera navigation in the virtual environment till the saving of scene images and annotations. The software can be found at [dataset generator](https://github.com/fkenghagho/RobotVQA/blob/master/tools/generateDataset.py). An example of annotation can be downloaded from [example of annotation](https://github.com/fkenghagho/RobotVQA/blob/master/dataset/datasetExample.zip)(**zip file**).
+   The structure of the visual dataset can be found at [dataset's structure](https://github.com/fkenghagho/RobotVQA/blob/master/dataset/datasetStructure.txt). This file deeply specifies the structure of objects in the scene and the image and information types needed to learn the structure of objects. For building a huge dataset, we model the environment of the target robot in Unreal Engine4.16, which is a photorealistic game engine allowing therefore efficient transfer learning. Then,  we write a software for an end-to-end construction of the dataset starting from the automatic camera navigation in the virtual environment till the saving of scene images and annotations. To enable a training of the relational network, we augment the annotation of the collected images by loosely specifying relationships among objects. Our annotation software can be found at [dataset generator](https://github.com/fkenghagho/RobotVQA/blob/master/tools/generateDataset.py). An example of annotation can be downloaded from [example of annotation](https://github.com/fkenghagho/RobotVQA/blob/master/dataset/datasetExample.zip)(**zip file**).
    
    The following images depict a typical scene:
    
@@ -169,10 +119,13 @@ size or material.
 
 - **Stackability:**  an object is stackable if and only if another similar object can be placed on top of it. This is very important when tryng to free the place occupied by objects. Determinants for this feature can be the object's shape, flatness or openness.
 
-- **Openability:** this feature informs us about whether or not an object can be openned. This is very important for getting into objects such as a bottle or fridge 
+- **Openability:** this feature informs us about whether or not an object can be opened. This is very important for getting into objects such as a bottle or fridge 
+
+# 11. Objects Categories
+
+In our virtual environment, we try to categorize objects as abstractly as possible to capture generality. That is, instead of categorizing an object as **FridgeDrawer**, it would be much better to  simply categorize it as **Drawer**, because there are only few instances of the category **FridgeDrawer** in the environment but so many instances of particular drawers. As far as the complementarity of **Fridge** is concerned, this is ensured by the relationship **has(Fridge, Drawer)**. This is also frequently observed with packaged food items: since the overall visual configuration of packages of a category(Coffee) can drastically vary, what would be the most common sufficient features to most packages? Observations show that the most common sufficient features to most packages are neither the package's shape, nor its color, nor the words written on it but rather the image depicting the content of the package. This discovery merely reinforces the idea, that objects should be carefully categorized to enable an efficient machine learning.
 
 
-# 11. Location and Relationships
+# 12. Relationships among Objects
 
-Some information, that we would like to get from the scene such as the semantic location *(in the pot , on the table, ...)* of objects or the possible  relationships *(cut(Knife,Cake), ...)* between them can be also computed by our deep convo-neural network, however a very big set of manually annotated images would be required. A manual annotation because those properties in contrast to the ones mentioned earlier cannot be dynamically estimated during the sampling of data from the simulated virtual world of the robot. In this thesis, we address the problem of location and relationships determination with a markov logic network, which takes as evidences the output of the convo-neural network and infers from it where an object may be located and how it may be related to other objects in the scene.
-
+Some information, that we would like to get from the scene such as the semantic location *(in the pot , on the table, ...)* of objects or the possible compositional  relationships *( has(Fridge,Door), has(Door, Handle) ...)* between them could also be computed by our deep convo-neural network, however a very big set of manually annotated images would be required. A manual annotation because those properties in contrast to the ones mentioned earlier cannot be dynamically estimated during the sampling of data from the simulated virtual world of the robot. In this thesis, we address the problem relationships determination with a relation-specific network. As described in the introduction, this seperation of modules(networks) allows us to capture dynamic properties of the scene such as objects relationships with a loosely annotated set of images.
