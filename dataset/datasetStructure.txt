@@ -15,6 +15,11 @@ Each Image has a Json-file holding its annotation with the format:
  questionId: questionid,              //not yet in use
  cameraGlobalOrientation: cgOrientation,
  cameraGlobalPosition: cgPosition,
+ objectRelationship: [
+                  {object1, relation, object2},
+				  ...
+				  {objectm, relation, objectm+1}
+                ]
  objects: [
 		    {
 				objectId: id1,
@@ -89,6 +94,7 @@ Intrinsic Projection Matrix in px:
 
 CUSTOM PROPERTIES:
 
+objectRelationship: {left, rigth, over, under, on, front, back, has, in} 
 objectColor: {red, orange, brown, yellow, green, blue, white, gray, black, transparent}
 objectShape: cubic, pyramidal,conic, spherical, cylindrical, filiform, flat
 objectExternMaterial:  plastic, wood, glass, steel, cartoon, ceramic  
