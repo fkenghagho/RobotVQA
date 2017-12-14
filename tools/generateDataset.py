@@ -10,9 +10,11 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
  
 R=[]
+
 objectColor=['pink','red','orange','brown','yellow','olive','green','blue','purple','white','gray','black']
 class Dataset(object):
     def __init__(self,folder,nberOfImages,cameraId):
+        self.T=[]
         self.folder=folder
         self.litImage='litImage'
         self.normalImage='normalImage'
@@ -57,7 +59,7 @@ class Dataset(object):
                 #t=np.array(t,dtype='uint8')
                 self.objectColor[objects[i]]=t
                 [j,k,l,s]=t
-                self.objectColorMatch[l][k][j]=i
+                self.objectColorMatch[j][k][l]=i
                 for u in range(j-3,j+4):
                         for v in range(k-3,k+4):
                             for w in range(l-3,l+4):
@@ -391,7 +393,7 @@ class Dataset(object):
                     
                     #get current objects
                     self.getCurrentObjects(imgc)
-                  
+                    self.T=imgc.copy()
                     #create annotation
                     #not
                     if not self.annotate():
