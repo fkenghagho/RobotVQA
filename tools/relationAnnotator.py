@@ -2,12 +2,20 @@ import numpy as np
 import Tkinter as t
 from Tkinter import *
 import tkMessageBox
+from tkFileDialog import askopenfilename
 
 class ObjectRelationAnnotator(object):
 	def __init__(self,datasetGenerator):
 		
 		#globale Variablen##########################################
-		self.datasetGenerator=datasetGenerator
+		self.listRelation=[]
+		self.annotFile=""
+		self.imageFile=""
+		self.outputImage="D:/dataset1/annotImage.jpg"
+		if datasetGenerator!=None:
+			self.datasetGenerator=datasetGenerator
+		else:
+			self.datasetGenerator=Dataset('D:/dataset1',1,0,mode='offline')
 		#window construction
 		self.topWindow = Tk()
 		# Add a grid
@@ -94,18 +102,56 @@ class ObjectRelationAnnotator(object):
 	
 	
 	def save(self):
-		if(self.tkvar.get()=='Verwalter'):
-			pass
-			
+		filename = askopenfilename() # show an "Open" dialog box and return the path to the selected file
+		print(filename)
+					
 	
 	def add(self):
-		self.objectMenu1['menu'].add_command(label="Home")
-		self.objectMenu1['menu'].add_command(label="Hello")
+		
+		self.objectMenu1['menu'].add_command(label="Hello",command=t._setit(self.objectTkvar1, "Hello"))
 		self.objectTkvar1.set('Hello')
+		if self.imageFile=="":
+			tkMessageBox.showinfo("Input Image-Selection","First choose an input image for annotation!!!")
+			self.imageFile=askopenfilename() # show an "Open" dialog box and return the path to the selected file
+			print(self.imageFile)
+			if not os.path.isfile(self.imageFile): 
+				tkMessageBox.showerror("Relationships-Creation","Wrong input Image!!!")
+			else:
+				filename, file_extension = os.path.splitext(self.imageFile)
+				if file_extension not in ['.JPG','.jpg','.png','.png','.bmp','.BMP'] :
+						tkMessageBox.showerror("Relationships-Creation","Wrong input Image type: "+str( file_extension)+"!!!")
+				else:
+					item=self.datasetGenerator.ImageParser(filename+'.json',self.imageFile,
+					self.outputImage,0.5,mode="indirect")
+					self.objectTkvar1.set('')
+					self.objectTkvar2.set('')
+					for i in range(len(item)):
+						obj=str(i)+':'+item[i]
+						self.objectMenu1['menu'].add_command(label=obj,command=t._setit(self.objectTkvar1, obj))
+						self.objectMenu2['menu'].add_command(label=obj,command=t._setit(self.objectTkvar2, obj))
+						self.objectTkvar1.set(obj)
+						self.objectTkvar2.set(obj)
+					tkMessageBox.showinfo("Relationships-Creation","Image loaded. You can now build a relation!!!")
+		else:
+			if(len(self.objectTkvar1.get())>0 and len(self.objectTkvar2.get())>0):
+				rel=self.relationTkvar.get()
+				obj1=self.objectTkvar1.get().split(':')[1]
+				obj2=self.objectTkvar2.get().split(':')[1]
+				self.listRelation.append([obj1,rel,obj2])
+			else:
+				tkMessageBox.showerror("Relationships-Creation","Wrong input objects!!!")
+				
 	
 	def cancel(self):
+		#clear menus
 		self.objectMenu1['menu'].delete(0,'end')
 		self.objectTkvar1.set('')
+		self.objectMenu2['menu'].delete(0,'end')
+		self.objectTkvar2.set('')
+		#reset main variables
+		self.annotFile=""
+		self.imageFile=""
+		del self.listRelation[:]
+		tkMessageBox.showinfo("Relationships-Deletion","System reset!!!")
 	def show(self):
-		if(self.tkvar.get()=='Verwalter'):
-			pass
+		tkMessageBox.showinfo("Relationships-Preview","No relationship has been established yet!!!")
