@@ -13,65 +13,68 @@ R=[]
 
 objectColor=['pink','red','orange','brown','yellow','olive','green','blue','purple','white','gray','black']
 class Dataset(object):
-    def __init__(self,folder,nberOfImages,cameraId):
-        self.T=[]
-        self.folder=folder
-        self.litImage='litImage'
-        self.normalImage='normalImage'
-        self.depthImage='depthImage'
-        self.maskImage='maskImage'
-        self.annotation='annotation'
-        self.annotExtension='json'
-        self.index=0
-        self.extension='jpg'
-        self.depthExtension='exr'
-        self.nberOfImages=nberOfImages
-        self.cameraId=cameraId
-        self.objectColor={}
-        self.listObjects={}
-        self.objectIndex={}
-        self.objectColorMatch=np.ones([256,256,256],dtype='int')*(-1)
-        #make dataset directory
-        try:
-            if not os.path.exists(self.folder):
-                os.makedirs(self.folder)
-            else:
-                for the_file in os.listdir(self.folder):
-                    file_path = os.path.join(self.folder, the_file)
-                    if os.path.isfile(file_path):
-                        os.unlink(file_path)
-        except Exception,e:
-             print('Error: Problem with dataset directory. '+str(e))
-        
-        try:
-            client.connect()
-            print('Status: \n'+client.request('vget /unrealcv/status'))
-            objects=client.request('vget /objects').split(' ')
-            print(objects)
-            print(str(len(objects))+' objects found in the scene.')
-            #map object to color
-            for i in range(len(objects)):
-                #convert '(R=127,G=191,B=127,A=255)' to [127, 191, 127, 255]
-                self.objectIndex[i]=objects[i]
-                e=client.request('vget /object/'+objects[i]+'/color')
-                t=e.split('(')[1].split(')')[0].split(',')
-                t=[int(t[0].split('=')[1]),int(t[1].split('=')[1]),int(t[2].split('=')[1]),int(t[3].split('=')[1])]
-                #t=np.array(t,dtype='uint8')
-                self.objectColor[objects[i]]=t
-                [j,k,l,s]=t
-                self.objectColorMatch[j][k][l]=i
-                for u in range(j-3,j+4):
-                        for v in range(k-3,k+4):
-                            for w in range(l-3,l+4):
-                                if u>=0 and v>=0 and w>=0 and u<=255 and v<=255 and w<=255:
-                                    if self.objectColorMatch[u][v][w]<0:
-                                       self.objectColorMatch[u][v][w]=i 
-            print(self.objectColor)
-            print(self.objectColorMatch)
-                        
-        except Exception,e:
-            print('Error: Problem with unrealcv .'+str(e))
-        
+    #mode=offline(without connection to image server. Used when processing existing data)/online(With connection to image server)
+    def __init__(self,folder,nberOfImages,cameraId,mode="offline"):
+        if mode=="online":
+                self.T=[]
+                self.folder=folder
+                self.litImage='litImage'
+                self.normalImage='normalImage'
+                self.depthImage='depthImage'
+                self.maskImage='maskImage'
+                self.annotation='annotation'
+                self.annotExtension='json'
+                self.index=0
+                self.extension='jpg'
+                self.depthExtension='exr'
+                self.nberOfImages=nberOfImages
+                self.cameraId=cameraId
+                self.objectColor={}
+                self.listObjects={}
+                self.objectIndex={}
+                self.objectColorMatch=np.ones([256,256,256],dtype='int')*(-1)
+                #make dataset directory
+                try:
+                    if not os.path.exists(self.folder):
+                        os.makedirs(self.folder)
+                    else:
+                        for the_file in os.listdir(self.folder):
+                            file_path = os.path.join(self.folder, the_file)
+                            if os.path.isfile(file_path):
+                                os.unlink(file_path)
+                except Exception,e:
+                    print('Error: Problem with dataset directory. '+str(e))
+                
+                try:
+                    client.connect()
+                    print('Status: \n'+client.request('vget /unrealcv/status'))
+                    objects=client.request('vget /objects').split(' ')
+                    print(objects)
+                    print(str(len(objects))+' objects found in the scene.')
+                    #map object to color
+                    for i in range(len(objects)):
+                        #convert '(R=127,G=191,B=127,A=255)' to [127, 191, 127, 255]
+                        self.objectIndex[i]=objects[i]
+                        e=client.request('vget /object/'+objects[i]+'/color')
+                        t=e.split('(')[1].split(')')[0].split(',')
+                        t=[int(t[0].split('=')[1]),int(t[1].split('=')[1]),int(t[2].split('=')[1]),int(t[3].split('=')[1])]
+                        #t=np.array(t,dtype='uint8')
+                        self.objectColor[objects[i]]=t
+                        [j,k,l,s]=t
+                        self.objectColorMatch[j][k][l]=i
+                        for u in range(j-3,j+4):
+                                for v in range(k-3,k+4):
+                                    for w in range(l-3,l+4):
+                                        if u>=0 and v>=0 and w>=0 and u<=255 and v<=255 and w<=255:
+                                            if self.objectColorMatch[u][v][w]<0:
+                                                self.objectColorMatch[u][v][w]=i 
+                    print(self.objectColor)
+                    print(self.objectColorMatch)
+                                
+                except Exception,e:
+                    print('Error: Problem with unrealcv .'+str(e))
+        else:
+            pass        
     #convert from raw to RGB image matrix
     def read_png(self,res):
         img = PIL.Image.open(StringIO.StringIO(res))
@@ -204,7 +207,7 @@ class Dataset(object):
                 listObj=listObj+']'
             else:
                 listObj=listObj+','
-        jsonImage='{'+'"imageId":"'+str(imageId)+'",'+'"questionId":"'+str(questionId)+'",'+'"cameraGlobalOrientation":'+str(camOrientation)+','+'"cameraGlobalPosition":'+str(camPosition)+','+'"objects":'+str(listObj)+''+'}'
+        jsonImage='{'+'"imageId":"'+str(imageId)+'",'+'"questionId":"'+str(questionId)+'",'+'"cameraGlobalOrientation":'+str(camOrientation)+','+'"cameraGlobalPosition":'+str(camPosition)+','+'"objectRelationship":[],'+'"objects":'+str(listObj)+''+'}'
         try:
             #convert from plain to json
             jsonImage=json.loads(jsonImage)
@@ -298,6 +301,49 @@ class Dataset(object):
         except Exception,e:
             print('Failed to save object. '+str(e))
      
+    #parse image
+    #mode direct to display output image as graphic
+    #mode indirect to save output image into file 
+    def ImageParser(self, jsonFile,imageName,outImageName,size,mode="direct"):
+        try:
+            #open annotation-json file
+            with open(jsonFile,'r') as infile:
+                jsonImage=json.load(infile)
+            listObjectId=[]
+            #load image to be overwritten with objects ids
+            img=cv2.imread(imageName)
+            #explore all objects
+            for obj in jsonImage['objects']:
+                #add object id in the list
+                print obj["objectId"]#debug
+                listObjectId.append(obj["objectId"])
+                lign=[]
+                col=[]
+                #get object pixels coordinates
+                for e in obj['objectSegmentationPixels']:
+                    lign.append(e[0])
+                    col.append(e[1])
+                #object's central point
+                Xc=int(np.average(lign))
+                Yc=int(np.average(col))
+                #overwrite image with this object id at point (Xc,Yc)
+                cv2.putText(img, str(len(listObjectId)-1), (Yc,Xc),cv2.FONT_HERSHEY_SCRIPT_SIMPLEX, size, (0, 255, 0), 1, cv2.LINE_AA)
+            if mode=="indirect":
+                cv2.imwrite(outImageName,img)
+            else:
+                cv2.imshow('Annotation',img)
+                k=cv2.waitKey(0) & 0xFF
+                if k==27:
+                    cv2.destroyAllWindows()
+            print('Image Parsed successfully.')
+            return listObjectId
+        except Exception,e:
+            print('Failed to parse image. '+str(e))
+            return []
+    
+    
+    
+    
     #compute  RGB-color of an image
     def computeRGBColor(self, imageName):
         #weighted sum of pixels' RGB color
