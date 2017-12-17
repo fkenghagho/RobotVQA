@@ -94,7 +94,7 @@ Intrinsic Projection Matrix in px:
 
 CUSTOM PROPERTIES:
 
-objectRelationship: {left, rigth, over, under, on, front, back, has, in} 
+objectRelationship: {left, rigth, over, under, on, front, behind, has, in} 
 objectColor: {red, orange, brown, yellow, green, blue, white, gray, black, transparent}
 objectShape: cubic, pyramidal,conic, spherical, cylindrical, filiform, flat
 objectExternMaterial:  plastic, wood, glass, steel, cartoon, ceramic  
