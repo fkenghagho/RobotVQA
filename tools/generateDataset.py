@@ -15,24 +15,24 @@ objectColor=['pink','red','orange','brown','yellow','olive','green','blue','purp
 class Dataset(object):
     #mode=offline(without connection to image server. Used when processing existing data)/online(With connection to image server)
     def __init__(self,folder,nberOfImages,cameraId,mode="offline"):
+        self.T=[]
+        self.folder=folder
+        self.litImage='litImage'
+        self.normalImage='normalImage'
+        self.depthImage='depthImage'
+        self.maskImage='maskImage'
+        self.annotation='annotation'
+        self.annotExtension='json'
+        self.index=0
+        self.extension='jpg'
+        self.depthExtension='exr'
+        self.nberOfImages=nberOfImages
+        self.cameraId=cameraId
+        self.objectColor={}
+        self.listObjects={}
+        self.objectIndex={}
+        self.objectColorMatch=np.ones([256,256,256],dtype='int')*(-1)
         if mode=="online":
-                self.T=[]
-                self.folder=folder
-                self.litImage='litImage'
-                self.normalImage='normalImage'
-                self.depthImage='depthImage'
-                self.maskImage='maskImage'
-                self.annotation='annotation'
-                self.annotExtension='json'
-                self.index=0
-                self.extension='jpg'
-                self.depthExtension='exr'
-                self.nberOfImages=nberOfImages
-                self.cameraId=cameraId
-                self.objectColor={}
-                self.listObjects={}
-                self.objectIndex={}
-                self.objectColorMatch=np.ones([256,256,256],dtype='int')*(-1)
                 #make dataset directory
                 try:
                     if not os.path.exists(self.folder):
