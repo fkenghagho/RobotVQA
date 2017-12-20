@@ -14,7 +14,8 @@ R=[]
 objectColor=['pink','red','orange','brown','yellow','olive','green','blue','purple','white','gray','black']
 class Dataset(object):
     #mode=offline(without connection to image server. Used when processing existing data)/online(With connection to image server)
-    def __init__(self,folder,nberOfImages,cameraId,mode="offline"):
+    #state=continue/restart
+    def __init__(self,folder,nberOfImages,offset,cameraId,mode="offline", state="continue"):
         self.T=[]
         self.folder=folder
         self.litImage='litImage'
@@ -23,7 +24,7 @@ class Dataset(object):
         self.maskImage='maskImage'
         self.annotation='annotation'
         self.annotExtension='json'
-        self.index=0
+        self.index=offset
         self.extension='jpg'
         self.depthExtension='exr'
         self.nberOfImages=nberOfImages
@@ -35,19 +36,22 @@ class Dataset(object):
         if mode=="online":
                 #make dataset directory
                 try:
-                    if not os.path.exists(self.folder):
-                        os.makedirs(self.folder)
-                    else:
-                        for the_file in os.listdir(self.folder):
-                            file_path = os.path.join(self.folder, the_file)
-                            if os.path.isfile(file_path):
-                                os.unlink(file_path)
+                    if state=="restart":
+                        if not os.path.exists(self.folder):
+                            os.makedirs(self.folder)
+                        else:
+                            for the_file in os.listdir(self.folder):
+                                file_path = os.path.join(self.folder, the_file)
+                                if os.path.isfile(file_path):
+                                    os.unlink(file_path)
                 except Exception,e:
                     print('Error: Problem with dataset directory. '+str(e))
                 
                 try:
                     client.connect()
                     print('Status: \n'+client.request('vget /unrealcv/status'))
+                    #set field of view
+                    client.request('vset /camera/'+str(self.cameraId)+'/horizontal_fieldofview '+str(70.0))
                     objects=client.request('vget /objects').split(' ')
                     print(objects)
                     print(str(len(objects))+' objects found in the scene.')
@@ -377,96 +381,114 @@ class Dataset(object):
         
     #save nberOfImages images
     def scan(self):
-        for i in range(self.index,self.nberOfImages):
-                try:
-                
-                    #take lit image
-                    client.request('vset /viewmode lit')
-                    img=client.request('vget /camera/'+str(self.cameraId)+'/lit png')
-                    #convert image properly . remove unused A channel  
-                    img=cv2.cvtColor(self.read_png(img),cv2.COLOR_RGBA2BGR)
-                    #save image
-                    if not(cv2.imwrite(os.path.join(self.folder,self.litImage)+str(i)+'.'+self.extension,img)):
-                        raise Exception('Failed to save lit image!!!')
-                    
-                    #take depth Float32
-                    img=client.request('vget /camera/'+str(self.cameraId)+'/depth npy')
-                    #convert image properly .  
-                    img=self.read_npy(img)
-                    #save image
-                    if not(cv2.imwrite(os.path.join(self.folder,self.depthImage)+str(i)+'.'+self.depthExtension,img)):
-                        raise Exception('Failed to save depth float32!!!')    
-                    
-                    #take depth image    
-                    img=255.*(1.-pow(np.exp(-img),0.2))
-                    imgc=np.zeros([img.shape[0],img.shape[1],3])
-                    imgc[:,:,0]=img
-                    imgc[:,:,1]=img
-                    imgc[:,:,2]=img
-                    imgc=np.array(imgc,dtype='uint8')
-                    #take depth image
-                    #client.request('vset /viewmode depth') 
-                    #img=client.request('vget /camera/'+str(self.cameraId)+'/depth png')
-                    #img=self.read_png(img)
-                    #convert image properly . remove unused A channel  
-                    #print img
-                    #img=cv2.cvtColor(img,cv2.COLOR_RGBA2BGR)
-                    #save image
-                    if not(cv2.imwrite(os.path.join(self.folder,self.depthImage)+str(i)+'.'+self.extension,imgc)):
-                        raise Exception('Failed to save depth image!!!')
-                    
-                   
-                    #take normal image 
-                    client.request('vset /viewmode normal')
-                    img=client.request('vget /camera/'+str(self.cameraId)+'/normal png')
-                    #convert image properly . remove unused A channel  
-                    img=cv2.cvtColor(self.read_png(img),cv2.COLOR_RGBA2BGR)
-                    #save image
-                    if not(cv2.imwrite(os.path.join(self.folder,self.normalImage)+str(i)+'.'+self.extension,img)):
-                        raise Exception('Failed to save normal image!!!')
-                        
-                        
-                    #take mask image 
-                    client.request('vset /viewmode object_mask')
-                    img=client.request('vget /camera/'+str(self.cameraId)+'/object_mask png')
-                    img=self.read_png(img)
-                    imgc=img.copy()
-                    #convert image properly . remove unused A channel  
-                    img=cv2.cvtColor(img,cv2.COLOR_RGBA2BGR)
-                    #save image
-                    if not(cv2.imwrite(os.path.join(self.folder,self.maskImage)+str(i)+'.'+self.extension,img)):
-                        raise Exception('Failed to save mask image!!!') 
-                    
-                    #get current objects
-                    self.getCurrentObjects(imgc)
-                    self.T=imgc.copy()
-                    #create annotation
-                    #not
-                    if not self.annotate():
-                        raise Exception('Annotation failed!!!')
-                    print('Image saved with success.')
-                except Exception,e:
-                    if  os.path.exists(os.path.join(self.folder,self.litImage)+str(i)+'.'+self.extension):
-                        os.unlink(os.path.join(self.folder,self.litImage)+str(i)+'.'+self.extension)
-                       
-                        
-                    if os.path.exists(os.path.join(self.folder,self.maskImage)+str(i)+'.'+self.extension):
-                        os.unlink(os.path.join(self.folder,self.maskImage)+str(i)+'.'+self.extension)
-                        
-                        
-                    if os.path.exists(os.path.join(self.folder,self.depthImage)+str(i)+'.'+self.extension):
-                        os.unlink(os.path.join(self.folder,self.depthImage)+str(i)+'.'+self.extension)
-                    
-                    if os.path.exists(os.path.join(self.folder,self.depthImage)+str(i)+'.'+self.depthExtension):
-                        os.unlink(os.path.join(self.folder,self.depthImage)+str(i)+'.'+self.depthExtension)
-                    
-                        
-                    if os.path.exists(os.path.join(self.folder,self.normalImage)+str(i)+'.'+self.extension):
-                        os.unlink(os.path.join(self.folder,self.normalImage)+str(i)+'.'+self.extension)
-                    
-                    print('Image could not be saved not saved: error occured .'+str(e))
-                  
-            
+        X=np.arange(-270,-128,30)
+        Y=np.arange(300,100,-30)
+        Z=np.arange(169,110,-30)
+        TETAX=np.arange(-90,90,30)
+        TETAY=np.arange(-90,90,30)
+        TETAZ=np.arange(-180,180,30)
+        i=self.index
+        for x in X:
+            for y in Y:
+                for z in Z:
+                    for tetax in TETAX:
+                        for tetay in TETAY:
+                            for tetaz in TETAZ:
+                                try:
+                                    i=i+1
+                                    self.index=i
+                                    #set camera position
+                                    client.request('vset /camera/'+str(self.cameraId)+'/location '+str(x)+' '+str(y)+' '+str(z))                              
+                                    #set camera orientation
+                                    client.request('vset /camera/'+str(self.cameraId)+'/rotation '+str(tetay)+' '+str(tetaz)+' '+str(tetax))
+                                    #take lit image
+                                    client.request('vset /viewmode lit')
+                                    img=client.request('vget /camera/'+str(self.cameraId)+'/lit png')
+                                    #convert image properly . remove unused A channel  
+                                    img=cv2.cvtColor(self.read_png(img),cv2.COLOR_RGBA2BGR)
+                                    #save image
+                                    if not(cv2.imwrite(os.path.join(self.folder,self.litImage)+str(i)+'.'+self.extension,img)):
+                                        raise Exception('Failed to save lit image!!!')
+                                    
+                                    #take depth Float32
+                                    img=client.request('vget /camera/'+str(self.cameraId)+'/depth npy')
+                                    #convert image properly .  
+                                    img=self.read_npy(img)
+                                    #save image
+                                    if not(cv2.imwrite(os.path.join(self.folder,self.depthImage)+str(i)+'.'+self.depthExtension,img)):
+                                        raise Exception('Failed to save depth float32!!!')    
+                                    
+                                    #take depth image    
+                                    img=255.*(1.-pow(np.exp(-img),0.2))
+                                    imgc=np.zeros([img.shape[0],img.shape[1],3])
+                                    imgc[:,:,0]=img
+                                    imgc[:,:,1]=img
+                                    imgc[:,:,2]=img
+                                    imgc=np.array(imgc,dtype='uint8')
+                                    #take depth image
+                                    #client.request('vset /viewmode depth') 
+                                    #img=client.request('vget /camera/'+str(self.cameraId)+'/depth png')
+                                    #img=self.read_png(img)
+                                    #convert image properly . remove unused A channel  
+                                    #print img
+                                    #img=cv2.cvtColor(img,cv2.COLOR_RGBA2BGR)
+                                    #save image
+                                    if not(cv2.imwrite(os.path.join(self.folder,self.depthImage)+str(i)+'.'+self.extension,imgc)):
+                                        raise Exception('Failed to save depth image!!!')
+                                    
+                                
+                                    #take normal image 
+                                    client.request('vset /viewmode normal')
+                                    img=client.request('vget /camera/'+str(self.cameraId)+'/normal png')
+                                    #convert image properly . remove unused A channel  
+                                    img=cv2.cvtColor(self.read_png(img),cv2.COLOR_RGBA2BGR)
+                                    #save image
+                                    if not(cv2.imwrite(os.path.join(self.folder,self.normalImage)+str(i)+'.'+self.extension,img)):
+                                        raise Exception('Failed to save normal image!!!')
+                                        
+                                        
+                                    #take mask image 
+                                    client.request('vset /viewmode object_mask')
+                                    img=client.request('vget /camera/'+str(self.cameraId)+'/object_mask png')
+                                    img=self.read_png(img)
+                                    imgc=img.copy()
+                                    #convert image properly . remove unused A channel  
+                                    img=cv2.cvtColor(img,cv2.COLOR_RGBA2BGR)
+                                    #save image
+                                    if not(cv2.imwrite(os.path.join(self.folder,self.maskImage)+str(i)+'.'+self.extension,img)):
+                                        raise Exception('Failed to save mask image!!!') 
+                                    
+                                    #get current objects
+                                    self.getCurrentObjects(imgc)
+                                    self.T=imgc.copy()
+                                    #create annotation
+                                    #not
+                                    if not self.annotate():
+                                        raise Exception('Annotation failed!!!')
+                                    print('Image saved with success.')
+                                except Exception,e:
+                                    if  os.path.exists(os.path.join(self.folder,self.litImage)+str(i)+'.'+self.extension):
+                                        os.unlink(os.path.join(self.folder,self.litImage)+str(i)+'.'+self.extension)
+                                    
+                                        
+                                    if os.path.exists(os.path.join(self.folder,self.maskImage)+str(i)+'.'+self.extension):
+                                        os.unlink(os.path.join(self.folder,self.maskImage)+str(i)+'.'+self.extension)
+                                        
+                                        
+                                    if os.path.exists(os.path.join(self.folder,self.depthImage)+str(i)+'.'+self.extension):
+                                        os.unlink(os.path.join(self.folder,self.depthImage)+str(i)+'.'+self.extension)
+                                    
+                                    if os.path.exists(os.path.join(self.folder,self.depthImage)+str(i)+'.'+self.depthExtension):
+                                        os.unlink(os.path.join(self.folder,self.depthImage)+str(i)+'.'+self.depthExtension)
+                                    
+                                        
+                                    if os.path.exists(os.path.join(self.folder,self.normalImage)+str(i)+'.'+self.extension):
+                                        os.unlink(os.path.join(self.folder,self.normalImage)+str(i)+'.'+self.extension)
+                                    
+                                    print('Image could not be saved not saved: error occured .'+str(e))
+                                #make a pause
+                                time.sleep(1)
+                            
        
 
     # Calculates translation Matrix given translation vector.
