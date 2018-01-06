@@ -51,7 +51,7 @@ As output, the system returns a scene graph. A scene graph is a directed graph, 
 
 ![Objects in the scene](images/objects.png "Objects in the scene")   
 
-![Relationships among Objects in the scene](images/relationAnnotation.png "Relationships among Objects in the scene") 
+![Relationships among Objects in the scene](images/relationAnnotation.PNG "Relationships among Objects in the scene") 
 
 # 7. Object Color Estimation: Learning vs Engineering
 
