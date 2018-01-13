@@ -1,0 +1,10 @@
+Dataset Cleanup
+----------------
+
+This file holds information about the post-processing of the dataset:
+
+-Angles(objets's orientation) normalization
+-Identification of target objects and background
+-Inconsistent relationships removal
+-Dataset compression
+
