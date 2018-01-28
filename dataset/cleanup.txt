@@ -1,3 +1,5 @@
+
+
 Dataset Cleanup
 ----------------
 
@@ -6,5 +8,8 @@ This file holds information about the post-processing of the dataset:
 -Angles(objets's orientation) normalization
 -Identification of target objects and background
 -Inconsistent relationships removal
+  *Relationships with background's objects
+  *Contradictory relationships except //valign
+  *Mirror relationships
 -Dataset compression
 
