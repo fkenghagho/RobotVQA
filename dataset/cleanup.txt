@@ -11,5 +11,6 @@ This file holds information about the post-processing of the dataset:
   *Relationships with background's objects
   *Contradictory relationships except //valign
   *Mirror relationships
+  *Duplication elimination
 -Dataset compression
 
