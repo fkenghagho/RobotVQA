@@ -340,10 +340,10 @@ class Dataset(object):
                 if k==27:
                     cv2.destroyAllWindows()
             print('Image Parsed successfully.')
-            return listObjectId
+            return listObjectId,str(jsonImage["cameraGlobalOrientation"][0])
         except Exception,e:
             print('Failed to parse image. '+str(e))
-            return []
+            return [],''
     
     
     
