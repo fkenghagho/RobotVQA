@@ -11,6 +11,7 @@ from mpl_toolkits.mplot3d import Axes3D
  
 R=[]
 
+
 objectColor=['pink','red','orange','brown','yellow','olive','green','blue','purple','white','gray','black']
 class Dataset(object):
     #mode=offline(without connection to image server. Used when processing existing data)/online(With connection to image server)
@@ -381,12 +382,12 @@ class Dataset(object):
         
     #save nberOfImages images
     def scan(self):
-        X=np.arange(-255,-216,10)
-        Y=np.arange(-4,303,50)
-        Z=np.arange(55,150,30)
-        TETAX=np.arange(0,360,60)
-        TETAY=np.arange(35,-35,-15)
-        TETAZ=np.arange(120,240,40)
+        X=np.arange(-267,-208,23)
+        Y=np.arange(182,308,21)
+        Z=np.arange(140,216,11)
+        TETAX=np.arange(-90,91,45)
+        TETAY=np.arange(-60,-33,13)
+        TETAZ=np.arange(-35,48,17)
         i=self.index
         for x in X:
             for y in Y:
@@ -395,7 +396,7 @@ class Dataset(object):
                         for tetay in TETAY:
                             for tetaz in TETAZ:
                                 try:
-                                    if (x,y,z,tetax,tetay,tetaz)>(-np.inf,46,85,270,270,120): 
+                                    if (x,y,z,tetax,tetay,tetaz)>(-221,224,140,45,-47,-18): 
                                         i=i+1
                                         self.index=i
                                         #set camera position
