@@ -12,14 +12,24 @@ class ObjectRelationAnnotator(object):
 		
 		#globale Variablen##########################################
 		self.listRelation=[]
+		self.index=-101
+		self.step=101
 		self.annotFile=""
 		self.imageFile=""
+		self.annotationFile=""
+		self.FILEOPENOPTIONS1 = dict(defaultextension='.jpg',filetypes=[('All files','*.*'), ('Image file','*litImage*.jpg')])
+		self.FILEOPENOPTIONS2 = dict(defaultextension='.json',filetypes=[('All files','*.*'), ('Image file','*.json')])
 		
 		if datasetGenerator!=None:
 			self.datasetGenerator=datasetGenerator
 		else:
+<<<<<<< HEAD
 			self.datasetGenerator=Dataset('D:/dataset1',1,0,0,mode='offline',state="continue")
 		self.outputImage=self.datasetGenerator.folder+'/'+'modified.'+self.datasetGenerator.extension
+=======
+			self.datasetGenerator=Dataset('C:/Dataset/raw/dataset1',1,0,0,mode='offline')
+		self.outputImage=self.datasetGenerator.folder+'ModifieD'+'/'+'modified.'+self.datasetGenerator.extension
+>>>>>>> 24ac18c8a52eb7d8711c7945035b288b0b753328
 		#window construction
 		self.topWindow = Tk()
 		# Add a grid
@@ -48,7 +58,7 @@ class ObjectRelationAnnotator(object):
 		
 		# Dictionary for relation with options
 		self.relationTkvar = StringVar(self.topWindow)
-		self.relationChoices = { 'left','right','front','behind','over','under','on','in','has'}
+		self.relationChoices = { 'left','front','under','on','in','has','valign'}
 		self.relationTkvar.set('left') # set the default option
 		
 		# Dictionary for obejct 1 with options
@@ -106,27 +116,33 @@ class ObjectRelationAnnotator(object):
 	
 	
 	def save(self):
-		if(self.listRelation==[] or self.imageFile==""):
+		if( self.annotationFile==""):
 			tkMessageBox.showerror("Relationships-Save","No relationship to save!!!")
 		else:
-			self.annotFile= askopenfilename(initialdir = self.datasetGenerator.folder) # show an "Open" dialog box and return the path to the selected file
-			if not os.path.isfile(self.annotFile):
-				tkMessageBox.showerror("Relationships-Save","Invalid selected output file!!!")
-			else:
-				with open(self.annotFile,"r") as f:
+			#self.annotFile= askopenfilename(initialdir = self.datasetGenerator.folder,**self.FILEOPENOPTIONS2) # show an "Open" dialog box and return the path to the selected file
+			#if not os.path.isfile(self.annotFile):
+			#	tkMessageBox.showerror("Relationships-Save","Invalid selected output file!!!")
+			#else:
+				with open(self.annotationFile,"r") as f:
 					annot=json.load(f)
 				f.close()
+				#empty list
+				del annot['objectRelationship'][:]
 				for elt in self.listRelation:
 					annot['objectRelationship'].append(json.loads('{"object1":"'+elt[0]+'","relation":"'+elt[1]+'","object2":"'+elt[2]+'"}'))
-				with open(self.annotFile,"w") as f:
+				with open(self.annotationFile,"w") as f:
 					json.dump(annot,f,indent=5)
 				f.close()
 				tkMessageBox.showinfo("Relationships-Save","Relationships saved successfully!!!")
 				del self.listRelation[:]
+				self.cancel()#reset
+				self.add()#next image
 	def add(self):
 		if self.imageFile=="":
-			tkMessageBox.showinfo("Input Image-Selection","First choose an input image for annotation!!!")
-			self.imageFile=askopenfilename(initialdir = self.datasetGenerator.folder) # show an "Open" dialog box and return the path to the selected file
+			#tkMessageBox.showinfo("Input Image-Selection","First choose an input image for annotation!!!")
+			#self.imageFile=askopenfilename(initialdir = self.datasetGenerator.folder,**self.FILEOPENOPTIONS1 ) # show an "Open" dialog box and return the path to the selected file
+			self.index=self.index+self.step
+			self.imageFile=self.datasetGenerator.folder+'/'+self.datasetGenerator.litImage+str(self.index)+'.'+self.datasetGenerator.extension
 			print(self.imageFile)
 			if not os.path.isfile(self.imageFile): 
 				tkMessageBox.showerror("Relationships-Creation","Wrong input Image!!!")
@@ -135,8 +151,8 @@ class ObjectRelationAnnotator(object):
 				if file_extension not in ['.'+self.datasetGenerator.extension] :
 						tkMessageBox.showerror("Relationships-Creation","Wrong input Image type: "+str( file_extension)+"!!!")
 				else:
-					annotationFile=self.datasetGenerator.folder+'/'+self.datasetGenerator.annotation+filename.split(self.datasetGenerator.litImage).pop()+'.'+self.datasetGenerator.annotExtension
-					item=self.datasetGenerator.ImageParser(annotationFile,self.imageFile,
+					self.annotationFile=self.datasetGenerator.folder+'/'+self.datasetGenerator.annotation+filename.split(self.datasetGenerator.litImage).pop()+'.'+self.datasetGenerator.annotExtension
+					item,tetax=self.datasetGenerator.ImageParser(self.annotationFile,self.imageFile,
 					self.outputImage,0.5,mode="indirect")
 					self.objectTkvar1.set('')
 					self.objectTkvar2.set('')
@@ -146,6 +162,7 @@ class ObjectRelationAnnotator(object):
 						self.objectMenu2['menu'].add_command(label=obj,command=t._setit(self.objectTkvar2, obj))
 						self.objectTkvar1.set(obj)
 						self.objectTkvar2.set(obj)
+					self.topWindow.title(self.imageFile+' *** '+tetax)
 					tkMessageBox.showinfo("Relationships-Creation","Image loaded. You can now build a relation!!!")
 		else:
 			if(len(self.objectTkvar1.get())>0 and len(self.objectTkvar2.get())>0):
@@ -159,6 +176,8 @@ class ObjectRelationAnnotator(object):
 				
 	
 	def cancel(self):
+		#resset index
+		self.annotationFile=""
 		#clear menus
 		self.objectMenu1['menu'].delete(0,'end')
 		self.objectTkvar1.set('')
@@ -170,6 +189,7 @@ class ObjectRelationAnnotator(object):
 		del self.listRelation[:]
 		if os.path.isfile(self.outputImage):
 			os.unlink(self.outputImage)
+		self.topWindow.title("Relationships-Annotator")
 		tkMessageBox.showinfo("Relationships-Deletion","System reset!!!")
 	def show(self):
 		if len(self.listRelation)<=0:
