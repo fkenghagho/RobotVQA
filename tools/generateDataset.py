@@ -596,16 +596,17 @@ class Dataset(object):
         
     #normal surface from depth
     #typ='raw' for matrice images
-    def normalSurface(self, depth,outputfile,typ='file'):
+    def normalSurface(self, depth,outputfile,divisor,typ='file'):
         global R
         if typ=='file':
             depth=cv2.imread(depth)
         #we assume depth is of type CV_8UC3
-        depthImg=((np.array(depth[:,:,0],dtype='float64')/127.5)-1.0)
+        #depthImg=((np.array(depth[:,:,0],dtype='float32')/divisor)-1.0)
+        depthImg=((depth/divisor)-1.0)
         #sobel x
-        sobelx=cv2.Sobel(depthImg,cv2.CV_64F,1,0,ksize=5)
-        sobely=cv2.Sobel(depthImg,cv2.CV_64F,0,1,ksize=5)
-        normalImg=np.zeros([depthImg.shape[0],depthImg.shape[1],3],dtype='float64')
+        sobelx=cv2.Sobel(depthImg,cv2.CV_32F,1,0,ksize=15)
+        sobely=cv2.Sobel(depthImg,cv2.CV_32F,0,1,ksize=15)
+        normalImg=np.zeros([depthImg.shape[0],depthImg.shape[1],3],dtype='float32')
         cols=depthImg.shape[1]
         rows=depthImg.shape[0]
         for y in range(rows):
