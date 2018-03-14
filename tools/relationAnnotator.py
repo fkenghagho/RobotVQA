@@ -18,7 +18,7 @@ class ObjectRelationAnnotator(object):
 		if datasetGenerator!=None:
 			self.datasetGenerator=datasetGenerator
 		else:
-			self.datasetGenerator=Dataset('D:/dataset1',1,0,mode='offline')
+			self.datasetGenerator=Dataset('D:/dataset1',1,0,0,mode='offline',state="continue")
 		self.outputImage=self.datasetGenerator.folder+'/'+'modified.'+self.datasetGenerator.extension
 		#window construction
 		self.topWindow = Tk()

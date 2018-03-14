@@ -104,3 +104,7 @@ objectPickeability: true, false
 objectStackability: true, false
 objectOpenability: false, true
 objectGraspability: false, true
+
+
+//TODO
+- Set Stackability of Mug to true
