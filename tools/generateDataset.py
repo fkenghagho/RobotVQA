@@ -652,5 +652,28 @@ class Dataset(object):
         PlaneDepth = DistanceObjectImage / (1 + (DistanceFromCenter / f)**2)**(0.5)
         return PlaneDepth-f
     
+    #return the binary of an object given its id and the image's annotation file .json
+    def binaryMaskObject(self, jsonFile,objName,shape, outImageName):
+        try:
+            with open(jsonFile,'r') as infile:
+                jsonImage=json.load(infile)
+            for a in jsonImage['objects']:
+                if a['objectName']==objName:
+                    e=a
+                    break
+            if e==None:
+                raise ValueError('Unknown object with name: '+objName)
+            img=np.zeros(shape,dtype='uint8')
+            obj=e
+            print  obj['objectSegmentationColor']
+            for e in obj['objectSegmentationPixels']:
+               img[e[0]][e[1]]=255
+                        
+            cv2.imwrite(outImageName,img)
+            print('Object mask saved successfully.')
+        except Exception,e:
+            print('Failed to save object mask. '+str(e))
+    
+    
     def BigNum(self,x):
         return (x)
