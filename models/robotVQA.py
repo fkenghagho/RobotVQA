@@ -1765,14 +1765,11 @@ class MaskRCNN():
         self.config = config
         self.model_dir = model_dir
         self.set_log_dir()
-<<<<<<< HEAD
         #initialize global session
         sessionConfig = tf.ConfigProto()
         sessionConfig.gpu_options.allow_growth = True
         K.tensorflow_backend.set_session(tf.Session(config=sessionConfig))
         print('Global Session created successfully!!!')
-=======
->>>>>>> a641e0a657f2ef9eff6cdd8f827b9e639237850f
         self.keras_model = self.build(mode=mode, config=config)
 
     def build(self, mode, config):
