@@ -131,7 +131,7 @@ class ExtendedRobotVQAConfig(RobotVQAConfig):
     IMAGES_PER_GPU = 1
 
     # Number of classes (including background)
-    NUM_CLASSES = 1 + 16  # background + 3 shapes
+    NUM_CLASSES = 1 + 17  # background + 3 shapes
 
     # Use small images for faster training. Set the limits of the small side
     # the large side, and that determines the image shape.
