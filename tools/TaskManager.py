@@ -38,7 +38,7 @@ class ExtendedDatasetLoader(utils.Dataset):
     """
     
     def __init__(self):
-        self.OBJECT_NAME_DICO=['Tea','Juice','Plate','Mug','Bowl','Tray','Tomato','Ketchup','Salz','Milch','Spoon','Spatula','Milk','Coffee','Cookie','Knife','Cornflakes','Cornflake','Eggholder','EggHolder', 'Cube']#Any other is part of background
+        self.OBJECT_NAME_DICO=['CookTop','Tea','Juice','Plate','Mug','Bowl','Tray','Tomato','Ketchup','Salz','Milch','Spoon','Spatula','Milk','Coffee','Cookie','Knife','Cornflakes','Cornflake','Eggholder','EggHolder', 'Cube']#Any other is part of background
         super(self.__class__,self).__init__()
 
     def register_images(self,folder,imgNameRoot,annotNameRoot):
@@ -131,7 +131,7 @@ class ExtendedRobotVQAConfig(RobotVQAConfig):
     IMAGES_PER_GPU = 1
 
     # Number of classes (including background)
-    NUM_CLASSES = 1 + 16  # background + 3 shapes
+    NUM_CLASSES = 1 + 17  # background + 3 shapes
 
     # Use small images for faster training. Set the limits of the small side
     # the large side, and that determines the image shape.
