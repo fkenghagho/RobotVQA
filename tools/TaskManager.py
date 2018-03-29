@@ -29,6 +29,12 @@ from visualize import get_ax
 import skimage
 import json
 
+#setting python paths
+sys.path.insert(0,'../models')
+from robotVQA import log
+import robotVQA as modellib
+
+        
 
 ################# Extended DatasetLoader Class(EDLC) ###################
 
@@ -129,9 +135,13 @@ class ExtendedRobotVQAConfig(RobotVQAConfig):
     # GPU because the images are small. Batch size is 1 (GPUs * images/GPU).
     GPU_COUNT = 1
     IMAGES_PER_GPU = 1
-
-    # Number of classes (including background)
-    NUM_CLASSES = 1 + 17  # background + 3 shapes
+    
+    #Number of target feature
+    NUMBER_FEATURES=5
+    #Target features
+    FEATURES=['CATEGORY','COLOR','SHAPE','MATERIAL','OPENABILITY']
+    # Number of classes per features(object's category/name, color, shape, material, openability) (including background)
+    NUM_CLASSES =[1+17,1+10,1+7,1+2,1+2]  # background + 3 shapes
 
     # Use small images for faster training. Set the limits of the small side
     # the large side, and that determines the image shape.
@@ -162,10 +172,7 @@ class TaskManager(object):
     def __init__(self,modeldir=None,rootdir=None,weightpath=None,pythonpath=None):
 
         try:
-            #setting python paths
-            if pythonpath!=None:
-                for path in pythonpath:
-                    sys.path.insert(0,path)
+            
             # Root directory of the project
             if rootdir==None:
                 self.ROOT_DIR = os.getcwd()
@@ -216,10 +223,8 @@ class TaskManager(object):
             print('Error-Could not visualize dataset: '+str(e))
     
     def train(self,dataset,init_with='coco'):
-        from robotVQA import log
-        import robotVQA as modellib
         #config= should be adequately set for training
-        model = modellib.MaskRCNN(mode="training", config=self.config,
+        model = modellib.RobotVQA(mode="training", config=self.config,
                           model_dir=self.MODEL_DIR)
                           
         #Weights initialization imagenet, coco, or last
@@ -252,12 +257,10 @@ class TaskManager(object):
         print('Training terminated successfully!')
     
     def inference(self,input_image_path,init_with='last'):
-        from robotVQA import log
-        import robotVQA as modellib
         #set config for inference properly
         self.config.GPU_COUNT = 1
         self.config.IMAGES_PER_GPU = 1
-        model = modellib.MaskRCNN(mode="inference",config=self.config,model_dir=self.MODEL_DIR)
+        model = modellib.RobotVQA(mode="inference",config=self.config,model_dir=self.MODEL_DIR)
         #Weights initialization imagenet, coco, or last
         if init_with == "imagenet":
             model_path=model.get_imagenet_weights()

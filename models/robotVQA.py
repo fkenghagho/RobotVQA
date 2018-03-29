@@ -1,6 +1,6 @@
 """
-Mask R-CNN
-The main Mask R-CNN model implemenetation.
+ROBOT VQA
+The main ROBOT VQA model implemenetation.
 
 Copyright (c) 2017 Matterport, Inc.
 Licensed under the MIT License (see LICENSE for details)
@@ -28,6 +28,7 @@ import keras.initializers as KI
 import keras.engine as KE
 import keras.models as KM
 
+sys.path.append('../tools')
 import utils
 
 # Requires TensorFlow 1.3+ and Keras 2.0.8+.
@@ -1599,7 +1600,11 @@ def data_generator(dataset, config, shuffle=True, augment=True, random_rois=0,
     - image_meta: [batch, size of image meta]
     - rpn_match: [batch, N] Integer (1=positive anchor, -1=negative, 0=neutral)
     - rpn_bbox: [batch, N, (dy, dx, log(dh), log(dw))] Anchor bbox deltas.
-    - gt_class_ids: [batch, MAX_GT_INSTANCES] Integer class IDs
+    - gt_class_cat_ids: [batch, MAX_GT_INSTANCES] Integer category class IDs,
+    - gt_class_col_ids: [batch, MAX_GT_INSTANCES] Integer color class IDs,
+    - gt_class_sha_ids: [batch, MAX_GT_INSTANCES] Integer shape class IDs,
+    - gt_class_mat_ids: [batch, MAX_GT_INSTANCES] Integer material class IDs,
+    - gt_class_opn_ids: [batch, MAX_GT_INSTANCES] Integer openability class IDs,
     - gt_boxes: [batch, MAX_GT_INSTANCES, (y1, x1, y2, x2)]
     - gt_masks: [batch, height, width, MAX_GT_INSTANCES]. The height and width
                 are those of the image unless use_mini_mask is True, in which
@@ -1630,30 +1635,33 @@ def data_generator(dataset, config, shuffle=True, augment=True, random_rois=0,
             if shuffle and image_index == 0:
                 np.random.shuffle(image_ids)
 
-            # Get GT bounding boxes and masks for image.
+            # Get GT raw data, metadata, feature class id, bounding boxes and masks for image.
             image_id = image_ids[image_index]
             image, image_meta, gt_class_ids, gt_boxes, gt_masks = \
                 load_image_gt(dataset, config, image_id, augment=augment,
                               use_mini_mask=config.USE_MINI_MASK)
+            #features' classes
+            [gt_class_cat_ids,gt_class_col_ids,gt_class_sha_ids,gt_class_mat_ids,gt_class_opn_ids]=gt_class_ids
 
             # Skip images that have no instances. This can happen in cases
             # where we train on a subset of classes and the image doesn't
             # have any of the classes we care about.
-            if not np.any(gt_class_ids > 0):
+            if not np.any(gt_class_cat_ids > 0):
                 continue
 
             # RPN Targets
             rpn_match, rpn_bbox = build_rpn_targets(image.shape, anchors,
-                                                    gt_class_ids, gt_boxes, config)
+                                                    gt_class_cat_ids, gt_boxes, config)
 
             # Mask R-CNN Targets
             if random_rois:
                 rpn_rois = generate_random_rois(
-                    image.shape, random_rois, gt_class_ids, gt_boxes)
+                    image.shape, random_rois, gt_class_cat_ids, gt_boxes)
                 if detection_targets:
                     rois, mrcnn_class_ids, mrcnn_bbox, mrcnn_mask =\
                         build_detection_targets(
                             rpn_rois, gt_class_ids, gt_boxes, gt_masks, config)
+                    [mrcnn_class_cat_ids,mrcnn_class_col_ids,mrcnn_class_sha_ids,mrcnn_class_mat_ids,mrcnn_class_opn_ids]=mrcnn_class_ids
 
             # Init batch arrays
             if b == 0:
@@ -1666,7 +1674,7 @@ def data_generator(dataset, config, shuffle=True, augment=True, random_rois=0,
                 batch_images = np.zeros(
                     (batch_size,) + image.shape, dtype=np.float32)
                 batch_gt_class_ids = np.zeros(
-                    (batch_size, config.MAX_GT_INSTANCES), dtype=np.int32)
+                    (batch_size, config.NUMBER_FEATURES, config.MAX_GT_INSTANCES), dtype=np.int32)
                 batch_gt_boxes = np.zeros(
                     (batch_size, config.MAX_GT_INSTANCES, 4), dtype=np.int32)
                 if config.USE_MINI_MASK:
@@ -1682,7 +1690,7 @@ def data_generator(dataset, config, shuffle=True, augment=True, random_rois=0,
                         batch_rois = np.zeros(
                             (batch_size,) + rois.shape, dtype=rois.dtype)
                         batch_mrcnn_class_ids = np.zeros(
-                            (batch_size,) + mrcnn_class_ids.shape, dtype=mrcnn_class_ids.dtype)
+                            (batch_size, config.NUMBER_FEATURES,) +mrcnn_class_cat_ids.shape, dtype=mrcnn_class_cat_ids.dtype)
                         batch_mrcnn_bbox = np.zeros(
                             (batch_size,) + mrcnn_bbox.shape, dtype=mrcnn_bbox.dtype)
                         batch_mrcnn_mask = np.zeros(
@@ -1692,7 +1700,11 @@ def data_generator(dataset, config, shuffle=True, augment=True, random_rois=0,
             if gt_boxes.shape[0] > config.MAX_GT_INSTANCES:
                 ids = np.random.choice(
                     np.arange(gt_boxes.shape[0]), config.MAX_GT_INSTANCES, replace=False)
-                gt_class_ids = gt_class_ids[ids]
+                gt_class_cat_ids = gt_class_cat_ids[ids]
+                gt_class_col_ids = gt_class_col_ids[ids]
+                gt_class_sha_ids = gt_class_sha_ids[ids]
+                gt_class_mat_ids = gt_class_mat_ids[ids]
+                gt_class_opn_ids = gt_class_opn_ids[ids]
                 gt_boxes = gt_boxes[ids]
                 gt_masks = gt_masks[:, :, ids]
 
@@ -1701,14 +1713,22 @@ def data_generator(dataset, config, shuffle=True, augment=True, random_rois=0,
             batch_rpn_match[b] = rpn_match[:, np.newaxis]
             batch_rpn_bbox[b] = rpn_bbox
             batch_images[b] = mold_image(image.astype(np.float32), config)
-            batch_gt_class_ids[b, :gt_class_ids.shape[0]] = gt_class_ids
+            batch_gt_class_ids[b, 0,:gt_class_cat_ids.shape[0]] = gt_class_cat_ids
+            batch_gt_class_ids[b, 1,:gt_class_col_ids.shape[0]] = gt_class_col_ids
+            batch_gt_class_ids[b, 2,:gt_class_sha_ids.shape[0]] = gt_class_sha_ids
+            batch_gt_class_ids[b, 3,:gt_class_mat_ids.shape[0]] = gt_class_mat_ids
+            batch_gt_class_ids[b, 4,:gt_class_opn_ids.shape[0]] = gt_class_opn_ids
             batch_gt_boxes[b, :gt_boxes.shape[0]] = gt_boxes
             batch_gt_masks[b, :, :, :gt_masks.shape[-1]] = gt_masks
             if random_rois:
                 batch_rpn_rois[b] = rpn_rois
                 if detection_targets:
                     batch_rois[b] = rois
-                    batch_mrcnn_class_ids[b] = mrcnn_class_ids
+                    batch_mrcnn_class_ids[b, 0,:mrcnn_class_cat_ids.shape[0]] = mrcnn_class_cat_ids
+                    batch_mrcnn_class_ids[b, 1,:mrcnn_class_col_ids.shape[0]] = mrcnn_class_col_ids
+                    batch_mrcnn_class_ids[b, 2,:mrcnn_class_sha_ids.shape[0]] = mrcnn_class_sha_ids
+                    batch_mrcnn_class_ids[b, 3,:mrcnn_class_mat_ids.shape[0]] = mrcnn_class_mat_ids
+                    batch_mrcnn_class_ids[b, 4,:mrcnn_class_opn_ids.shape[0]] = mrcnn_class_opn_ids
                     batch_mrcnn_bbox[b] = mrcnn_bbox
                     batch_mrcnn_mask[b] = mrcnn_mask
             b += 1
@@ -1716,7 +1736,8 @@ def data_generator(dataset, config, shuffle=True, augment=True, random_rois=0,
             # Batch full?
             if b >= batch_size:
                 inputs = [batch_images, batch_image_meta, batch_rpn_match, batch_rpn_bbox,
-                          batch_gt_class_ids, batch_gt_boxes, batch_gt_masks]
+                          batch_gt_class_ids[:,0,:],batch_gt_class_ids[:,1,:],batch_gt_class_ids[:,2,:],batch_gt_class_ids[:,3,:],batch_gt_class_ids[:,4,:],
+                           batch_gt_boxes, batch_gt_masks]
                 outputs = []
 
                 if random_rois:
@@ -1724,10 +1745,14 @@ def data_generator(dataset, config, shuffle=True, augment=True, random_rois=0,
                     if detection_targets:
                         inputs.extend([batch_rois])
                         # Keras requires that output and targets have the same number of dimensions
-                        batch_mrcnn_class_ids = np.expand_dims(
-                            batch_mrcnn_class_ids, -1)
+                        batch_mrcnn_class_cat_ids = np.expand_dims(batch_mrcnn_class_ids[:,0,:], -1)
+                        batch_mrcnn_class_col_ids = np.expand_dims(batch_mrcnn_class_ids[:,1,:], -1)
+                        batch_mrcnn_class_sha_ids = np.expand_dims(batch_mrcnn_class_ids[:,2,:], -1)
+                        batch_mrcnn_class_mat_ids = np.expand_dims(batch_mrcnn_class_ids[:,3,:], -1)
+                        batch_mrcnn_class_opn_ids = np.expand_dims(batch_mrcnn_class_ids[:,4,:], -1)
                         outputs.extend(
-                            [batch_mrcnn_class_ids, batch_mrcnn_bbox, batch_mrcnn_mask])
+                            [batch_mrcnn_class_cat_ids,batch_mrcnn_class_col_ids,batch_mrcnn_class_sha_ids,batch_mrcnn_class_mat_ids,batch_mrcnn_class_opn_ids, 
+                            batch_mrcnn_bbox, batch_mrcnn_mask])
 
                 yield inputs, outputs
 
@@ -1745,12 +1770,11 @@ def data_generator(dataset, config, shuffle=True, augment=True, random_rois=0,
 
 
 ############################################################
-#  MaskRCNN Class
+#  ROBOTVQA Class
 ############################################################
 
-class MaskRCNN():
-    """Encapsulates the Mask RCNN model functionality.
-
+class RobotVQA():
+    """Encapsulates the ROBOT VQA model functionality.
     The actual Keras model is in the keras_model property.
     """
 
@@ -1771,9 +1795,16 @@ class MaskRCNN():
         K.tensorflow_backend.set_session(tf.Session(config=sessionConfig))
         print('Global Session created successfully!!!')
         self.keras_model = self.build(mode=mode, config=config)
+        print('Constants definition ...')
+        self.NUMBER_FEATURES=self.config.NUMBER_FEATURES
+        self.CATEGORY_INDEX=0
+        self.COLOR_INDEX=1
+        self.SHAPE_INDEX=2
+        self.MATERIAL_INDEX=3
+        self.OPENABILITY_INDEX=4
 
     def build(self, mode, config):
-        """Build Mask R-CNN architecture.
+        """Build RobotVQA architecture.
             input_shape: The shape of the input image.
             mode: Either "training" or "inference". The inputs and
                 outputs of the model differ accordingly.
@@ -1790,7 +1821,8 @@ class MaskRCNN():
         # Inputs
         input_image = KL.Input(
             shape=config.IMAGE_SHAPE.tolist(), name="input_image")
-        input_image_meta = KL.Input(shape=[None], name="input_image_meta")
+        #meta infos
+        input_image_meta = KL.Input(shape=[self.NUMBER_FEATURES,None], name="input_image_meta")
         if mode == "training":
             # RPN GT
             input_rpn_match = KL.Input(
@@ -1799,9 +1831,21 @@ class MaskRCNN():
                 shape=[None, 4], name="input_rpn_bbox", dtype=tf.float32)
 
             # Detection GT (class IDs, bounding boxes, and masks)
-            # 1. GT Class IDs (zero padded)
-            input_gt_class_ids = KL.Input(
-                shape=[None], name="input_gt_class_ids", dtype=tf.int32)
+            # 1.1. GT Category Class IDs (zero padded)
+            input_gt_class_cat_ids = KL.Input(
+                shape=[None], name="input_gt_class_cat_ids", dtype=tf.int32)
+            # 1.2. GT Color Class IDs (zero padded)
+            input_gt_class_col_ids = KL.Input(
+                shape=[None], name="input_gt_class_col_ids", dtype=tf.int32)
+            # 1.3. GT Shape Class IDs (zero padded)
+            input_gt_class_sha_ids = KL.Input(
+                shape=[None], name="input_gt_class_sha_ids", dtype=tf.int32)
+            # 1.4. GT Material Class IDs (zero padded)
+            input_gt_class_mat_ids = KL.Input(
+                shape=[None], name="input_gt_class_mat_ids", dtype=tf.int32)
+            # 1.5. GT Openability Class IDs (zero padded)
+            input_gt_class_opn_ids = KL.Input(
+                shape=[None], name="input_gt_class_opn_ids", dtype=tf.int32)
             # 2. GT Boxes in pixels (zero padded)
             # [batch, MAX_GT_INSTANCES, (y1, x1, y2, x2)] in image coordinates
             input_gt_boxes = KL.Input(
@@ -1850,7 +1894,7 @@ class MaskRCNN():
 
         # Note that P6 is used in RPN, but not in the classifier heads.
         rpn_feature_maps = [P2, P3, P4, P5, P6]
-        mrcnn_feature_maps = [P2, P3, P4, P5]
+        robotvqa_feature_maps = [P2, P3, P4, P5]
 
         # Generate Anchors
         self.anchors = utils.generate_pyramid_anchors(config.RPN_ANCHOR_SCALES,
@@ -1891,9 +1935,17 @@ class MaskRCNN():
         if mode == "training":
             # Class ID mask to mark class IDs supported by the dataset the image
             # came from.
-            _, _, _, active_class_ids = KL.Lambda(lambda x: parse_image_meta_graph(x),
-                                                  mask=[None, None, None, None])(input_image_meta)
-
+            #category
+            _, _, _, active_class_cat_ids = KL.Lambda(lambda x: parse_image_meta_graph(x),
+                                                  mask=[None, None, None, None])(input_image_meta[self.CATEGORY_INDEX])
+            _, _, _, active_class_col_ids = KL.Lambda(lambda x: parse_image_meta_graph(x),
+                                                  mask=[None, None, None, None])(input_image_meta[self.COLOR_INDEX])
+            _, _, _, active_class_mat_ids = KL.Lambda(lambda x: parse_image_meta_graph(x),
+                                                  mask=[None, None, None, None])(input_image_meta[self.MATERIAL_INDEX])
+            _, _, _, active_class_sha_ids = KL.Lambda(lambda x: parse_image_meta_graph(x),
+                                                  mask=[None, None, None, None])(input_image_meta[self.SHAPE_INDEX])
+            _, _, _, active_class_opn_ids = KL.Lambda(lambda x: parse_image_meta_graph(x),
+                                                  mask=[None, None, None, None])(input_image_meta[self.OPENABILITY_INDEX])                                                  
             if not config.USE_RPN_ROIS:
                 # Ignore predicted ROIs and use ROIs provided as an input.
                 input_rois = KL.Input(shape=[config.POST_NMS_ROIS_TRAINING, 4],
@@ -1908,20 +1960,50 @@ class MaskRCNN():
             # Subsamples proposals and generates target outputs for training
             # Note that proposal class IDs, gt_boxes, and gt_masks are zero
             # padded. Equally, returned rois and targets are zero padded.
+            
+            #all target features
+            input_gt_class_ids=[input_gt_class_cat_ids,input_gt_class_col_ids,input_gt_class_sha_ids,input_gt_class_mat_ids,input_gt_class_opn_ids]
+            
+            #target
             rois, target_class_ids, target_bbox, target_mask =\
                 DetectionTargetLayer(config, name="proposal_targets")([
                     target_rois, input_gt_class_ids, gt_boxes, input_gt_masks])
+                    
+            [target_class_cat_ids,target_class_col_ids,target_class_sha_ids,target_class_mat_ids,target_class_opn_ids]=target_class_ids
 
             # Network Heads
             # TODO: verify that this handles zero padded ROIs
-            mrcnn_class_logits, mrcnn_class, mrcnn_bbox =\
-                fpn_classifier_graph(rois, mrcnn_feature_maps, config.IMAGE_SHAPE,
-                                     config.POOL_SIZE, config.NUM_CLASSES)
-
-            mrcnn_mask = build_fpn_mask_graph(rois, mrcnn_feature_maps,
+            
+            #category recognition and bounding box
+            robotvqa_class_cat_logits, robotvqa_class_cat, robotvqa_bbox =\
+                fpn_classifier_graph(rois, robotvqa_feature_maps, config.IMAGE_SHAPE,
+                                     config.POOL_SIZE, config.NUM_CLASSES[self.CATEGORY_INDEX])
+                                     
+            #color recognition
+            robotvqa_class_col_logits, robotvqa_class_col, robotvqa_bbox =\
+                fpn_classifier_graph(rois, robotvqa_feature_maps, config.IMAGE_SHAPE,
+                                     config.POOL_SIZE, config.NUM_CLASSES[self.COLOR_INDEX])
+                                     
+            #shape recognition
+            robotvqa_class_sha_logits, robotvqa_class_sha, robotvqa_bbox =\
+                fpn_classifier_graph(rois, robotvqa_feature_maps, config.IMAGE_SHAPE,
+                                     config.POOL_SIZE, config.NUM_CLASSES[self.SHAPE_INDEX])
+                                     
+            #material recognition
+            robotvqa_class_mat_logits, robotvqa_class_mat, robotvqa_bbox =\
+                fpn_classifier_graph(rois, robotvqa_feature_maps, config.IMAGE_SHAPE,
+                                     config.POOL_SIZE, config.NUM_CLASSES[self.MATERIAL_INDEX])
+                                     
+            #openability recognition
+            robotvqa_class_opn_logits, robotvqa_class_opn, robotvqa_bbox =\
+                fpn_classifier_graph(rois, robotvqa_feature_maps, config.IMAGE_SHAPE,
+                                     config.POOL_SIZE, config.NUM_CLASSES[self.OPENABILITY_INDEX])
+                                     
+            #object segmentation
+            robotvqa_mask = build_fpn_mask_graph(rois, robotvqa_feature_maps,
                                               config.IMAGE_SHAPE,
                                               config.MASK_POOL_SIZE,
-                                              config.NUM_CLASSES)
+                                              config.NUM_CLASSES[self.CATEGORY_INDEX])
 
             # TODO: clean up (use tf.identify if necessary)
             output_rois = KL.Lambda(lambda x: x * 1, name="output_rois")(rois)
@@ -1929,36 +2011,83 @@ class MaskRCNN():
             # Losses
             rpn_class_loss = KL.Lambda(lambda x: rpn_class_loss_graph(*x), name="rpn_class_loss")(
                 [input_rpn_match, rpn_class_logits])
+                
             rpn_bbox_loss = KL.Lambda(lambda x: rpn_bbox_loss_graph(config, *x), name="rpn_bbox_loss")(
                 [input_rpn_bbox, input_rpn_match, rpn_bbox])
-            class_loss = KL.Lambda(lambda x: mrcnn_class_loss_graph(*x), name="mrcnn_class_loss")(
-                [target_class_ids, mrcnn_class_logits, active_class_ids])
+                
+            class_cat_loss = KL.Lambda(lambda x: mrcnn_class_loss_graph(*x), name="mrcnn_class_loss")(
+                [target_class_cat_ids, robotvqa_class_cat_logits, active_class_cat_ids])
+                
+            class_col_loss = KL.Lambda(lambda x: mrcnn_class_loss_graph(*x), name="mrcnn_class_col_loss")(
+                [target_class_col_ids, robotvqa_class_col_logits, active_class_col_ids])
+                
+            class_sha_loss = KL.Lambda(lambda x: mrcnn_class_loss_graph(*x), name="mrcnn_class_sha_loss")(
+                [target_class_sha_ids, robotvqa_class_sha_logits, active_class_sha_ids])
+                
+            class_mat_loss = KL.Lambda(lambda x: mrcnn_class_loss_graph(*x), name="mrcnn_class_mat_loss")(
+                [target_class_mat_ids, robotvqa_class_mat_logits, active_class_mat_ids])
+                
+            class_opn_loss = KL.Lambda(lambda x: mrcnn_class_loss_graph(*x), name="mrcnn_class_opn_loss")(
+                [target_class_opn_ids, robotvqa_class_opn_logits, active_class_opn_ids])
+                
             bbox_loss = KL.Lambda(lambda x: mrcnn_bbox_loss_graph(*x), name="mrcnn_bbox_loss")(
-                [target_bbox, target_class_ids, mrcnn_bbox])
+                [target_bbox, target_class_cat_ids, robotvqa_bbox])
+                
             mask_loss = KL.Lambda(lambda x: mrcnn_mask_loss_graph(*x), name="mrcnn_mask_loss")(
-                [target_mask, target_class_ids, mrcnn_mask])
+                [target_mask, target_class_cat_ids, robotvqa_mask])
 
             # Model
             inputs = [input_image, input_image_meta,
-                      input_rpn_match, input_rpn_bbox, input_gt_class_ids, input_gt_boxes, input_gt_masks]
+                      input_rpn_match, input_rpn_bbox,
+                       input_gt_class_cat_ids,input_gt_class_col_ids,input_gt_class_sha_ids, input_gt_class_mat_ids,input_gt_class_opn_ids,
+                       input_gt_boxes, 
+                       input_gt_masks]
             if not config.USE_RPN_ROIS:
                 inputs.append(input_rois)
             outputs = [rpn_class_logits, rpn_class, rpn_bbox,
-                       mrcnn_class_logits, mrcnn_class, mrcnn_bbox, mrcnn_mask,
+                       robotvqa_class_cat_logits,robotvqa_class_col_logits,robotvqa_class_sha_logits,robotvqa_class_mat_logits,robotvqa_class_opn_logits,
+                        class_cat_loss,class_col_loss,class_sha_loss,class_mat_loss,class_opn_loss,
+                        robotvqa_class_cat,robotvqa_class_col,robotvqa_class_sha,robotvqa_class_mat,robotvqa_class_opn,
+                        robotvqa_bbox,
+                        robotvqa_mask,
                        rpn_rois, output_rois,
-                       rpn_class_loss, rpn_bbox_loss, class_loss, bbox_loss, mask_loss]
+                       rpn_class_loss, rpn_bbox_loss, bbox_loss, mask_loss]
             model = KM.Model(inputs, outputs, name='mask_rcnn')
         else:
+
             # Network Heads
-            # Proposal classifier and BBox regressor heads
-            mrcnn_class_logits, mrcnn_class, mrcnn_bbox =\
-                fpn_classifier_graph(rpn_rois, mrcnn_feature_maps, config.IMAGE_SHAPE,
-                                     config.POOL_SIZE, config.NUM_CLASSES)
+            # TODO: verify that this handles zero padded ROIs
+            
+            #category recognition and bounding box
+            robotvqa_class_cat_logits, robotvqa_class_cat, robotvqa_bbox =\
+                fpn_classifier_graph(rois, robotvqa_feature_maps, config.IMAGE_SHAPE,
+                                     config.POOL_SIZE, config.NUM_CLASSES[self.CATEGORY_INDEX])
+                                     
+            #color recognition
+            robotvqa_class_col_logits, robotvqa_class_col, robotvqa_bbox =\
+                fpn_classifier_graph(rois, robotvqa_feature_maps, config.IMAGE_SHAPE,
+                                     config.POOL_SIZE, config.NUM_CLASSES[self.COLOR_INDEX])
+                                     
+            #shape recognition
+            robotvqa_class_sha_logits, robotvqa_class_sha, robotvqa_bbox =\
+                fpn_classifier_graph(rois, robotvqa_feature_maps, config.IMAGE_SHAPE,
+                                     config.POOL_SIZE, config.NUM_CLASSES[self.SHAPE_INDEX])
+                                     
+            #material recognition
+            robotvqa_class_mat_logits, robotvqa_class_mat, robotvqa_bbox =\
+                fpn_classifier_graph(rois, robotvqa_feature_maps, config.IMAGE_SHAPE,
+                                     config.POOL_SIZE, config.NUM_CLASSES[self.MATERIAL_INDEX])
+                                     
+            #openability recognition
+            robotvqa_class_opn_logits, robotvqa_class_opn, robotvqa_bbox =\
+                fpn_classifier_graph(rois, robotvqa_feature_maps, config.IMAGE_SHAPE,
+                                     config.POOL_SIZE, config.NUM_CLASSES[self.OPENABILITY_INDEX])
+                                     
 
             # Detections
             # output is [batch, num_detections, (y1, x1, y2, x2, class_id, score)] in image coordinates
             detections = DetectionLayer(config, name="mrcnn_detection")(
-                [rpn_rois, mrcnn_class, mrcnn_bbox, input_image_meta])
+                [rpn_rois,robotvqa_class_cat, robotvqa_bbox, input_image_meta])
 
             # Convert boxes to normalized coordinates
             # TODO: let DetectionLayer return normalized coordinates to avoid
@@ -1967,15 +2096,24 @@ class MaskRCNN():
             detection_boxes = KL.Lambda(
                 lambda x: x[..., :4] / np.array([h, w, h, w]))(detections)
 
-            # Create masks for detections
-            mrcnn_mask = build_fpn_mask_graph(detection_boxes, mrcnn_feature_maps,
+            #object segmentation
+            robotvqa_mask = build_fpn_mask_graph(detection_boxes, robotvqa_feature_maps,
                                               config.IMAGE_SHAPE,
                                               config.MASK_POOL_SIZE,
-                                              config.NUM_CLASSES)
+                                              config.NUM_CLASSES[self.CATEGORY_INDEX])
 
             model = KM.Model([input_image, input_image_meta],
-                             [detections, mrcnn_class, mrcnn_bbox,
-                                 mrcnn_mask, rpn_rois, rpn_class, rpn_bbox],
+                             [detections,
+                             robotvqa_class_cat,
+                             robotvqa_class_col,
+                             robotvqa_class_sha,
+                             robotvqa_class_mat,
+                             robotvqa_class_opn,
+                             robotvqa_bbox,
+                                 robotvqa_mask,
+                                  rpn_rois, 
+                                  rpn_class, 
+                                  rpn_bbox],
                              name='mask_rcnn')
 
         # Add multi-GPU support.
@@ -2355,8 +2493,8 @@ class MaskRCNN():
 
         Returns a list of dicts, one dict per image. The dict contains:
         rois: [N, (y1, x1, y2, x2)] detection bounding boxes
-        class_ids: [N] int class IDs
-        scores: [N] float probability scores for the class IDs
+        class_ids: [NUMBER_FEATURES,N] int class IDs
+        scores: [NUMBER_FEATURES,N] float probability scores for the class IDs
         masks: [H, W, N] instance binary masks
         """
         assert self.mode == "inference", "Create model in inference mode."
@@ -2373,19 +2511,24 @@ class MaskRCNN():
             log("molded_images", molded_images)
             log("image_metas", image_metas)
         # Run object detection
-        detections, mrcnn_class, mrcnn_bbox, mrcnn_mask, \
+        detections, mrcnn_class_cat, mrcnn_class_col, mrcnn_class_sha, mrcnn_class_mat, mrcnn_class_opn, mrcnn_bbox, mrcnn_mask, \
             rois, rpn_class, rpn_bbox =\
             self.keras_model.predict([molded_images, image_metas], verbose=0)
         # Process detections
         results = []
         for i, image in enumerate(images):
-            final_rois, final_class_ids, final_scores, final_masks =\
+            final_rois, final_class_cat_ids, \
+            final_class_cat_ids, final_class_col_ids, final_class_sha_ids, final_class_mat_ids, final_class_opn_ids, \
+            final_cat_scores,final_col_scores,final_sha_scores,final_mat_scores,final_opn_scores \
+            final_masks =\
                 self.unmold_detections(detections[i], mrcnn_mask[i],
                                        image.shape, windows[i])
             results.append({
                 "rois": final_rois,
-                "class_ids": final_class_ids,
-                "scores": final_scores,
+                "class_cat_ids": final_class_cat_ids,"class_col_ids": final_class_col_ids,"class_sha_ids": final_class_sha_ids,
+                "class_mat_ids": final_class_mat_ids,"class_opn_ids": final_class_opn_ids,                
+                "scores_cat": final_cat_scores,"scores_col": final_col_scores,"scores_sha": final_sha_scores,"scores_mat": final_mat_scores,
+                "scores_opn": final_opn_scores,
                 "masks": final_masks,
             })
         return results
