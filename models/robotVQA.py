@@ -30,6 +30,7 @@ import keras.models as KM
 
 sys.path.append('../tools')
 import utils
+import TaskManager as tkm
 
 # Requires TensorFlow 1.3+ and Keras 2.0.8+.
 from distutils.version import LooseVersion
@@ -792,7 +793,7 @@ class DetectionLayer(KE.Layer):
         image_meta = inputs[3]
 
         # Run detection refinement graph on each item in the batch
-        _, _, window, _ = parse_image_meta_graph(image_meta)
+        _, _, window, _ = parse_image_meta_graph(image_meta,self.config)
         detections_batch = utils.batch_slice(
             [rois, mrcnn_class, mrcnn_bbox, window],
             lambda x, y, w, z: refine_detections_graph(x, y, w, z, self.config),
@@ -1181,7 +1182,7 @@ def load_image_gt(dataset, config, image_id, augment=False,
     Returns:
     image: [height, width, 3]
     shape: the original shape of the image before resizing and cropping.
-    class_ids: [instance_count] Integer class IDs
+    class_ids: [NUMBER_FEATURES,instance_count], list of Integer class IDs
     bbox: [instance_count, (y1, x1, y2, x2)]
     mask: [height, width, instance_count]. The height and width are those
         of the image unless use_mini_mask is True, in which case they are
@@ -1208,7 +1209,12 @@ def load_image_gt(dataset, config, image_id, augment=False,
     # and here is to filter them out
     _idx = np.sum(mask, axis=(0, 1)) > 0
     mask = mask[:, :, _idx]
-    class_ids = class_ids[_idx]
+    class_cat_ids = class_ids[0][_idx]
+    class_col_ids = class_ids[1][_idx]
+    class_sha_ids = class_ids[2][_idx]
+    class_mat_ids = class_ids[3][_idx]
+    class_opn_ids = class_ids[4][_idx]
+    list_class_ids=[class_cat_ids,class_col_ids,class_sha_ids,class_mat_ids,class_opn_ids]
     # Bounding boxes. Note that some boxes might be all zeros
     # if the corresponding mask got cropped out.
     # bbox: [num_instances, (y1, x1, y2, x2)]
@@ -1217,18 +1223,35 @@ def load_image_gt(dataset, config, image_id, augment=False,
     # Active classes
     # Different datasets have different classes, so track the
     # classes supported in the dataset of this image.
-    active_class_ids = np.zeros([dataset.num_classes], dtype=np.int32)
-    source_class_ids = dataset.source_class_ids[dataset.image_info[image_id]["source"]]
-    active_class_ids[source_class_ids] = 1
+    active_class_cat_ids = np.zeros([dataset.num_classes[0]], dtype=np.int32)
+    source_class_cat_ids = dataset.source_class_ids[dataset.image_info[image_id]["source"]][0]
+    active_class_cat_ids[source_class_cat_ids] = 1
 
+    active_class_col_ids = np.zeros([dataset.num_classes[1]], dtype=np.int32)
+    source_class_col_ids = dataset.source_class_ids[dataset.image_info[image_id]["source"]][1]
+    active_class_col_ids[source_class_col_ids] = 1
+    
+    active_class_sha_ids = np.zeros([dataset.num_classes[2]], dtype=np.int32)
+    source_class_sha_ids = dataset.source_class_ids[dataset.image_info[image_id]["source"]][2]
+    active_class_sha_ids[source_class_sha_ids] = 1
+    
+    active_class_mat_ids = np.zeros([dataset.num_classes[3]], dtype=np.int32)
+    source_class_mat_ids = dataset.source_class_ids[dataset.image_info[image_id]["source"]][3]
+    active_class_mat_ids[source_class_mat_ids] = 1
+    
+    active_class_opn_ids = np.zeros([dataset.num_classes[4]], dtype=np.int32)
+    source_class_opn_ids = dataset.source_class_ids[dataset.image_info[image_id]["source"]][4]
+    active_class_opn_ids[source_class_opn_ids] = 1
+    
     # Resize masks to smaller size to reduce memory usage
     if use_mini_mask:
         mask = utils.minimize_mask(bbox, mask, config.MINI_MASK_SHAPE)
 
     # Image meta data
+    active_class_ids=[active_class_cat_ids,active_class_cat_ids,active_class_cat_ids,active_class_cat_ids,active_class_cat_ids]
     image_meta = compose_image_meta(image_id, shape, window, active_class_ids)
 
-    return image, image_meta, class_ids, bbox, mask
+    return image, image_meta, list_class_ids, bbox, mask
 
 
 def build_detection_targets(rpn_rois, gt_class_ids, gt_boxes, gt_masks, config):
@@ -1822,7 +1845,7 @@ class RobotVQA():
         input_image = KL.Input(
             shape=config.IMAGE_SHAPE.tolist(), name="input_image")
         #meta infos
-        input_image_meta = KL.Input(shape=[self.NUMBER_FEATURES,None], name="input_image_meta")
+        input_image_meta = KL.Input(shape=[None], name="input_image_meta")
         if mode == "training":
             # RPN GT
             input_rpn_match = KL.Input(
@@ -1936,16 +1959,11 @@ class RobotVQA():
             # Class ID mask to mark class IDs supported by the dataset the image
             # came from.
             #category
-            _, _, _, active_class_cat_ids = KL.Lambda(lambda x: parse_image_meta_graph(x),
-                                                  mask=[None, None, None, None])(input_image_meta[self.CATEGORY_INDEX])
-            _, _, _, active_class_col_ids = KL.Lambda(lambda x: parse_image_meta_graph(x),
-                                                  mask=[None, None, None, None])(input_image_meta[self.COLOR_INDEX])
-            _, _, _, active_class_mat_ids = KL.Lambda(lambda x: parse_image_meta_graph(x),
-                                                  mask=[None, None, None, None])(input_image_meta[self.MATERIAL_INDEX])
-            _, _, _, active_class_sha_ids = KL.Lambda(lambda x: parse_image_meta_graph(x),
-                                                  mask=[None, None, None, None])(input_image_meta[self.SHAPE_INDEX])
-            _, _, _, active_class_opn_ids = KL.Lambda(lambda x: parse_image_meta_graph(x),
-                                                  mask=[None, None, None, None])(input_image_meta[self.OPENABILITY_INDEX])                                                  
+            _, _, _, active_class_ids = KL.Lambda(lambda x,y: parse_image_meta_graph(x,y),
+                                                  mask=[None, None, None, None])(input_image_meta,self.config)
+            #Active classes/output feature
+            [active_class_cat_ids,active_class_col_ids,active_class_sha_ids,active_class_mat_ids,active_class_opn_ids]=active_class_ids
+                                                                                                   
             if not config.USE_RPN_ROIS:
                 # Ignore predicted ROIs and use ROIs provided as an input.
                 input_rois = KL.Input(shape=[config.POST_NMS_ROIS_TRAINING, 4],
@@ -2414,7 +2432,12 @@ class RobotVQA():
             # Build image_meta
             image_meta = compose_image_meta(
                 0, image.shape, window,
-                np.zeros([self.config.NUM_CLASSES], dtype=np.int32))
+                [np.zeros([self.config.NUM_CLASSES[0]], dtype=np.int32),
+                 np.zeros([self.config.NUM_CLASSES[1]], dtype=np.int32),
+                 np.zeros([self.config.NUM_CLASSES[2]], dtype=np.int32),
+                 np.zeros([self.config.NUM_CLASSES[3]], dtype=np.int32),
+                 np.zeros([self.config.NUM_CLASSES[4]], dtype=np.int32),
+                ])
             # Append
             molded_images.append(molded_image)
             windows.append(window)
@@ -2519,7 +2542,7 @@ class RobotVQA():
         for i, image in enumerate(images):
             final_rois, final_class_cat_ids, \
             final_class_cat_ids, final_class_col_ids, final_class_sha_ids, final_class_mat_ids, final_class_opn_ids, \
-            final_cat_scores,final_col_scores,final_sha_scores,final_mat_scores,final_opn_scores \
+            final_cat_scores,final_col_scores,final_sha_scores,final_mat_scores,final_opn_scores, \
             final_masks =\
                 self.unmold_detections(detections[i], mrcnn_mask[i],
                                        image.shape, windows[i])
@@ -2643,7 +2666,7 @@ def compose_image_meta(image_id, image_shape, window, active_class_ids):
     image_shape: [height, width, channels]
     window: (y1, x1, y2, x2) in pixels. The area of the image where the real
             image is (excluding the padding)
-    active_class_ids: List of class_ids available in the dataset from which
+    active_class_ids: List of class_ids available in the dataset from which/feature
         the image came. Useful if training on images from multiple datasets
         where not all classes are present in all datasets.
     """
@@ -2651,12 +2674,16 @@ def compose_image_meta(image_id, image_shape, window, active_class_ids):
         [image_id] +            # size=1
         list(image_shape) +     # size=3
         list(window) +          # size=4 (y1, x1, y2, x2) in image cooredinates
-        list(active_class_ids)  # size=num_classes
+        list(active_class_ids[0])+  # size=num_classes
+        list(active_class_ids[1])+
+        list(active_class_ids[2])+
+        list(active_class_ids[3])+
+        list(active_class_ids[4])
     )
     return meta
 
 
-def parse_image_meta_graph(meta):
+def parse_image_meta_graph(meta,config):
     """Parses a tensor that contains image attributes to its components.
     See compose_image_meta() for more details.
 
@@ -2665,7 +2692,12 @@ def parse_image_meta_graph(meta):
     image_id = meta[:, 0]
     image_shape = meta[:, 1:4]
     window = meta[:, 4:8]   # (y1, x1, y2, x2) window of image in in pixels
-    active_class_ids = meta[:, 8:]
+    [N1,N2,N3,N4,N5]=config.NUM_CLASSES
+    active_class_ids=[meta[:, 8:8+N1]]
+    active_class_ids.append(meta[:, 8+N1:8+N1+N2])
+    active_class_ids.append(meta[:, 8+N1+N2:8+N1+N2+N3])
+    active_class_ids.append(meta[:, 8+N1+N2+N3:8+N1+N2+N3+N4])
+    active_class_ids.append(meta[:, 8+N1+N2+N3+N4:8+N1+N2+N3+N4+N5])
     return [image_id, image_shape, window, active_class_ids]
 
 

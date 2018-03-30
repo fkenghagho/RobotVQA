@@ -44,10 +44,10 @@ class ExtendedDatasetLoader(utils.Dataset):
     """
     
     def __init__(self):
-        self.OBJECT_NAME_DICO=['CookTop','Tea','Juice','Plate','Mug','Bowl','Tray','Tomato','Ketchup','Salz','Milch','Spoon','Spatula','Milk','Coffee','Cookie','Knife','Cornflakes','Cornflake','Eggholder','EggHolder', 'Cube']#Any other is part of background
+        
         super(self.__class__,self).__init__()
 
-    def register_images(self,folder,imgNameRoot,annotNameRoot):
+    def register_images(self,folder,imgNameRoot,annotNameRoot,config):
         """get all image files that pass the filter
         """
         image_filter=folder+'/'+imgNameRoot+'*.*'
@@ -63,7 +63,7 @@ class ExtendedDatasetLoader(utils.Dataset):
                     jsonImage=json.load(infile)
                 infile.close()
                 for obj in jsonImage['objects']:
-                    if (obj['objectName'] not in classes) and (obj['objectName'] in self.OBJECT_NAME_DICO):
+                    if (obj['objectName'] not in classes) and (obj['objectName'] in config.OBJECT_NAME_DICO):
                         classes.append(obj['objectName'])
             except Exception as e:
                 print('Data '+str(anot)+' could not be processed:'+str(e))
@@ -141,7 +141,19 @@ class ExtendedRobotVQAConfig(RobotVQAConfig):
     #Target features
     FEATURES=['CATEGORY','COLOR','SHAPE','MATERIAL','OPENABILITY']
     # Number of classes per features(object's category/name, color, shape, material, openability) (including background)
-    NUM_CLASSES =[1+17,1+10,1+7,1+2,1+2]  # background + 3 shapes
+    NUM_CLASSES =[1+17,1+10,1+7,1+6,1+2]  # background + 3 shapes
+    #categories
+    OBJECT_NAME_DICO=['CookTop','Tea','Juice','Plate','Mug','Bowl','Tray','Tomato','Ketchup','Salz','Milch','Spoon','Spatula','Milk','Coffee','Cookie','Knife','Cornflakes','Cornflake','Eggholder','EggHolder', 'Cube']#Any other is part of background
+    #colors
+    OBJECT_COLOR_DICO=['Red', 'Orange', 'Brown', 'Yellow', 'Green', 'Blue', 'White', 'Gray', 'Black', 'Transparent']
+    #shape
+    OBJECT_SHAPE_DICO=['Cubic', 'Pyramidal','Conical', 'Spherical', 'Cylindrical', 'Filiform', 'Flat']
+    #material
+    OBJECT_MATERIAL_DICO=['Plastic', 'Wood', 'Glass', 'Steel', 'Cartoon', 'Ceramic']
+    #openability
+    OBJECT_OPENABILITY_DICO={'True':'Openable','False':'Non-Openable'}
+    
+    
 
     # Use small images for faster training. Set the limits of the small side
     # the large side, and that determines the image shape.
@@ -161,7 +173,7 @@ class ExtendedRobotVQAConfig(RobotVQAConfig):
     # use small validation steps since the epoch is small
     VALIDATION_STEPS = 5
     
-
+    
 
 
 
