@@ -1182,7 +1182,7 @@ def load_image_gt(dataset, config, image_id, augment=False,
     Returns:
     image: [height, width, 3]
     shape: the original shape of the image before resizing and cropping.
-    class_ids: [NUMBER_FEATURES,instance_count], list of Integer class IDs
+    class_ids: [NUM_FEATURES,instance_count], list of Integer class IDs
     bbox: [instance_count, (y1, x1, y2, x2)]
     mask: [height, width, instance_count]. The height and width are those
         of the image unless use_mini_mask is True, in which case they are
@@ -1697,7 +1697,7 @@ def data_generator(dataset, config, shuffle=True, augment=True, random_rois=0,
                 batch_images = np.zeros(
                     (batch_size,) + image.shape, dtype=np.float32)
                 batch_gt_class_ids = np.zeros(
-                    (batch_size, config.NUMBER_FEATURES, config.MAX_GT_INSTANCES), dtype=np.int32)
+                    (batch_size, config.NUM_FEATURES, config.MAX_GT_INSTANCES), dtype=np.int32)
                 batch_gt_boxes = np.zeros(
                     (batch_size, config.MAX_GT_INSTANCES, 4), dtype=np.int32)
                 if config.USE_MINI_MASK:
@@ -1713,7 +1713,7 @@ def data_generator(dataset, config, shuffle=True, augment=True, random_rois=0,
                         batch_rois = np.zeros(
                             (batch_size,) + rois.shape, dtype=rois.dtype)
                         batch_mrcnn_class_ids = np.zeros(
-                            (batch_size, config.NUMBER_FEATURES,) +mrcnn_class_cat_ids.shape, dtype=mrcnn_class_cat_ids.dtype)
+                            (batch_size, config.NUM_FEATURES,) +mrcnn_class_cat_ids.shape, dtype=mrcnn_class_cat_ids.dtype)
                         batch_mrcnn_bbox = np.zeros(
                             (batch_size,) + mrcnn_bbox.shape, dtype=mrcnn_bbox.dtype)
                         batch_mrcnn_mask = np.zeros(
@@ -1819,7 +1819,7 @@ class RobotVQA():
         print('Global Session created successfully!!!')
         self.keras_model = self.build(mode=mode, config=config)
         print('Constants definition ...')
-        self.NUMBER_FEATURES=self.config.NUMBER_FEATURES
+        self.NUM_FEATURES=self.config.NUM_FEATURES
         self.CATEGORY_INDEX=0
         self.COLOR_INDEX=1
         self.SHAPE_INDEX=2
@@ -2516,8 +2516,8 @@ class RobotVQA():
 
         Returns a list of dicts, one dict per image. The dict contains:
         rois: [N, (y1, x1, y2, x2)] detection bounding boxes
-        class_ids: [NUMBER_FEATURES,N] int class IDs
-        scores: [NUMBER_FEATURES,N] float probability scores for the class IDs
+        class_ids: [NUM_FEATURES,N] int class IDs
+        scores: [NUM_FEATURES,N] float probability scores for the class IDs
         masks: [H, W, N] instance binary masks
         """
         assert self.mode == "inference", "Create model in inference mode."

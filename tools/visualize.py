@@ -92,9 +92,9 @@ def display_instances(image, boxes, masks, class_ids, class_names,
     """
     boxes: [num_instance, (y1, x1, y2, x2, class_id)] in image coordinates.
     masks: [height, width, num_instances]
-    class_ids: [NUMBER_FEATURES,num_instances] ids/feature
-    class_names: [NUMBER_FEATURES], list of class names of the dataset/feature
-    scores: [NUMBER_FEATURES,num_instances],(optional) confidence scores for each box/feature
+    class_ids: [NUM_FEATURES,num_instances] ids/feature
+    class_names: [NUM_FEATURES], list of class names of the dataset/feature
+    scores: [NUM_FEATURES,num_instances],(optional) confidence scores for each box/feature
     figsize: (optional) the size of the image.
     """
     # Number of instances

@@ -46,7 +46,16 @@ class ExtendedDatasetLoader(utils.Dataset):
     def __init__(self):
         
         super(self.__class__,self).__init__()
-
+        
+    def normalize(self,s):
+        """Capitalize first letter of string s
+        """
+        try:
+            return s[0].upper()+s[1:]
+        except Exception as e:
+            print('Bad feature value: '+str(e))
+            return ''
+            
     def register_images(self,folder,imgNameRoot,annotNameRoot,config):
         """get all image files that pass the filter
         """
@@ -54,7 +63,7 @@ class ExtendedDatasetLoader(utils.Dataset):
         annotation_filter=folder+'/'+annotNameRoot+'*.json'
         images=glob.glob(image_filter)
         annotations=glob.glob(annotation_filter)
-        classes=[]
+        classes=[[],[],[],[],[]]#for 5 output_features
         #Add classes
         print('\nLoading classes from dataset ...\n')
         for anot in annotations:
@@ -63,14 +72,30 @@ class ExtendedDatasetLoader(utils.Dataset):
                     jsonImage=json.load(infile)
                 infile.close()
                 for obj in jsonImage['objects']:
-                    if (obj['objectName'] not in classes) and (obj['objectName'] in config.OBJECT_NAME_DICO):
-                        classes.append(obj['objectName'])
+                    cat=self.normalize(obj['objectName'])
+                    col=self.normalize(obj['objectColor'])
+                    sha=self.normalize(obj['objectShape'])
+                    mat=self.normalize(obj['objectExternMaterial'])
+                    opn=self.normalize(config.OBJECT_OPENABILITY_DICO(obj['objectOpenability']))
+                    if((cat in config.OBJECT_NAME_DICO) and (col in config.OBJECT_COLOR_DICO) and (sha in config.OBJECT_SHAPE_DICO) and \
+                        (mat in config.OBJECT_MATERIAL_DICO) and (opn in config.OBJECT_OPENABILITY_DICO)):
+                            if cat not in classes[0]:
+                                classes[0].append(cat)
+                            if col not in classes[1]:
+                                classes[1].append(col)
+                            if sha not in classes[2]:
+                                classes[2].append(sha)
+                            if mat not in classes[3]:
+                                classes[3].append(mat)
+                            if opn not in classes[4]:
+                                classes[4].append(opn)
             except Exception as e:
                 print('Data '+str(anot)+' could not be processed:'+str(e))
         print('\nClasses found:',classes, '\n')
         print('\nRegistering classes ...\n')
-        for i in range(len(classes)):
-            self.add_class("robotVQA",i+1,classes[i])
+        for feature_id in range(config.NUM_FEATURES)
+            for i in range(len(classes[feature_id])):
+                self.add_class(feature_id,"robotVQA",i+1,classes[feature_id][i])
         print('\nAdding images ...\n')
         #Add images      
         for i in range(len(images)):
@@ -137,9 +162,9 @@ class ExtendedRobotVQAConfig(RobotVQAConfig):
     IMAGES_PER_GPU = 1
     
     #Number of target feature
-    NUMBER_FEATURES=5
+    NUM_FEATURES=5
     #Target features
-    FEATURES=['CATEGORY','COLOR','SHAPE','MATERIAL','OPENABILITY']
+    FEATURES_INDEX={'CATEGORY':0,'COLOR':1,'SHAPE':2,'MATERIAL':3,'OPENABILITY':4}
     # Number of classes per features(object's category/name, color, shape, material, openability) (including background)
     NUM_CLASSES =[1+17,1+10,1+7,1+6,1+2]  # background + 3 shapes
     #categories
