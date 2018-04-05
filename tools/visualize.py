@@ -92,9 +92,9 @@ def display_instances(image, boxes, masks, class_ids, class_names,
     """
     boxes: [num_instance, (y1, x1, y2, x2, class_id)] in image coordinates.
     masks: [height, width, num_instances]
-    class_ids: [num_instances]
-    class_names: list of class names of the dataset
-    scores: (optional) confidence scores for each box
+    class_ids: [NUM_FEATURES,num_instances] ids/feature
+    class_names: [NUM_FEATURES], list of class names of the dataset/feature
+    scores: [NUM_FEATURES,num_instances],(optional) confidence scores for each box/feature
     figsize: (optional) the size of the image.
     """
     # Number of instances
@@ -102,7 +102,7 @@ def display_instances(image, boxes, masks, class_ids, class_names,
     if not N:
         print("\n*** No instances to display *** \n")
     else:
-        assert boxes.shape[0] == masks.shape[-1] == class_ids.shape[0]
+        assert boxes.shape[0] == masks.shape[-1] == class_ids[0].shape[0]
 
     if not ax:
         _, ax = plt.subplots(1, figsize=figsize)
@@ -132,13 +132,16 @@ def display_instances(image, boxes, masks, class_ids, class_names,
         ax.add_patch(p)
 
         # Label
-        class_id = class_ids[i]
-        score = scores[i] if scores is not None else None
-        label = class_names[class_id]
+        caption=''
+        if scores!=None:
+            for j in range(len(class_ids)):
+                caption=caption+class_names[j][class_ids[j][i]]+' '+str(scores[j][i])+'\n'
+        else:
+            for j in range(len(class_ids)):
+                caption=caption+class_names[j][class_ids[j][i]]+'\n'
         x = random.randint(x1, (x1 + x2) // 2)
-        caption = "{} {:.3f}".format(label, score) if score else label
         ax.text(x1, y1 + 8, caption,
-                color='w', size=11, backgroundcolor="none")
+                color='black', size=7, backgroundcolor="none")
 
         # Mask
         mask = masks[:, :, i]
