@@ -30,9 +30,10 @@ import skimage
 import json
 
 #setting python paths
-sys.path.insert(0,'../models')
-from robotVQA import log
+sys.path.append('../models')
 import robotVQA as modellib
+
+
 
         
 
@@ -50,11 +51,8 @@ class ExtendedDatasetLoader(utils.Dataset):
     def normalize(self,s):
         """Capitalize first letter of string s
         """
-        try:
-            return s[0].upper()+s[1:]
-        except Exception as e:
-            print('Bad feature value: '+str(e))
-            return ''
+        return s[0].upper()+s[1:]
+        
             
     def register_images(self,folder,imgNameRoot,annotNameRoot,config):
         """get all image files that pass the filter
@@ -64,6 +62,8 @@ class ExtendedDatasetLoader(utils.Dataset):
         images=glob.glob(image_filter)
         annotations=glob.glob(annotation_filter)
         classes=[[],[],[],[],[]]#for 5 output_features
+        nbfails=0
+        nbsuccess=0
         #Add classes
         print('\nLoading classes from dataset ...\n')
         for anot in annotations:
@@ -72,28 +72,36 @@ class ExtendedDatasetLoader(utils.Dataset):
                     jsonImage=json.load(infile)
                 infile.close()
                 for obj in jsonImage['objects']:
-                    cat=self.normalize(obj['objectName'])
-                    col=self.normalize(obj['objectColor'])
-                    sha=self.normalize(obj['objectShape'])
-                    mat=self.normalize(obj['objectExternMaterial'])
-                    opn=self.normalize(config.OBJECT_OPENABILITY_DICO(obj['objectOpenability']))
-                    if((cat in config.OBJECT_NAME_DICO) and (col in config.OBJECT_COLOR_DICO) and (sha in config.OBJECT_SHAPE_DICO) and \
-                        (mat in config.OBJECT_MATERIAL_DICO) and (opn in config.OBJECT_OPENABILITY_DICO)):
-                            if cat not in classes[0]:
-                                classes[0].append(cat)
-                            if col not in classes[1]:
-                                classes[1].append(col)
-                            if sha not in classes[2]:
-                                classes[2].append(sha)
-                            if mat not in classes[3]:
-                                classes[3].append(mat)
-                            if opn not in classes[4]:
-                                classes[4].append(opn)
+                    try:
+                            cat=self.normalize(obj['objectName'])
+                            col=self.normalize(obj['objectColor'])
+                            sha=self.normalize(obj['objectShape'])
+                            mat=self.normalize(obj['objectExternMaterial'])
+                            opn=self.normalize(obj['objectOpenability'])
+                            opn=self.normalize(config.OBJECT_OPENABILITY_DICO[opn])
+                            if((cat in config.OBJECT_NAME_DICO) and (col in config.OBJECT_COLOR_DICO) and (sha in config.OBJECT_SHAPE_DICO) and \
+                                (mat in config.OBJECT_MATERIAL_DICO) and (opn in list(config.OBJECT_OPENABILITY_DICO.values()))):
+                                    if cat not in classes[0]:
+                                        classes[0].append(cat)
+                                    if col not in classes[1]:
+                                        classes[1].append(col)
+                                    if sha not in classes[2]:
+                                        classes[2].append(sha)
+                                    if mat not in classes[3]:
+                                        classes[3].append(mat)
+                                    if opn not in classes[4]:
+                                        classes[4].append(opn)
+                                    nbsuccess+=1
+                    except Exception as e:
+                        print('Data '+str(anot)+': An object could not be processed:'+str(e))
+                        nbfails+=1    
             except Exception as e:
                 print('Data '+str(anot)+' could not be processed:'+str(e))
+                nbfails+=1
+        print('\n',nbsuccess,' Objects successfully found and ',nbfails,' Objects failed!', '\n')
         print('\nClasses found:',classes, '\n')
         print('\nRegistering classes ...\n')
-        for feature_id in range(config.NUM_FEATURES)
+        for feature_id in range(config.NUM_FEATURES):
             for i in range(len(classes[feature_id])):
                 self.add_class(feature_id,"robotVQA",i+1,classes[feature_id][i])
         print('\nAdding images ...\n')
@@ -112,7 +120,7 @@ class ExtendedDatasetLoader(utils.Dataset):
            
         
     
-    def load_mask(self, image_id):
+    def load_mask(self, image_id,config):
         """Generate instance masks for objects of the given image ID.
         """
         info = self.image_info[image_id]
@@ -120,30 +128,50 @@ class ExtendedDatasetLoader(utils.Dataset):
         shape=info['shape']
         shape=[shape[0],shape[1]]
         mask=[]
-        classes=[]
+        nbfail=0
+        nbsuccess=0
+        classes=[[],[],[],[],[]]
         try:
             with open(annotationPath,'r') as infile:
                 jsonImage=json.load(infile)
             img=np.zeros(shape,dtype='uint8')
             for obj in jsonImage['objects']:
-                if obj['objectName'] in self.OBJECT_NAME_DICO:#not a background
-                    classes.append(obj['objectName'])#add class of the current instance
-                    img=img*0
-                    for cord in obj['objectSegmentationPixels']:
-                        img[cord[0]][cord[1]]=1
-                    mask.append(img.copy())
+                try:
+                        cat=self.normalize(obj['objectName'])
+                        col=self.normalize(obj['objectColor'])
+                        sha=self.normalize(obj['objectShape'])
+                        mat=self.normalize(obj['objectExternMaterial'])
+                        opn=self.normalize(obj['objectOpenability'])
+                        opn=self.normalize(config.OBJECT_OPENABILITY_DICO[opn])
+                        if((cat in config.OBJECT_NAME_DICO) and (col in config.OBJECT_COLOR_DICO) and (sha in config.OBJECT_SHAPE_DICO) and \
+                            (mat in config.OBJECT_MATERIAL_DICO) and (opn in list(config.OBJECT_OPENABILITY_DICO.values()))):
+                                    classes[0].append(cat)
+                                    classes[1].append(col)
+                                    classes[2].append(sha)
+                                    classes[3].append(mat)
+                                    classes[4].append(opn)
+                                    img=img*0
+                                    for cord in obj['objectSegmentationPixels']:
+                                            img[cord[0]][cord[1]]=1
+                                    mask.append(img.copy())
+                                    nbsuccess+=1
+                except Exception as e:
+                                    nbfail+=1
+            print('\n\n',nbsuccess,'/',nbsuccess+nbfail,' Object(s) found!')
             nbInstances=len(mask)
             shape.append(nbInstances)
-            print(shape)
+            print('\nShape:\n',shape)
             masks=np.zeros(shape,dtype='uint8')
             for i in range(nbInstances):
                 masks[:,:,i]=mask[i].copy()
             del mask[:]
-            for i in range(len(classes)):
-                classes[i]=self.class_names.index(classes[i])
-            return masks,np.array(classes,dtype='int32') 
+            for j in range(len(classes)):
+                for i in range(len(classes[j])):
+                    classes[j][i]=self.class_names[j].index(classes[j][i])
+                classes[j]=np.array(classes[j],dtype='int32')
+            return masks,classes 
         except Exception as e:
-            print('Data '+str(annotationPath)+' could not be processed:'+str(e))
+            print('\n\n Data '+str(annotationPath)+' could not be processed:'+str(e))
             return super(self.__class__,self).load_mask(image_id)
       
 
@@ -166,7 +194,7 @@ class ExtendedRobotVQAConfig(RobotVQAConfig):
     #Target features
     FEATURES_INDEX={'CATEGORY':0,'COLOR':1,'SHAPE':2,'MATERIAL':3,'OPENABILITY':4}
     # Number of classes per features(object's category/name, color, shape, material, openability) (including background)
-    NUM_CLASSES =[1+17,1+10,1+7,1+6,1+2]  # background + 3 shapes
+    NUM_CLASSES =[1+16,1+7,1+5,1+5,1+2]  # background + 3 shapes
     #categories
     OBJECT_NAME_DICO=['CookTop','Tea','Juice','Plate','Mug','Bowl','Tray','Tomato','Ketchup','Salz','Milch','Spoon','Spatula','Milk','Coffee','Cookie','Knife','Cornflakes','Cornflake','Eggholder','EggHolder', 'Cube']#Any other is part of background
     #colors
@@ -241,7 +269,7 @@ class TaskManager(object):
     def getDataset(self,folder, imgNameRoot, annotNameRoot):
         try:
             dataset=ExtendedDatasetLoader()
-            dataset.register_images(folder,imgNameRoot,annotNameRoot)
+            dataset.register_images(folder,imgNameRoot,annotNameRoot,self.config)
             dataset.prepare()
             return dataset
         except Exception as e:
@@ -324,7 +352,9 @@ class TaskManager(object):
         results = model.detect([image], verbose=1)
         r = results[0]
         dst=self.getDataset('c:/MSCOCO/val2014','litImage','annotation')
-        visualize.display_instances(image, r['rois'], r['masks'], r['class_ids'], dst.class_names, r['scores'], ax=get_ax())
+        class_ids=[r['class_cat_ids'],r['class_col_ids'],r['class_sha_ids'],r['class_mat_ids'],r['class_opn_ids']]
+        scores=[r['scores_cat'],r['scores_col'],r['scores_sha'],r['scores_mat'],r['scores_opn']]
+        visualize.display_instances(image, r['rois'], r['masks'], class_ids, dst.class_names, scores, ax=get_ax())
 
 
 

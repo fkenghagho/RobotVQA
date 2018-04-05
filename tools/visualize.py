@@ -135,13 +135,13 @@ def display_instances(image, boxes, masks, class_ids, class_names,
         caption=''
         if scores!=None:
             for j in range(len(class_ids)):
-                caption=caption+class_names[j][class_ids[j][i]]+' '+scores[j][i]+'\n'
+                caption=caption+class_names[j][class_ids[j][i]]+' '+str(scores[j][i])+'\n'
         else:
             for j in range(len(class_ids)):
                 caption=caption+class_names[j][class_ids[j][i]]+'\n'
         x = random.randint(x1, (x1 + x2) // 2)
         ax.text(x1, y1 + 8, caption,
-                color='w', size=11, backgroundcolor="none")
+                color='black', size=7, backgroundcolor="none")
 
         # Mask
         mask = masks[:, :, i]

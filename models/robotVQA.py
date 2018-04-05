@@ -459,14 +459,14 @@ def overlaps_graph(boxes1, boxes2):
     return overlaps
 
 
-def detection_targets_graph(proposals, gt_class_ids, gt_boxes, gt_masks, config):
+def detection_targets_graph(Inputs, config):
     """Generates detection targets for one image. Subsamples proposals and
     generates target class IDs, bounding box deltas, and masks for each.
 
     Inputs:
     proposals: [N, (y1, x1, y2, x2)] in normalized coordinates. Might
                be zero padded if there are not enough proposals.
-    gt_class_ids: [MAX_GT_INSTANCES] int class IDs
+    gt_class_ids: [NUM_FEATURES,MAX_GT_INSTANCES] int class IDs
     gt_boxes: [MAX_GT_INSTANCES, (y1, x1, y2, x2)] in normalized coordinates.
     gt_masks: [height, width, MAX_GT_INSTANCES] of boolean type.
 
@@ -481,6 +481,11 @@ def detection_targets_graph(proposals, gt_class_ids, gt_boxes, gt_masks, config)
 
     Note: Returned arrays might be zero padded if not enough target ROIs.
     """
+    #input
+    proposals=Inputs[0]
+    gt_class_ids=Inputs[1:6]
+    gt_boxes=Inputs[6]
+    gt_masks=Inputs[7]
     # Assertions
     asserts = [
         tf.Assert(tf.greater(tf.shape(proposals)[0], 0), [proposals],
@@ -492,19 +497,21 @@ def detection_targets_graph(proposals, gt_class_ids, gt_boxes, gt_masks, config)
     # Remove zero padding
     proposals, _ = trim_zeros_graph(proposals, name="trim_proposals")
     gt_boxes, non_zeros = trim_zeros_graph(gt_boxes, name="trim_gt_boxes")
-    gt_class_ids = tf.boolean_mask(gt_class_ids, non_zeros,
-                                   name="trim_gt_class_ids")
+    for i in range(config.NUM_FEATURES):
+        gt_class_ids[i] = tf.boolean_mask(gt_class_ids[i], non_zeros,
+                                    name="trim_gt_class_ids"+str(i))
     gt_masks = tf.gather(gt_masks, tf.where(non_zeros)[:, 0], axis=2,
                          name="trim_gt_masks")
 
     # Handle COCO crowds
     # A crowd box in COCO is a bounding box around several instances. Exclude
     # them from training. A crowd box is given a negative class ID.
-    crowd_ix = tf.where(gt_class_ids < 0)[:, 0]
-    non_crowd_ix = tf.where(gt_class_ids > 0)[:, 0]
+    crowd_ix = tf.where(gt_class_ids[0] < 0)[:, 0]
+    non_crowd_ix = tf.where(gt_class_ids[0] > 0)[:, 0]
     crowd_boxes = tf.gather(gt_boxes, crowd_ix)
     crowd_masks = tf.gather(gt_masks, crowd_ix, axis=2)
-    gt_class_ids = tf.gather(gt_class_ids, non_crowd_ix)
+    for i in range(config.NUM_FEATURES):
+        gt_class_ids[i] = tf.gather(gt_class_ids[i], non_crowd_ix)
     gt_boxes = tf.gather(gt_boxes, non_crowd_ix)
     gt_masks = tf.gather(gt_masks, non_crowd_ix, axis=2)
 
@@ -542,7 +549,9 @@ def detection_targets_graph(proposals, gt_class_ids, gt_boxes, gt_masks, config)
     positive_overlaps = tf.gather(overlaps, positive_indices)
     roi_gt_box_assignment = tf.argmax(positive_overlaps, axis=1)
     roi_gt_boxes = tf.gather(gt_boxes, roi_gt_box_assignment)
-    roi_gt_class_ids = tf.gather(gt_class_ids, roi_gt_box_assignment)
+    roi_gt_class_ids=[]
+    for i in range(config.NUM_FEATURES):
+        roi_gt_class_ids.append(tf.gather(gt_class_ids[i], roi_gt_box_assignment))
 
     # Compute bbox refinement for positive ROIs
     deltas = utils.box_refinement_graph(positive_rois, roi_gt_boxes)
@@ -586,11 +595,12 @@ def detection_targets_graph(proposals, gt_class_ids, gt_boxes, gt_masks, config)
     P = tf.maximum(config.TRAIN_ROIS_PER_IMAGE - tf.shape(rois)[0], 0)
     rois = tf.pad(rois, [(0, P), (0, 0)])
     roi_gt_boxes = tf.pad(roi_gt_boxes, [(0, N + P), (0, 0)])
-    roi_gt_class_ids = tf.pad(roi_gt_class_ids, [(0, N + P)])
+    for i in range(config.NUM_FEATURES):
+        roi_gt_class_ids[i] = tf.pad(roi_gt_class_ids[i], [(0, N + P)])
     deltas = tf.pad(deltas, [(0, N + P), (0, 0)])
     masks = tf.pad(masks, [[0, N + P], (0, 0), (0, 0)])
 
-    return rois, roi_gt_class_ids, deltas, masks
+    return [rois]+roi_gt_class_ids+[deltas, masks]
 
 
 class DetectionTargetLayer(KE.Layer):
@@ -600,7 +610,7 @@ class DetectionTargetLayer(KE.Layer):
     Inputs:
     proposals: [batch, N, (y1, x1, y2, x2)] in normalized coordinates. Might
                be zero padded if there are not enough proposals.
-    gt_class_ids: [batch, MAX_GT_INSTANCES] Integer class IDs.
+    gt_class_ids: [batch,NUM_FEATURES, MAX_GT_INSTANCES] Integer class IDs/output feature.
     gt_boxes: [batch, MAX_GT_INSTANCES, (y1, x1, y2, x2)] in normalized
               coordinates.
     gt_masks: [batch, height, width, MAX_GT_INSTANCES] of boolean type
@@ -626,31 +636,32 @@ class DetectionTargetLayer(KE.Layer):
 
     def call(self, inputs):
         proposals = inputs[0]
-        gt_class_ids = inputs[1]
-        gt_boxes = inputs[2]
-        gt_masks = inputs[3]
+        gt_class_ids = inputs[1:6]
+        gt_boxes = inputs[6]
+        gt_masks = inputs[7]
 
         # Slice the batch and run a graph for each slice
         # TODO: Rename target_bbox to target_deltas for clarity
-        names = ["rois", "target_class_ids", "target_bbox", "target_mask"]
         outputs = utils.batch_slice(
-            [proposals, gt_class_ids, gt_boxes, gt_masks],
-            lambda w, x, y, z: detection_targets_graph(
-                w, x, y, z, self.config),
-            self.config.IMAGES_PER_GPU, names=names)
+            [proposals]+ gt_class_ids+[ gt_boxes, gt_masks],
+            lambda  x: detection_targets_graph(x, self.config),self.config.IMAGES_PER_GPU,parallel_processing=True)
         return outputs
 
     def compute_output_shape(self, input_shape):
         return [
             (None, self.config.TRAIN_ROIS_PER_IMAGE, 4),  # rois
-            (None, 1),  # class_ids
+            (None, 1),  # class_ids/category
+            (None, 1),  # class_ids/color
+            (None, 1),  # class_ids/shape
+            (None, 1),  # class_ids/material
+            (None, 1),  # class_ids/openability
             (None, self.config.TRAIN_ROIS_PER_IMAGE, 4),  # deltas
             (None, self.config.TRAIN_ROIS_PER_IMAGE, self.config.MASK_SHAPE[0],
              self.config.MASK_SHAPE[1])  # masks
         ]
 
     def compute_mask(self, inputs, mask=None):
-        return [None, None, None, None]
+        return [None,None, None, None, None, None, None, None]
 
 
 ############################################################
@@ -669,28 +680,36 @@ def clip_to_window(window, boxes):
     return boxes
 
 
-def refine_detections_graph(rois, probs, deltas, window, config):
+def refine_detections_graph(Inputs, config):
     """Refine classified proposals and filter overlaps and return final
     detections.
 
     Inputs:
         rois: [N, (y1, x1, y2, x2)] in normalized coordinates
-        probs: [N, num_classes]. Class probabilities.
+        probs: [N, NUM_FEATURES, num_classes]. Class probabilities.
         deltas: [N, num_classes, (dy, dx, log(dh), log(dw))]. Class-specific
                 bounding box deltas.
         window: (y1, x1, y2, x2) in image coordinates. The part of the image
             that contains the image excluding the padding.
 
-    Returns detections shaped: [N, (y1, x1, y2, x2, class_id, score)] where
+    Returns detections shaped: [N, (y1, x1, y2, x2, class_ids, scores)] where
         coordinates are in image domain.
     """
-    # Class IDs per ROI
-    class_ids = tf.argmax(probs, axis=1, output_type=tf.int32)
-    # Class probability of the top class of each ROI
-    indices = tf.stack([tf.range(probs.shape[0]), class_ids], axis=1)
-    class_scores = tf.gather_nd(probs, indices)
+    rois=Inputs[0]
+    probs=Inputs[1:6]
+    deltas=Inputs[6]
+    window=Inputs[7]
+    # Class IDs per ROI per feature
+    class_ids =[]
+    indices =[]
+    class_scores=[]
+    for i in range(config.NUM_FEATURES):
+        class_ids.append(tf.argmax(probs[i], axis=1, output_type=tf.int32))
+        # Class probability of the top class of each ROI
+        indices.append(tf.stack([tf.range(probs[i].shape[0]), class_ids[i]], axis=1))
+        class_scores.append(tf.gather_nd(probs[i], indices[i]))
     # Class-specific bounding box deltas
-    deltas_specific = tf.gather_nd(deltas, indices)
+    deltas_specific = tf.gather_nd(deltas, indices[0])
     # Apply bounding box deltas
     # Shape: [boxes, (y1, x1, y2, x2)] in normalized coordinates
     refined_rois = apply_box_deltas_graph(
@@ -707,18 +726,18 @@ def refine_detections_graph(rois, probs, deltas, window, config):
     # TODO: Filter out boxes with zero area
 
     # Filter out background boxes
-    keep = tf.where(class_ids > 0)[:, 0]
+    keep = tf.where(class_ids[0] > 0)[:, 0]
     # Filter out low confidence boxes
     if config.DETECTION_MIN_CONFIDENCE:
-        conf_keep = tf.where(class_scores >= config.DETECTION_MIN_CONFIDENCE)[:, 0]
+        conf_keep = tf.where(class_scores[0] >= config.DETECTION_MIN_CONFIDENCE)[:, 0]
         keep = tf.sets.set_intersection(tf.expand_dims(keep, 0),
                                         tf.expand_dims(conf_keep, 0))
         keep = tf.sparse_tensor_to_dense(keep)[0]
 
     # Apply per-class NMS
     # 1. Prepare variables
-    pre_nms_class_ids = tf.gather(class_ids, keep)
-    pre_nms_scores = tf.gather(class_scores, keep)
+    pre_nms_class_ids = tf.gather(class_ids[0], keep)
+    pre_nms_scores = tf.gather(class_scores[0], keep)
     pre_nms_rois = tf.gather(refined_rois,   keep)
     unique_pre_nms_class_ids = tf.unique(pre_nms_class_ids)[0]
 
@@ -754,7 +773,7 @@ def refine_detections_graph(rois, probs, deltas, window, config):
     keep = tf.sparse_tensor_to_dense(keep)[0]
     # Keep top detections
     roi_count = config.DETECTION_MAX_INSTANCES
-    class_scores_keep = tf.gather(class_scores, keep)
+    class_scores_keep = tf.gather(class_scores[0], keep)
     num_keep = tf.minimum(tf.shape(class_scores_keep)[0], roi_count)
     top_ids = tf.nn.top_k(class_scores_keep, k=num_keep, sorted=True)[1]
     keep = tf.gather(keep, top_ids)
@@ -763,8 +782,16 @@ def refine_detections_graph(rois, probs, deltas, window, config):
     # Coordinates are in image domain.
     detections = tf.concat([
         tf.to_float(tf.gather(refined_rois, keep)),
-        tf.to_float(tf.gather(class_ids, keep))[..., tf.newaxis],
-        tf.gather(class_scores, keep)[..., tf.newaxis]
+        tf.to_float(tf.gather(class_ids[0], keep))[..., tf.newaxis],
+        tf.to_float(tf.gather(class_ids[1], keep))[..., tf.newaxis],
+        tf.to_float(tf.gather(class_ids[2], keep))[..., tf.newaxis],
+        tf.to_float(tf.gather(class_ids[3], keep))[..., tf.newaxis],
+        tf.to_float(tf.gather(class_ids[4], keep))[..., tf.newaxis],
+        tf.gather(class_scores[0], keep)[..., tf.newaxis],
+        tf.gather(class_scores[1], keep)[..., tf.newaxis],
+        tf.gather(class_scores[2], keep)[..., tf.newaxis],
+        tf.gather(class_scores[3], keep)[..., tf.newaxis],
+        tf.gather(class_scores[4], keep)[..., tf.newaxis]
         ], axis=1)
 
     # Pad with zeros if detections < DETECTION_MAX_INSTANCES
@@ -778,7 +805,7 @@ class DetectionLayer(KE.Layer):
     returns the final detection boxes.
 
     Returns:
-    [batch, num_detections, (y1, x1, y2, x2, class_id, class_score)] where
+    [batch, num_detections, (y1, x1, y2, x2, class_ids, class_score)] where
     coordinates are in image domain
     """
 
@@ -788,25 +815,25 @@ class DetectionLayer(KE.Layer):
 
     def call(self, inputs):
         rois = inputs[0]
-        mrcnn_class = inputs[1]
-        mrcnn_bbox = inputs[2]
-        image_meta = inputs[3]
+        mrcnn_class = inputs[1:6]
+        mrcnn_bbox = inputs[6]
+        image_meta = inputs[7]
 
         # Run detection refinement graph on each item in the batch
-        _, _, window, _ = parse_image_meta_graph(image_meta,self.config)
+        _, _, window, _,_,_,_,_ = parse_image_meta_graph(image_meta,self.config)
         detections_batch = utils.batch_slice(
-            [rois, mrcnn_class, mrcnn_bbox, window],
-            lambda x, y, w, z: refine_detections_graph(x, y, w, z, self.config),
-            self.config.IMAGES_PER_GPU)
+            [rois]+ mrcnn_class+[mrcnn_bbox, window],
+            lambda x: refine_detections_graph(x, self.config),
+            self.config.IMAGES_PER_GPU,parallel_processing=True)
 
         # Reshape output
         # [batch, num_detections, (y1, x1, y2, x2, class_score)] in pixels
         return tf.reshape(
             detections_batch,
-            [self.config.BATCH_SIZE, self.config.DETECTION_MAX_INSTANCES, 6])
+            [self.config.BATCH_SIZE, self.config.DETECTION_MAX_INSTANCES, 4+self.config.NUM_FEATURES*2])
 
     def compute_output_shape(self, input_shape):
-        return (None, self.config.DETECTION_MAX_INSTANCES, 6)
+        return (None, self.config.DETECTION_MAX_INSTANCES, 4+self.config.NUM_FEATURES*2)
 
 
 # Region Proposal Network (RPN)
@@ -892,11 +919,11 @@ def fpn_classifier_graph(rois, feature_maps,
                   [P2, P3, P4, P5]. Each has a different resolution.
     image_shape: [height, width, depth]
     pool_size: The width of the square feature map generated from ROI Pooling.
-    num_classes: number of classes, which determines the depth of the results
+    num_classes: number of classes/feature, which determines the depth of the results
 
     Returns:
-        logits: [N, NUM_CLASSES] classifier logits (before softmax)
-        probs: [N, NUM_CLASSES] classifier probabilities
+        logits: [N, NUM_FEATURES, NUM_CLASSES] classifier logits (before softmax)
+        probs: [N,NUM_FEATURES, NUM_CLASSES] classifier probabilities
         bbox_deltas: [N, (dy, dx, log(dh), log(dw))] Deltas to apply to
                      proposal boxes
     """
@@ -919,18 +946,37 @@ def fpn_classifier_graph(rois, feature_maps,
                        name="pool_squeeze")(x)
 
     # Classifier head
-    mrcnn_class_logits = KL.TimeDistributed(KL.Dense(num_classes),
-                                            name='mrcnn_class_logits')(shared)
-    mrcnn_probs = KL.TimeDistributed(KL.Activation("softmax"),
-                                     name="mrcnn_class")(mrcnn_class_logits)
+    mrcnn_class_logits=[]
+    mrcnn_class_logits.append(KL.TimeDistributed(KL.Dense(num_classes[0]),
+                                            name='mrcnn_class_logits0')(shared))
+    mrcnn_class_logits.append(KL.TimeDistributed(KL.Dense(num_classes[1]),
+                                            name='mrcnn_class_logits1')(shared))
+    mrcnn_class_logits.append(KL.TimeDistributed(KL.Dense(num_classes[2]),
+                                            name='mrcnn_class_logits2')(shared))
+    mrcnn_class_logits.append(KL.TimeDistributed(KL.Dense(num_classes[3]),
+                                            name='mrcnn_class_logits3')(shared))
+    mrcnn_class_logits.append(KL.TimeDistributed(KL.Dense(num_classes[4]),
+                                            name='mrcnn_class_logits4')(shared))
+                                            
+    mrcnn_probs = []
+    mrcnn_probs.append(KL.TimeDistributed(KL.Activation("softmax"),
+                                     name="mrcnn_class0")(mrcnn_class_logits[0]))
+    mrcnn_probs.append(KL.TimeDistributed(KL.Activation("softmax"),
+                                     name="mrcnn_class1")(mrcnn_class_logits[1]))
+    mrcnn_probs.append(KL.TimeDistributed(KL.Activation("softmax"),
+                                     name="mrcnn_class2")(mrcnn_class_logits[2]))
+    mrcnn_probs.append(KL.TimeDistributed(KL.Activation("softmax"),
+                                     name="mrcnn_class3")(mrcnn_class_logits[3]))
+    mrcnn_probs.append(KL.TimeDistributed(KL.Activation("softmax"),
+                                     name="mrcnn_class4")(mrcnn_class_logits[4]))
 
     # BBox head
     # [batch, boxes, num_classes * (dy, dx, log(dh), log(dw))]
-    x = KL.TimeDistributed(KL.Dense(num_classes * 4, activation='linear'),
+    x = KL.TimeDistributed(KL.Dense(num_classes[0] * 4, activation='linear'),
                            name='mrcnn_bbox_fc')(shared)
     # Reshape to [batch, boxes, num_classes, (dy, dx, log(dh), log(dw))]
     s = K.int_shape(x)
-    mrcnn_bbox = KL.Reshape((s[1], num_classes, 4), name="mrcnn_bbox")(x)
+    mrcnn_bbox = KL.Reshape((s[1], num_classes[0], 4), name="mrcnn_bbox")(x)
 
     return mrcnn_class_logits, mrcnn_probs, mrcnn_bbox
 
@@ -1190,7 +1236,7 @@ def load_image_gt(dataset, config, image_id, augment=False,
     """
     # Load image and mask
     image = dataset.load_image(image_id)
-    mask, class_ids = dataset.load_mask(image_id)
+    mask, class_ids = dataset.load_mask(image_id,config)
     shape = image.shape
     image, window, scale, padding = utils.resize_image(
         image,
@@ -1224,23 +1270,23 @@ def load_image_gt(dataset, config, image_id, augment=False,
     # Different datasets have different classes, so track the
     # classes supported in the dataset of this image.
     active_class_cat_ids = np.zeros([dataset.num_classes[0]], dtype=np.int32)
-    source_class_cat_ids = dataset.source_class_ids[dataset.image_info[image_id]["source"]][0]
+    source_class_cat_ids = dataset.source_class_ids[0][dataset.image_info[image_id]["source"]]
     active_class_cat_ids[source_class_cat_ids] = 1
 
     active_class_col_ids = np.zeros([dataset.num_classes[1]], dtype=np.int32)
-    source_class_col_ids = dataset.source_class_ids[dataset.image_info[image_id]["source"]][1]
+    source_class_col_ids = dataset.source_class_ids[1][dataset.image_info[image_id]["source"]]
     active_class_col_ids[source_class_col_ids] = 1
     
     active_class_sha_ids = np.zeros([dataset.num_classes[2]], dtype=np.int32)
-    source_class_sha_ids = dataset.source_class_ids[dataset.image_info[image_id]["source"]][2]
+    source_class_sha_ids = dataset.source_class_ids[2][dataset.image_info[image_id]["source"]]
     active_class_sha_ids[source_class_sha_ids] = 1
     
     active_class_mat_ids = np.zeros([dataset.num_classes[3]], dtype=np.int32)
-    source_class_mat_ids = dataset.source_class_ids[dataset.image_info[image_id]["source"]][3]
+    source_class_mat_ids = dataset.source_class_ids[3][dataset.image_info[image_id]["source"]]
     active_class_mat_ids[source_class_mat_ids] = 1
     
     active_class_opn_ids = np.zeros([dataset.num_classes[4]], dtype=np.int32)
-    source_class_opn_ids = dataset.source_class_ids[dataset.image_info[image_id]["source"]][4]
+    source_class_opn_ids = dataset.source_class_ids[4][dataset.image_info[image_id]["source"]]
     active_class_opn_ids[source_class_opn_ids] = 1
     
     # Resize masks to smaller size to reduce memory usage
@@ -1248,7 +1294,7 @@ def load_image_gt(dataset, config, image_id, augment=False,
         mask = utils.minimize_mask(bbox, mask, config.MINI_MASK_SHAPE)
 
     # Image meta data
-    active_class_ids=[active_class_cat_ids,active_class_cat_ids,active_class_cat_ids,active_class_cat_ids,active_class_cat_ids]
+    active_class_ids=[active_class_cat_ids,active_class_col_ids,active_class_sha_ids,active_class_mat_ids,active_class_opn_ids]
     image_meta = compose_image_meta(image_id, shape, window, active_class_ids)
 
     return image, image_meta, list_class_ids, bbox, mask
@@ -1261,7 +1307,7 @@ def build_detection_targets(rpn_rois, gt_class_ids, gt_boxes, gt_masks, config):
 
     Inputs:
     rpn_rois: [N, (y1, x1, y2, x2)] proposal boxes.
-    gt_class_ids: [instance count] Integer class IDs
+    gt_class_ids: [NUM_FEATURES,instance count] Integer class IDs/output feature
     gt_boxes: [instance count, (y1, x1, y2, x2)]
     gt_masks: [height, width, instance count] Grund truth masks. Can be full
               size or mini-masks.
@@ -1275,8 +1321,8 @@ def build_detection_targets(rpn_rois, gt_class_ids, gt_boxes, gt_masks, config):
            to bbox boundaries and resized to neural network output size.
     """
     assert rpn_rois.shape[0] > 0
-    assert gt_class_ids.dtype == np.int32, "Expected int but got {}".format(
-        gt_class_ids.dtype)
+    assert gt_class_ids[0].dtype == np.int32, "Expected int but got {}".format(
+        gt_class_ids[0].dtype)
     assert gt_boxes.dtype == np.int32, "Expected int but got {}".format(
         gt_boxes.dtype)
     assert gt_masks.dtype == np.bool_, "Expected bool but got {}".format(
@@ -1286,9 +1332,13 @@ def build_detection_targets(rpn_rois, gt_class_ids, gt_boxes, gt_masks, config):
     # according to XinLei Chen's paper, it doesn't help.
 
     # Trim empty padding in gt_boxes and gt_masks parts
-    instance_ids = np.where(gt_class_ids > 0)[0]
+    instance_ids = np.where(gt_class_ids[0] > 0)[0]
     assert instance_ids.shape[0] > 0, "Image must contain instances."
-    gt_class_ids = gt_class_ids[instance_ids]
+    gt_class_ids[0] = gt_class_ids[0][instance_ids]
+    gt_class_ids[1] = gt_class_ids[1][instance_ids]
+    gt_class_ids[2] = gt_class_ids[2][instance_ids]
+    gt_class_ids[3] = gt_class_ids[3][instance_ids]
+    gt_class_ids[4] = gt_class_ids[4][instance_ids]
     gt_boxes = gt_boxes[instance_ids]
     gt_masks = gt_masks[:, :, instance_ids]
 
@@ -1311,7 +1361,12 @@ def build_detection_targets(rpn_rois, gt_class_ids, gt_boxes, gt_masks, config):
         overlaps.shape[0]), rpn_roi_iou_argmax]
     # GT box assigned to each ROI
     rpn_roi_gt_boxes = gt_boxes[rpn_roi_iou_argmax]
-    rpn_roi_gt_class_ids = gt_class_ids[rpn_roi_iou_argmax]
+    rpn_roi_gt_class_ids=[]
+    rpn_roi_gt_class_ids.append(gt_class_ids[0][rpn_roi_iou_argmax])
+    rpn_roi_gt_class_ids.append(gt_class_ids[1][rpn_roi_iou_argmax])
+    rpn_roi_gt_class_ids.append(gt_class_ids[2][rpn_roi_iou_argmax])
+    rpn_roi_gt_class_ids.append(gt_class_ids[3][rpn_roi_iou_argmax])
+    rpn_roi_gt_class_ids.append(gt_class_ids[4][rpn_roi_iou_argmax])
 
     # Positive ROIs are those with >= 0.5 IoU with a GT box.
     fg_ids = np.where(rpn_roi_iou_max > 0.5)[0]
@@ -1362,28 +1417,37 @@ def build_detection_targets(rpn_rois, gt_class_ids, gt_boxes, gt_masks, config):
 
     # Reset the gt boxes assigned to BG ROIs.
     rpn_roi_gt_boxes[keep_bg_ids, :] = 0
-    rpn_roi_gt_class_ids[keep_bg_ids] = 0
+    rpn_roi_gt_class_ids[0][keep_bg_ids] = 0
+    rpn_roi_gt_class_ids[1][keep_bg_ids] = 0
+    rpn_roi_gt_class_ids[2][keep_bg_ids] = 0
+    rpn_roi_gt_class_ids[3][keep_bg_ids] = 0
+    rpn_roi_gt_class_ids[4][keep_bg_ids] = 0
 
     # For each kept ROI, assign a class_id, and for FG ROIs also add bbox refinement.
     rois = rpn_rois[keep]
     roi_gt_boxes = rpn_roi_gt_boxes[keep]
-    roi_gt_class_ids = rpn_roi_gt_class_ids[keep]
+    roi_gt_class_ids=[]
+    roi_gt_class_ids.append(rpn_roi_gt_class_ids[0][keep])
+    roi_gt_class_ids.append(rpn_roi_gt_class_ids[1][keep])
+    roi_gt_class_ids.append(rpn_roi_gt_class_ids[2][keep])
+    roi_gt_class_ids.append(rpn_roi_gt_class_ids[3][keep])
+    roi_gt_class_ids.append(rpn_roi_gt_class_ids[4][keep])
     roi_gt_assignment = rpn_roi_iou_argmax[keep]
 
     # Class-aware bbox deltas. [y, x, log(h), log(w)]
     bboxes = np.zeros((config.TRAIN_ROIS_PER_IMAGE,
-                       config.NUM_CLASSES, 4), dtype=np.float32)
-    pos_ids = np.where(roi_gt_class_ids > 0)[0]
+                       config.NUM_CLASSES[0], 4), dtype=np.float32)
+    pos_ids = np.where(roi_gt_class_ids[0] > 0)[0]
     bboxes[pos_ids, roi_gt_class_ids[pos_ids]] = utils.box_refinement(
         rois[pos_ids], roi_gt_boxes[pos_ids, :4])
     # Normalize bbox refinements
     bboxes /= config.BBOX_STD_DEV
 
     # Generate class-specific target masks.
-    masks = np.zeros((config.TRAIN_ROIS_PER_IMAGE, config.MASK_SHAPE[0], config.MASK_SHAPE[1], config.NUM_CLASSES),
+    masks = np.zeros((config.TRAIN_ROIS_PER_IMAGE, config.MASK_SHAPE[0], config.MASK_SHAPE[1], config.NUM_CLASSES[0]),
                      dtype=np.float32)
     for i in pos_ids:
-        class_id = roi_gt_class_ids[i]
+        class_id = roi_gt_class_ids[0][i]
         assert class_id > 0, "class id must be greater than 0"
         gt_id = roi_gt_assignment[i]
         class_mask = gt_masks[:, :, gt_id]
@@ -1817,7 +1881,6 @@ class RobotVQA():
         sessionConfig.gpu_options.allow_growth = True
         K.tensorflow_backend.set_session(tf.Session(config=sessionConfig))
         print('Global Session created successfully!!!')
-        self.keras_model = self.build(mode=mode, config=config)
         print('Constants definition ...')
         self.NUM_FEATURES=self.config.NUM_FEATURES
         self.CATEGORY_INDEX=0
@@ -1825,6 +1888,9 @@ class RobotVQA():
         self.SHAPE_INDEX=2
         self.MATERIAL_INDEX=3
         self.OPENABILITY_INDEX=4
+        #Model
+        self.keras_model = self.build(mode=mode, config=config)
+        
 
     def build(self, mode, config):
         """Build RobotVQA architecture.
@@ -1959,9 +2025,11 @@ class RobotVQA():
             # Class ID mask to mark class IDs supported by the dataset the image
             # came from.
             #category
-            _, _, _, active_class_ids = KL.Lambda(lambda x,y: parse_image_meta_graph(x,y),
-                                                  mask=[None, None, None, None])(input_image_meta,self.config)
+            print('\n\n Dim: ',input_image_meta.get_shape(),'\n\n')
+            output = KL.Lambda(lambda x: self.parse_image_meta_graph(x),
+            mask=[None,None,None,None,None,None,None,None])(input_image_meta)
             #Active classes/output feature
+            active_class_ids=output[3:]
             [active_class_cat_ids,active_class_col_ids,active_class_sha_ids,active_class_mat_ids,active_class_opn_ids]=active_class_ids
                                                                                                    
             if not config.USE_RPN_ROIS:
@@ -1981,41 +2049,35 @@ class RobotVQA():
             
             #all target features
             input_gt_class_ids=[input_gt_class_cat_ids,input_gt_class_col_ids,input_gt_class_sha_ids,input_gt_class_mat_ids,input_gt_class_opn_ids]
-            
+            DetectionTargetLayer_input=[target_rois]+input_gt_class_ids+[ gt_boxes, input_gt_masks]
             #target
-            rois, target_class_ids, target_bbox, target_mask =\
-                DetectionTargetLayer(config, name="proposal_targets")([
-                    target_rois, input_gt_class_ids, gt_boxes, input_gt_masks])
+            DetectionTargetLayer_output =\
+                DetectionTargetLayer(config, name="proposal_targets")(DetectionTargetLayer_input)
+            rois=DetectionTargetLayer_output[0]
+            target_class_ids=DetectionTargetLayer_output[1:6]
+            target_bbox=DetectionTargetLayer_output[6]
+            target_mask=DetectionTargetLayer_output[7]
                     
-            [target_class_cat_ids,target_class_col_ids,target_class_sha_ids,target_class_mat_ids,target_class_opn_ids]=target_class_ids
+            #target_class_ids is a 2D tensor
+            target_class_cat_ids=target_class_ids[0]
+            target_class_col_ids=target_class_ids[1]
+            target_class_sha_ids=target_class_ids[2]
+            target_class_mat_ids=target_class_ids[3]
+            target_class_opn_ids=target_class_ids[4]
 
             # Network Heads
             # TODO: verify that this handles zero padded ROIs
             
-            #category recognition and bounding box
-            robotvqa_class_cat_logits, robotvqa_class_cat, robotvqa_bbox =\
+            
+            #classifiers and regressors
+            robotvqa_class_logits, robotvqa_class, robotvqa_bbox =\
                 fpn_classifier_graph(rois, robotvqa_feature_maps, config.IMAGE_SHAPE,
-                                     config.POOL_SIZE, config.NUM_CLASSES[self.CATEGORY_INDEX])
+                                     config.POOL_SIZE, config.NUM_CLASSES)
                                      
-            #color recognition
-            robotvqa_class_col_logits, robotvqa_class_col, robotvqa_bbox =\
-                fpn_classifier_graph(rois, robotvqa_feature_maps, config.IMAGE_SHAPE,
-                                     config.POOL_SIZE, config.NUM_CLASSES[self.COLOR_INDEX])
-                                     
-            #shape recognition
-            robotvqa_class_sha_logits, robotvqa_class_sha, robotvqa_bbox =\
-                fpn_classifier_graph(rois, robotvqa_feature_maps, config.IMAGE_SHAPE,
-                                     config.POOL_SIZE, config.NUM_CLASSES[self.SHAPE_INDEX])
-                                     
-            #material recognition
-            robotvqa_class_mat_logits, robotvqa_class_mat, robotvqa_bbox =\
-                fpn_classifier_graph(rois, robotvqa_feature_maps, config.IMAGE_SHAPE,
-                                     config.POOL_SIZE, config.NUM_CLASSES[self.MATERIAL_INDEX])
-                                     
-            #openability recognition
-            robotvqa_class_opn_logits, robotvqa_class_opn, robotvqa_bbox =\
-                fpn_classifier_graph(rois, robotvqa_feature_maps, config.IMAGE_SHAPE,
-                                     config.POOL_SIZE, config.NUM_CLASSES[self.OPENABILITY_INDEX])
+            [robotvqa_class_cat_logits,robotvqa_class_col_logits,robotvqa_class_sha_logits,robotvqa_class_mat_logits,robotvqa_class_opn_logits]=robotvqa_class_logits
+            [robotvqa_class_cat,robotvqa_class_col,robotvqa_class_sha,robotvqa_class_mat,robotvqa_class_opn]=robotvqa_class
+        
+            
                                      
             #object segmentation
             robotvqa_mask = build_fpn_mask_graph(rois, robotvqa_feature_maps,
@@ -2076,36 +2138,19 @@ class RobotVQA():
             # Network Heads
             # TODO: verify that this handles zero padded ROIs
             
-            #category recognition and bounding box
-            robotvqa_class_cat_logits, robotvqa_class_cat, robotvqa_bbox =\
-                fpn_classifier_graph(rois, robotvqa_feature_maps, config.IMAGE_SHAPE,
-                                     config.POOL_SIZE, config.NUM_CLASSES[self.CATEGORY_INDEX])
+            #classifiers and regressors
+            robotvqa_class_logits, robotvqa_class, robotvqa_bbox =\
+                fpn_classifier_graph(rpn_rois, robotvqa_feature_maps, config.IMAGE_SHAPE,
+                                     config.POOL_SIZE, config.NUM_CLASSES)
                                      
-            #color recognition
-            robotvqa_class_col_logits, robotvqa_class_col, robotvqa_bbox =\
-                fpn_classifier_graph(rois, robotvqa_feature_maps, config.IMAGE_SHAPE,
-                                     config.POOL_SIZE, config.NUM_CLASSES[self.COLOR_INDEX])
-                                     
-            #shape recognition
-            robotvqa_class_sha_logits, robotvqa_class_sha, robotvqa_bbox =\
-                fpn_classifier_graph(rois, robotvqa_feature_maps, config.IMAGE_SHAPE,
-                                     config.POOL_SIZE, config.NUM_CLASSES[self.SHAPE_INDEX])
-                                     
-            #material recognition
-            robotvqa_class_mat_logits, robotvqa_class_mat, robotvqa_bbox =\
-                fpn_classifier_graph(rois, robotvqa_feature_maps, config.IMAGE_SHAPE,
-                                     config.POOL_SIZE, config.NUM_CLASSES[self.MATERIAL_INDEX])
-                                     
-            #openability recognition
-            robotvqa_class_opn_logits, robotvqa_class_opn, robotvqa_bbox =\
-                fpn_classifier_graph(rois, robotvqa_feature_maps, config.IMAGE_SHAPE,
-                                     config.POOL_SIZE, config.NUM_CLASSES[self.OPENABILITY_INDEX])
-                                     
+            [robotvqa_class_cat_logits,robotvqa_class_col_logits,robotvqa_class_sha_logits,robotvqa_class_mat_logits,robotvqa_class_opn_logits]=robotvqa_class_logits
+            [robotvqa_class_cat,robotvqa_class_col,robotvqa_class_sha,robotvqa_class_mat,robotvqa_class_opn]=robotvqa_class
+                                 
 
             # Detections
-            # output is [batch, num_detections, (y1, x1, y2, x2, class_id, score)] in image coordinates
+            # output is [batch, num_detections, (y1, x1, y2, x2, class_ids, scores)] in image coordinates
             detections = DetectionLayer(config, name="mrcnn_detection")(
-                [rpn_rois,robotvqa_class_cat, robotvqa_bbox, input_image_meta])
+                [rpn_rois]+robotvqa_class+[robotvqa_bbox, input_image_meta])
 
             # Convert boxes to normalized coordinates
             # TODO: let DetectionLayer return normalized coordinates to avoid
@@ -2165,6 +2210,27 @@ class RobotVQA():
             return dir_name, None
         checkpoint = os.path.join(dir_name, checkpoints[-1])
         return dir_name, checkpoint
+    
+    def parse_image_meta_graph(self,meta):
+        """Parses a tensor that contains image attributes to its components.
+        See compose_image_meta() for more details.
+    
+        meta: [batch, meta length] where meta length depends on NUM_CLASSES
+        """
+        
+        image_id = meta[:, 0]
+        image_shape = meta[:, 1:4]
+        window = meta[:, 4:8]   # (y1, x1, y2, x2) window of image in in pixels
+        [N1,N2,N3,N4,N5]=self.config.NUM_CLASSES
+        active_class_ids=[meta[:, 8:8+N1]]
+        active_class_ids.append(meta[:, 8+N1:8+N1+N2])
+        active_class_ids.append(meta[:, 8+N1+N2:8+N1+N2+N3])
+        active_class_ids.append(meta[:, 8+N1+N2+N3:8+N1+N2+N3+N4])
+        active_class_ids.append(meta[:, 8+N1+N2+N3+N4:8+N1+N2+N3+N4+N5])
+        return [image_id, image_shape, window]+active_class_ids
+        #return [image_id, image_shape, window, active_class_ids]
+
+    
 
     def load_weights(self, filepath, by_name=False, exclude=None):
         """Modified version of the correspoding Keras function with
@@ -2230,7 +2296,9 @@ class RobotVQA():
         self.keras_model._losses = []
         self.keras_model._per_input_losses = {}
         loss_names = ["rpn_class_loss", "rpn_bbox_loss",
-                      "mrcnn_class_loss", "mrcnn_bbox_loss", "mrcnn_mask_loss"]
+                      "mrcnn_class_loss","mrcnn_class_col_loss",
+                      "mrcnn_class_sha_loss","mrcnn_class_mat_loss","mrcnn_class_opn_loss",
+                       "mrcnn_bbox_loss", "mrcnn_mask_loss"]
         for name in loss_names:
             layer = self.keras_model.get_layer(name)
             if layer.output in self.keras_model.losses:
@@ -2453,7 +2521,7 @@ class RobotVQA():
         network output to a format suitable for use in the rest of the
         application.
 
-        detections: [N, (y1, x1, y2, x2, class_id, score)]
+        detections: [N, (y1, x1, y2, x2, class_ids, scores)]
         mrcnn_mask: [N, height, width, num_classes]
         image_shape: [height, width, depth] Original size of the image before resizing
         window: [y1, x1, y2, x2] Box in the image where the real image is
@@ -2461,8 +2529,8 @@ class RobotVQA():
 
         Returns:
         boxes: [N, (y1, x1, y2, x2)] Bounding boxes in pixels
-        class_ids: [N] Integer class IDs for each bounding box
-        scores: [N] Float probability scores of the class_id
+        class_ids: [N]*NUM_FEATURES Integer class IDs for each bounding box
+        scores: [N]*NUM_FEATURES Float probability scores of the class_id
         masks: [height, width, num_instances] Instance masks
         """
         # How many detections do we have?
@@ -2472,9 +2540,12 @@ class RobotVQA():
 
         # Extract boxes, class_ids, scores, and class-specific masks
         boxes = detections[:N, :4]
-        class_ids = detections[:N, 4].astype(np.int32)
-        scores = detections[:N, 5]
-        masks = mrcnn_mask[np.arange(N), :, :, class_ids]
+        class_ids=[]
+        scores=[]
+        for i in range(self.config.NUM_FEATURES):
+            class_ids.append(detections[:N, 4+i].astype(np.int32))
+            scores.append(detections[:N, 4+self.config.NUM_FEATURES+i])
+        masks = mrcnn_mask[np.arange(N), :, :, class_ids[0]]
 
         # Compute scale and shift to translate coordinates to image domain.
         h_scale = image_shape[0] / (window[2] - window[0])
@@ -2496,7 +2567,7 @@ class RobotVQA():
             class_ids = np.delete(class_ids, exclude_ix, axis=0)
             scores = np.delete(scores, exclude_ix, axis=0)
             masks = np.delete(masks, exclude_ix, axis=0)
-            N = class_ids.shape[0]
+            N = class_ids[0].shape[0]
 
         # Resize masks to original image size and set boundary threshold.
         full_masks = []
@@ -2507,7 +2578,7 @@ class RobotVQA():
         full_masks = np.stack(full_masks, axis=-1)\
             if full_masks else np.empty((0,) + masks.shape[1:3])
 
-        return boxes, class_ids, scores, full_masks
+        return [boxes]+class_ids+scores+[full_masks]
 
     def detect(self, images, verbose=0):
         """Runs the detection pipeline.
@@ -2540,7 +2611,7 @@ class RobotVQA():
         # Process detections
         results = []
         for i, image in enumerate(images):
-            final_rois, final_class_cat_ids, \
+            final_rois, \
             final_class_cat_ids, final_class_col_ids, final_class_sha_ids, final_class_mat_ids, final_class_opn_ids, \
             final_cat_scores,final_col_scores,final_sha_scores,final_mat_scores,final_opn_scores, \
             final_masks =\
@@ -2653,6 +2724,25 @@ class RobotVQA():
         for k, v in outputs_np.items():
             log(k, v)
         return outputs_np
+def parse_image_meta_graph(meta,config):
+    """Parses a tensor that contains image attributes to its components.
+    See compose_image_meta() for more details.
+
+    meta: [batch, meta length] where meta length depends on NUM_CLASSES
+    """
+    
+    image_id = meta[:, 0]
+    image_shape = meta[:, 1:4]
+    window = meta[:, 4:8]   # (y1, x1, y2, x2) window of image in in pixels
+    [N1,N2,N3,N4,N5]=config.NUM_CLASSES
+    active_class_ids=[meta[:, 8:8+N1]]
+    active_class_ids.append(meta[:, 8+N1:8+N1+N2])
+    active_class_ids.append(meta[:, 8+N1+N2:8+N1+N2+N3])
+    active_class_ids.append(meta[:, 8+N1+N2+N3:8+N1+N2+N3+N4])
+    active_class_ids.append(meta[:, 8+N1+N2+N3+N4:8+N1+N2+N3+N4+N5])
+    return [image_id, image_shape, window]+active_class_ids
+    #return [image_id, image_shape, window, active_class_ids]
+
 
 
 ############################################################
@@ -2681,24 +2771,6 @@ def compose_image_meta(image_id, image_shape, window, active_class_ids):
         list(active_class_ids[4])
     )
     return meta
-
-
-def parse_image_meta_graph(meta,config):
-    """Parses a tensor that contains image attributes to its components.
-    See compose_image_meta() for more details.
-
-    meta: [batch, meta length] where meta length depends on NUM_CLASSES
-    """
-    image_id = meta[:, 0]
-    image_shape = meta[:, 1:4]
-    window = meta[:, 4:8]   # (y1, x1, y2, x2) window of image in in pixels
-    [N1,N2,N3,N4,N5]=config.NUM_CLASSES
-    active_class_ids=[meta[:, 8:8+N1]]
-    active_class_ids.append(meta[:, 8+N1:8+N1+N2])
-    active_class_ids.append(meta[:, 8+N1+N2:8+N1+N2+N3])
-    active_class_ids.append(meta[:, 8+N1+N2+N3:8+N1+N2+N3+N4])
-    active_class_ids.append(meta[:, 8+N1+N2+N3+N4:8+N1+N2+N3+N4+N5])
-    return [image_id, image_shape, window, active_class_ids]
 
 
 def mold_image(images, config):
