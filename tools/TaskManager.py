@@ -128,6 +128,7 @@ class ExtendedDatasetLoader(utils.Dataset):
         shape=info['shape']
         shape=[shape[0],shape[1]]
         mask=[]
+        pose=[]
         nbfail=0
         nbsuccess=0
         classes=[[],[],[],[],[]]
@@ -142,6 +143,12 @@ class ExtendedDatasetLoader(utils.Dataset):
                         sha=self.normalize(obj['objectShape'])
                         mat=self.normalize(obj['objectExternMaterial'])
                         opn=self.normalize(obj['objectOpenability'])
+                        ori=obj['objectLocalOrientation']
+                        #normalize angles to principal ones
+                        ori[0]=utils.principal_angle(ori[0])
+                        ori[1]=utils.principal_angle(ori[1])
+                        ori[2]=utils.principal_angle(ori[2])
+                        pos=obj['objectLocalPosition']
                         opn=self.normalize(config.OBJECT_OPENABILITY_DICO[opn])
                         if((cat in config.OBJECT_NAME_DICO) and (col in config.OBJECT_COLOR_DICO) and (sha in config.OBJECT_SHAPE_DICO) and \
                             (mat in config.OBJECT_MATERIAL_DICO) and (opn in list(config.OBJECT_OPENABILITY_DICO.values()))):
@@ -154,6 +161,7 @@ class ExtendedDatasetLoader(utils.Dataset):
                                     for cord in obj['objectSegmentationPixels']:
                                             img[cord[0]][cord[1]]=1
                                     mask.append(img.copy())
+                                    pose.append(np.array(ori+pos,dtype='float32'))
                                     nbsuccess+=1
                 except Exception as e:
                                     nbfail+=1
@@ -162,14 +170,17 @@ class ExtendedDatasetLoader(utils.Dataset):
             shape.append(nbInstances)
             print('\nShape:\n',shape)
             masks=np.zeros(shape,dtype='uint8')
+            poses=np.zeros([nbInstances,6],dtype='float32')
             for i in range(nbInstances):
                 masks[:,:,i]=mask[i].copy()
+                poses[i,:]=pose[i].copy()
             del mask[:]
+            del pose[:]
             for j in range(len(classes)):
                 for i in range(len(classes[j])):
                     classes[j][i]=self.class_names[j].index(classes[j][i])
                 classes[j]=np.array(classes[j],dtype='int32')
-            return masks,classes 
+            return masks,classes,poses 
         except Exception as e:
             print('\n\n Data '+str(annotationPath)+' could not be processed:'+str(e))
             return super(self.__class__,self).load_mask(image_id)
@@ -354,7 +365,7 @@ class TaskManager(object):
         dst=self.getDataset('c:/MSCOCO/val2014','litImage','annotation')
         class_ids=[r['class_cat_ids'],r['class_col_ids'],r['class_sha_ids'],r['class_mat_ids'],r['class_opn_ids']]
         scores=[r['scores_cat'],r['scores_col'],r['scores_sha'],r['scores_mat'],r['scores_opn']]
-        visualize.display_instances(image, r['rois'], r['masks'], class_ids, dst.class_names, scores, ax=get_ax())
+        visualize.display_instances(image, r['rois'], r['masks'], class_ids, dst.class_names,r['poses'], scores=scores, ax=get_ax())
 
 
 
