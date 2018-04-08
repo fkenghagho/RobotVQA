@@ -86,11 +86,12 @@ def apply_mask(image, mask, color, alpha=0.5):
     return image
 
 
-def display_instances(image, boxes, masks, class_ids, class_names,
+def display_instances(image, boxes, masks, class_ids, class_names,poses,
                       scores=None, title="",
                       figsize=(16, 16), ax=None):
     """
     boxes: [num_instance, (y1, x1, y2, x2, class_id)] in image coordinates.
+    poses: [num_instance, (tetax,tetay,tetaz,x,y,z)] in radians and cm.
     masks: [height, width, num_instances]
     class_ids: [NUM_FEATURES,num_instances] ids/feature
     class_names: [NUM_FEATURES], list of class names of the dataset/feature
@@ -102,7 +103,9 @@ def display_instances(image, boxes, masks, class_ids, class_names,
     if not N:
         print("\n*** No instances to display *** \n")
     else:
-        assert boxes.shape[0] == masks.shape[-1] == class_ids[0].shape[0]
+        assert boxes.shape[0] == masks.shape[-1] == class_ids[0].shape[0]==class_ids[1].shape[0]==class_ids[2].shape[0]==\
+        class_ids[3].shape[0]==class_ids[4].shape[0]==scores[0].shape[0]==scores[1].shape[0]==scores[2].shape[0]==\
+        scores[3].shape[0]==scores[4].shape[0]==poses.shape[0]
 
     if not ax:
         _, ax = plt.subplots(1, figsize=figsize)
@@ -116,11 +119,9 @@ def display_instances(image, boxes, masks, class_ids, class_names,
     ax.set_xlim(-10, width + 10)
     ax.axis('off')
     ax.set_title(title)
-
     masked_image = image.astype(np.uint32).copy()
     for i in range(N):
         color = colors[i]
-
         # Bounding box
         if not np.any(boxes[i]):
             # Skip this instance. Has no bbox. Likely lost in image cropping.
@@ -139,6 +140,8 @@ def display_instances(image, boxes, masks, class_ids, class_names,
         else:
             for j in range(len(class_ids)):
                 caption=caption+class_names[j][class_ids[j][i]]+'\n'
+        caption=caption+'Orientation: ('+str(poses[i][0])+','+str(poses[i][1])+','+str(poses[i][2])+')\n'
+        caption=caption+'Position: ('+str(poses[i][3])+','+str(poses[i][4])+','+str(poses[i][5])+')'
         x = random.randint(x1, (x1 + x2) // 2)
         ax.text(x1, y1 + 8, caption,
                 color='black', size=7, backgroundcolor="none")

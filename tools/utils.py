@@ -393,7 +393,8 @@ class Dataset(object):
         # Otherwise, it returns an empty mask.
         mask = np.empty([0, 0, 0])
         class_ids= np.empty([0], np.int32)
-        return mask, class_ids
+        poses= np.empty([0], np.float32)
+        return mask, class_ids, poses
 
 
 def resize_image(image, min_dim=None, max_dim=None, padding=False):
@@ -733,6 +734,16 @@ def batch_slice(inputs, graph_fn, batch_size, names=None,parallel_processing=Fal
 
     return result
 
+#principal measure in radians of  an  angle:
+def principal_angle(angle):
+    angle=np.pi*angle/180.
+    if angle<0.:
+        inc=np.pi*2
+    else:
+        inc=-np.pi*2
+    while(not(angle<=np.pi and angle>-np.pi)):
+        angle+=inc
+    return angle
 
 def download_trained_weights(coco_model_path, verbose=1):
     """Download COCO trained weights from Releases.
