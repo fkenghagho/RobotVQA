@@ -217,7 +217,10 @@ class ExtendedRobotVQAConfig(RobotVQAConfig):
     OBJECT_MATERIAL_DICO=['Plastic', 'Wood', 'Glass', 'Steel', 'Cartoon', 'Ceramic']
     #openability
     OBJECT_OPENABILITY_DICO={'True':'Openable','False':'Non-Openable'}
-    
+    #object relationships
+    OBJECT_RELATION_DICO={'BG':0,'Left':0+1,'Right':1+1,'Front':2+1,'Behind':3+1,'Over':4+1,'Under':5+1,'Valign':6+1,'In':7+1,'On':8+1}
+    #relationship categories
+    RELATION_CATEGORY_DICO={0:'Vertical',1:'Horizontal',2:'',3:'Vertical'}
     
 
     # Use small images for faster training. Set the limits of the small side
