@@ -135,6 +135,7 @@ class ExtendedDatasetLoader(utils.Dataset):
         try:
             with open(annotationPath,'r') as infile:
                 jsonImage=json.load(infile)
+            infile.close()
             img=np.zeros(shape,dtype='uint8')
             for obj in jsonImage['objects']:
                 try:
@@ -207,7 +208,7 @@ class ExtendedRobotVQAConfig(RobotVQAConfig):
     # Number of classes per features(object's category/name, color, shape, material, openability) (including background)
     NUM_CLASSES =[1+16,1+7,1+5,1+5,1+2]  # background + 3 shapes
     #categories
-    OBJECT_NAME_DICO=['CookTop','Tea','Juice','Plate','Mug','Bowl','Tray','Tomato','Ketchup','Salz','Milch','Spoon','Spatula','Milk','Coffee','Cookie','Knife','Cornflakes','Cornflake','Eggholder','EggHolder', 'Cube']#Any other is part of background
+    OBJECT_NAME_DICO=['CookTop','Tea','Juice','Plate','Mug','Bowl','Tray','Tomato','Ketchup','Salz','Milch','Spoon','Spatula','Milk','Coffee','Cookie','Knife','Cornflakes','Cornflake','Eggholder','EggHolder', 'Cube','Mayonnaise','Cereal','Reis']#Any other is part of background
     #colors
     OBJECT_COLOR_DICO=['Red', 'Orange', 'Brown', 'Yellow', 'Green', 'Blue', 'White', 'Gray', 'Black', 'Transparent']
     #shape

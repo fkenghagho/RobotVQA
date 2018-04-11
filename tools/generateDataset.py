@@ -1,5 +1,6 @@
 import numpy as np
 import os 
+import glob
 import sys
 import time
 import StringIO, PIL.Image
@@ -673,7 +674,130 @@ class Dataset(object):
             print('Object mask saved successfully.')
         except Exception,e:
             print('Failed to save object mask. '+str(e))
-    
+            
+            
+    def cleanRelation(self):
+        """make the relations consistent """
+        try:
+            #load annotation files
+            annotation_files=glob.glob(self.folder+'/*.json')
+            print annotation_files
+            #Initialize dictionary for objId-category mapping
+            self.dict_id_cat={}
+            
+            #Initialize counter for number of relations group by relation types
+            self.rel_count={'left':0,'right':0,'front':0,'behind':0,'over':0,'under':0,'valign':0,'in':0,'on':0}
+            
+            #Initialize set of valid categories
+            self.valid_cat=['CookTop','Tea','Juice','Plate','Mug','Bowl','Tray','Tomato','Ketchup','Salz','Milch','Spoon','Spatula','Milk',
+            'Coffee','Cookie','Knife','Cornflakes','Cornflake','Eggholder','EggHolder', 'Cube','Mayonnaise','Cereal','Reis']
+            
+            #process each file
+            
+            for jsonFile in annotation_files:
+                try:
+                    #open json file
+                    with open(jsonFile,'r') as infile:
+                        jsonImage=json.load(infile)
+                    infile.close()
+                    
+                    #Modify json file
+                    if jsonImage['objectRelationship']!=[]:
+                        #Complete the id-cat dictionary
+                        print('Updating id-cat dictionary ...')
+                        for obj in jsonImage['objects']:
+                            try:
+                                catName=obj['objectName'][0].upper()+obj['objectName'][1:]
+                                idName=obj['objectId']
+                                if idName not in list(self.dict_id_cat.keys()):
+                                    self.dict_id_cat[idName]=catName
+                            except Exception,e:
+                                print('An object processing failed: '+str(e))
+                        #clean up relations
+                        relations1=[]
+                        print('Cleaning up relations ...')
+                        #Remove redundance
+                        print('1. Eliminating duplications ...')
+                        for rel in jsonImage['objectRelationship']:
+                            if rel not in relations1:
+                                relations1.append(rel.copy())
+                        #Remove relations involving invalid object categories
+                        print('2. Eliminating relations involving invalid object categories ...')
+                        relations2=[]
+                        for rel in relations1:
+                            if (self.dict_id_cat[rel['object1']] in self.valid_cat and self.dict_id_cat[rel['object2']] in self.valid_cat):
+                                relations2.append(rel.copy())
+                        del relations1[:]
+                        #Remove identities
+                        print('3. Eliminating identity relations ...')
+                        relations3=[]
+                        for rel in relations2:
+                            if rel['object1']!=rel['object2']:
+                                relations3.append(rel.copy())
+                        del relations2[:]
+                        #Remove  inconsistencies
+                        print('4. Eliminating inconstent relations ...')
+                        relations4=[]
+                        for rel in relations3:
+                            rel1=rel.copy()
+                            rel1['object1']=rel['object2']
+                            rel1['object2']=rel['object1']
+                            if rel1 not in relations3:
+                                relations4.append(rel.copy())
+                        del relations3[:]
+                        #Remove  unknown relations
+                        print('5. Eliminating unknown relations ...')
+                        relations5=[]
+                        for rel in relations4:
+                            if rel['relation'] in list(self.rel_count.keys()):
+                                relations5.append(rel.copy())
+                        del relations4[:]
+                        #Augmenting relations
+                        print('6. Augmenting relations ...')
+                        relations6=[]
+                        for rel in relations5:
+                            rel1=rel.copy()
+                            if rel['relation']=='on':
+                                rel1['relation']='under'
+                                rel1['object1']=rel['object2']
+                                rel1['object2']=rel['object1']
+                            else:
+                                if rel['relation']=='under':
+                                    rel1['relation']='over'
+                                    rel1['object1']=rel['object2']
+                                    rel1['object2']=rel['object1']
+                                else:
+                                    if rel['relation']=='front':
+                                        rel1['relation']='behind'
+                                        rel1['object1']=rel['object2']
+                                        rel1['object2']=rel['object1']
+                                    else:
+                                        if rel['relation']=='left':
+                                            rel1['relation']='right'
+                                            rel1['object1']=rel['object2']
+                                            rel1['object2']=rel['object1']
+                            if rel not in relations6:
+                                relations6.append(rel.copy())
+                            if rel1 not in relations6:
+                                relations6.append(rel1.copy())
+                        del relations5[:]
+                        print('7. Updating instance counter ...')
+                        for rel in relations6:
+                            self.rel_count[rel['relation']]+=1
+                    
+                    #Save json file
+                    del jsonImage['objectRelationship'][:]
+                    jsonImage['objectRelationship']=jsonImage['objectRelationship']+relations6
+                    print('Saving changes ...')
+                    with open(jsonFile,'w') as infile:
+                        json.dump(jsonImage,infile)
+                    infile.close()
+                    del relations6[:]
+                except Exception,e:
+                    print('Failed to clean up '+jsonFile+': '+str(e))
+            print('Relation clean-up successfully terminated!')
+        except Exception,e:
+            print('\n\n Failed to clean up relations among objects: '+str(e))
     
     def BigNum(self,x):
         return (x)
