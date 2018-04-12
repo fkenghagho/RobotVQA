@@ -396,9 +396,8 @@ class Dataset(object):
         mask = np.empty([0, 0, 0])
         class_ids= np.empty([0], np.int32)
         poses= np.empty([0], np.float32)
-        relations=np.empty([0,0], np.int32)
-        relation_categories=np.empty([0,0], np.int32)
-        return mask, class_ids, poses, relations, relation_categories
+        relations=np.empty([0,0,0], np.int32)
+        return mask, class_ids, poses, relations
 
 
 def resize_image(image, min_dim=None, max_dim=None, padding=False):

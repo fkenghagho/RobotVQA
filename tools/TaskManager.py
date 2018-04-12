@@ -188,8 +188,7 @@ class ExtendedDatasetLoader(utils.Dataset):
             print('\nShape:\n',shape)
             masks=np.zeros(shape,dtype='uint8')
             poses=np.zeros([nbInstances,6],dtype='float32')
-            relations=np.zeros([nbInstances,nbInstances],dtype='int32')
-            relation_categories=np.zeros([nbInstances,nbInstances],dtype='int32')
+            relations=np.zeros([nbInstances,nbInstances,4],dtype='int32')
             for i in range(nbInstances):
                 masks[:,:,i]=mask[i].copy()
                 poses[i,:]=pose[i].copy()
@@ -201,11 +200,11 @@ class ExtendedDatasetLoader(utils.Dataset):
                 classes[j]=np.array(classes[j],dtype='int32')
             for rel in jsonImage['objectRelationship']:
                 if(rel['object1'] in id_name_map) and (rel['object2'] in id_name_map):
-                    relations[id_name_map.index(rel['object1'])][id_name_map.index(rel['object2'])]=self.class_names[5].index(self.normalize(rel['relation']))
-                    relation_categories[id_name_map.index(rel['object1'])][id_name_map.index(rel['object2'])]=\
-                    self.class_names[6].index(config.OBJECT_RELATION_DICO[self.normalize(rel['relation'])])    
+                    relations[id_name_map.index(rel['object1'])][id_name_map.index(rel['object2'])][self.class_names[6].index(config.OBJECT_RELATION_DICO[self.normalize(rel['relation'])])-1]=self.class_names[5].index(self.normalize(rel['relation']))
+                   
+                        
             del id_name_map[:]
-            return masks,classes,poses,relations,relation_categories 
+            return masks,classes,poses,relations
         except Exception as e:
             print('\n\n Data '+str(annotationPath)+' could not be processed:'+str(e))
             return super(self.__class__,self).load_mask(image_id)
