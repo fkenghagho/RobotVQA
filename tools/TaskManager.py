@@ -51,6 +51,7 @@ class ExtendedDatasetLoader(utils.Dataset):
     def normalize(self,s):
         """Capitalize first letter of string s
         """
+        s=s.rstrip().lstrip()
         return s[0].upper()+s[1:]
         
             
@@ -101,9 +102,22 @@ class ExtendedDatasetLoader(utils.Dataset):
         print('\n',nbsuccess,' Objects successfully found and ',nbfails,' Objects failed!', '\n')
         print('\nClasses found:',classes, '\n')
         print('\nRegistering classes ...\n')
-        for feature_id in range(config.NUM_FEATURES):
+        for feature_id in range(config.NUM_FEATURES-2):
             for i in range(len(classes[feature_id])):
                 self.add_class(feature_id,"robotVQA",i+1,classes[feature_id][i])
+        
+        print('\nAdding object relationships ...\n')        
+        #Add relationships
+        feature_id=5
+        for i in range(config.NUM_CLASSES[feature_id]-1):
+                 self.add_class(feature_id,"robotVQA",i+1,self.normalize(list(config.OBJECT_RELATION_DICO.keys())[i]))
+                 
+        print('\nAdding relationship categories ...\n')        
+        #Add relationship categories
+        feature_id=6
+        for i in range(config.NUM_CLASSES[feature_id]-1):
+                 self.add_class(feature_id,"robotVQA",i+1,self.normalize(list(config.RELATION_CATEGORY_DICO.values())[i]))
+        
         print('\nAdding images ...\n')
         #Add images      
         for i in range(len(images)):
@@ -132,6 +146,7 @@ class ExtendedDatasetLoader(utils.Dataset):
         nbfail=0
         nbsuccess=0
         classes=[[],[],[],[],[]]
+        id_name_map=[]
         try:
             with open(annotationPath,'r') as infile:
                 jsonImage=json.load(infile)
@@ -153,6 +168,7 @@ class ExtendedDatasetLoader(utils.Dataset):
                         opn=self.normalize(config.OBJECT_OPENABILITY_DICO[opn])
                         if((cat in config.OBJECT_NAME_DICO) and (col in config.OBJECT_COLOR_DICO) and (sha in config.OBJECT_SHAPE_DICO) and \
                             (mat in config.OBJECT_MATERIAL_DICO) and (opn in list(config.OBJECT_OPENABILITY_DICO.values()))):
+                                    id_name_map.append(obj['objectId'])
                                     classes[0].append(cat)
                                     classes[1].append(col)
                                     classes[2].append(sha)
@@ -172,6 +188,8 @@ class ExtendedDatasetLoader(utils.Dataset):
             print('\nShape:\n',shape)
             masks=np.zeros(shape,dtype='uint8')
             poses=np.zeros([nbInstances,6],dtype='float32')
+            relations=np.zeros([nbInstances,nbInstances],dtype='int32')
+            relation_categories=np.zeros([nbInstances,nbInstances],dtype='int32')
             for i in range(nbInstances):
                 masks[:,:,i]=mask[i].copy()
                 poses[i,:]=pose[i].copy()
@@ -181,7 +199,13 @@ class ExtendedDatasetLoader(utils.Dataset):
                 for i in range(len(classes[j])):
                     classes[j][i]=self.class_names[j].index(classes[j][i])
                 classes[j]=np.array(classes[j],dtype='int32')
-            return masks,classes,poses 
+            for rel in jsonImage['objectRelationship']:
+                if(rel['object1'] in id_name_map) and (rel['object2'] in id_name_map):
+                    relations[id_name_map.index(rel['object1'])][id_name_map.index(rel['object2'])]=self.class_names[5].index(self.normalize(rel['relation']))
+                    relation_categories[id_name_map.index(rel['object1'])][id_name_map.index(rel['object2'])]=\
+                    self.class_names[6].index(config.OBJECT_RELATION_DICO[self.normalize(rel['relation'])])    
+            del id_name_map[:]
+            return masks,classes,poses,relations,relation_categories 
         except Exception as e:
             print('\n\n Data '+str(annotationPath)+' could not be processed:'+str(e))
             return super(self.__class__,self).load_mask(image_id)
@@ -202,13 +226,14 @@ class ExtendedRobotVQAConfig(RobotVQAConfig):
     IMAGES_PER_GPU = 1
     
     #Number of target feature
-    NUM_FEATURES=5
+    NUM_FEATURES=7
     #Target features
-    FEATURES_INDEX={'CATEGORY':0,'COLOR':1,'SHAPE':2,'MATERIAL':3,'OPENABILITY':4}
+    FEATURES_INDEX={'CATEGORY':0,'COLOR':1,'SHAPE':2,'MATERIAL':3,'OPENABILITY':4,'RELATION':5,'RELATION_CATEGORY':6}
     # Number of classes per features(object's category/name, color, shape, material, openability) (including background)
-    NUM_CLASSES =[1+16,1+7,1+5,1+5,1+2]  # background + 3 shapes
+    NUM_CLASSES =[1+18,1+7,1+5,1+5,1+2,1+9,1+4]  # background + 3 shapes
     #categories
-    OBJECT_NAME_DICO=['CookTop','Tea','Juice','Plate','Mug','Bowl','Tray','Tomato','Ketchup','Salz','Milch','Spoon','Spatula','Milk','Coffee','Cookie','Knife','Cornflakes','Cornflake','Eggholder','EggHolder', 'Cube','Mayonnaise','Cereal','Reis']#Any other is part of background
+    OBJECT_NAME_DICO=['Cooktop','Tea','Juice','Plate','Mug','Bowl','Tray','Tomato','Ketchup','Salz','Milch','Spoon','Spatula','Milk','Coffee','Cookie','Knife','Cornflakes'
+    ,'EggHolder', 'Cube','Mayonnaise','Cereal','Reis']#Any other is part of background
     #colors
     OBJECT_COLOR_DICO=['Red', 'Orange', 'Brown', 'Yellow', 'Green', 'Blue', 'White', 'Gray', 'Black', 'Transparent']
     #shape
@@ -218,9 +243,9 @@ class ExtendedRobotVQAConfig(RobotVQAConfig):
     #openability
     OBJECT_OPENABILITY_DICO={'True':'Openable','False':'Non-Openable'}
     #object relationships
-    OBJECT_RELATION_DICO={'BG':0,'Left':0+1,'Right':1+1,'Front':2+1,'Behind':3+1,'Over':4+1,'Under':5+1,'Valign':6+1,'In':7+1,'On':8+1}
+    OBJECT_RELATION_DICO={'Left':'LeftRight','Right':'LeftRight','Front':'FrontBehind','Behind':'FrontBehind','Over':'OverUnder','Under':'OverUnder','Valign':'OverUnder','In':'OnIn','On':'OnIn'}
     #relationship categories
-    RELATION_CATEGORY_DICO={0:'Vertical',1:'Horizontal',2:'',3:'Vertical'}
+    RELATION_CATEGORY_DICO={0+1:'LeftRight',1+1:'FrontBehind',2+1:'OverUnder',3+1:'OnIn'}
     
 
     # Use small images for faster training. Set the limits of the small side
