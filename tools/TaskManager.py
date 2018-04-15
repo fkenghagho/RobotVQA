@@ -229,7 +229,7 @@ class ExtendedRobotVQAConfig(RobotVQAConfig):
     #Target features
     FEATURES_INDEX={'CATEGORY':0,'COLOR':1,'SHAPE':2,'MATERIAL':3,'OPENABILITY':4,'RELATION':5,'RELATION_CATEGORY':6}
     # Number of classes per features(object's category/name, color, shape, material, openability) (including background)
-    NUM_CLASSES =[1+18,1+7,1+5,1+5,1+2,1+9,1+4]  # background + 3 shapes
+    NUM_CLASSES =[1+20,1+7,1+5,1+5,1+2,1+9,1+4]  # background + 3 shapes
     #categories
     OBJECT_NAME_DICO=['Cooktop','Tea','Juice','Plate','Mug','Bowl','Tray','Tomato','Ketchup','Salz','Milch','Spoon','Spatula','Milk','Coffee','Cookie','Knife','Cornflakes'
     ,'EggHolder', 'Cube','Mayonnaise','Cereal','Reis']#Any other is part of background
@@ -257,7 +257,13 @@ class ExtendedRobotVQAConfig(RobotVQAConfig):
 
     # Reduce training ROIs per image because the images are small and have
     # few objects. Aim to allow ROI sampling to pick 33% positive ROIs.
-    TRAIN_ROIS_PER_IMAGE = 100
+    TRAIN_ROIS_PER_IMAGE = 2
+
+    # Maximum number of ground truth instances to use in one image
+    MAX_GT_INSTANCES = 2
+    
+    # Max number of final detections
+    DETECTION_MAX_INSTANCES = 2
 
     # Use a small epoch since the data is simple
     STEPS_PER_EPOCH = 100
@@ -391,9 +397,10 @@ class TaskManager(object):
         results = model.detect([image], verbose=1)
         r = results[0]
         dst=self.getDataset('c:/MSCOCO/val2014','litImage','annotation')
-        class_ids=[r['class_cat_ids'],r['class_col_ids'],r['class_sha_ids'],r['class_mat_ids'],r['class_opn_ids']]
-        scores=[r['scores_cat'],r['scores_col'],r['scores_sha'],r['scores_mat'],r['scores_opn']]
-        visualize.display_instances(image, r['rois'], r['masks'], class_ids, dst.class_names,r['poses'], scores=scores, ax=get_ax())
+        class_ids=[r['class_cat_ids'],r['class_col_ids'],r['class_sha_ids'],r['class_mat_ids'],r['class_opn_ids'],r['class_rel_ids']]
+        scores=[r['scores_cat'],r['scores_col'],r['scores_sha'],r['scores_mat'],r['scores_opn'],r['scores_rel']]
+        visualize.display_instances(image, r['rois'], r['masks'], class_ids, dst.class_names,r['poses'], scores=scores, ax=get_ax(cols=2),\
+        title='Object description',title1='Object relationships')
 
 
 

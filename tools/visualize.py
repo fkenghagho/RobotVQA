@@ -87,8 +87,8 @@ def apply_mask(image, mask, color, alpha=0.5):
 
 
 def display_instances(image, boxes, masks, class_ids, class_names,poses,
-                      scores=None, title="",
-                      figsize=(16, 16), ax=None):
+                      scores=None, title="",title1='',
+                      figsize=(16, 16), axs=None):
     """
     boxes: [num_instance, (y1, x1, y2, x2, class_id)] in image coordinates.
     poses: [num_instance, (tetax,tetay,tetaz,x,y,z)] in radians and cm.
@@ -108,18 +108,23 @@ def display_instances(image, boxes, masks, class_ids, class_names,poses,
         scores[3].shape[0]==scores[4].shape[0]==poses.shape[0]
 
     if not ax:
-        _, ax = plt.subplots(1, figsize=figsize)
+        _, axs = plt.subplots(1,2, figsize=figsize)
+    ax=axs[0]
+    ax1=axs[1]
 
     # Generate random colors
     colors = random_colors(N)
-
+    titles=[title,title1]
     # Show area outside image boundaries.
     height, width = image.shape[:2]
-    ax.set_ylim(height + 10, -10)
-    ax.set_xlim(-10, width + 10)
-    ax.axis('off')
-    ax.set_title(title)
+    for i in range(cols*rows):
+        axs[i].set_ylim(height + 10, -10)
+        axs[i].set_xlim(-10, width + 10)
+        axs[i].axis('off')
+        axs[i].set_title(titles[i])
     masked_image = image.astype(np.uint32).copy()
+    x2=40
+    y2=40
     for i in range(N):
         color = colors[i]
         # Bounding box
@@ -133,18 +138,27 @@ def display_instances(image, boxes, masks, class_ids, class_names,poses,
         ax.add_patch(p)
 
         # Label
-        caption=''
+        caption=str(i)+'. '
         if scores!=None:
-            for j in range(len(class_ids)):
+            for j in range(len(class_ids)-1):
                 caption=caption+class_names[j][class_ids[j][i]]+' '+str(scores[j][i])+'\n'
         else:
-            for j in range(len(class_ids)):
+            for j in range(len(class_ids)-1):
                 caption=caption+class_names[j][class_ids[j][i]]+'\n'
         caption=caption+'Orientation: ('+str(poses[i][0])+','+str(poses[i][1])+','+str(poses[i][2])+')\n'
         caption=caption+'Position: ('+str(poses[i][3])+','+str(poses[i][4])+','+str(poses[i][5])+')'
         x = random.randint(x1, (x1 + x2) // 2)
         ax.text(x1, y1 + 8, caption,
                 color='black', size=7, backgroundcolor="none")
+                
+        #object relationship
+        for k in range(N):
+            for l in range(4):
+                if(class_ids[len(class_ids)-1][i][k][l]!=0):
+                    caption=str(i)+'.'+class_names[0][class_ids[0][i]]+' is '+class_names[5][class_ids[len(class_ids)-1][i][k][l]]+' '+str(k)+\
+                    '.'+class_names[0][class_ids[0][k]]+': '+str((scores[len(class_ids)-1][i][k][l]))+'.'
+                    ax1.text(x2, y2, caption,color='black', size=12, backgroundcolor="white")
+                    y2+=10
 
         # Mask
         mask = masks[:, :, i]

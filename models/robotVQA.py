@@ -467,6 +467,7 @@ def detection_targets_graph(Inputs, config):
     proposals: [N, (y1, x1, y2, x2)] in normalized coordinates. Might
                be zero padded if there are not enough proposals.
     gt_class_ids: [NUM_FEATURES,MAX_GT_INSTANCES] int class IDs
+    relations:    [MAX_GT_INSTANCES,MAX_GT_INSTANCES,4]
     gt_boxes: [MAX_GT_INSTANCES, (y1, x1, y2, x2)] in normalized coordinates.
     gt_masks: [height, width, MAX_GT_INSTANCES] of boolean type.
     gt_poses: [MAX_GT_INSTANCES, (tetax,tetay,tetaz,x,y,z)]
@@ -475,6 +476,7 @@ def detection_targets_graph(Inputs, config):
     and masks.
     rois: [TRAIN_ROIS_PER_IMAGE, (y1, x1, y2, x2)] in normalized coordinates
     class_ids: [TRAIN_ROIS_PER_IMAGE]. Integer class IDs. Zero padded.
+    relations: [TRAIN_ROIS_PER_IMAGE,TRAIN_ROIS_PER_IMAGE,4]
     deltas: [TRAIN_ROIS_PER_IMAGE, NUM_CLASSES, (dy, dx, log(dh), log(dw))]
             Class-specific bbox refinements.
     masks: [TRAIN_ROIS_PER_IMAGE, height, width). Masks cropped to bbox
@@ -485,10 +487,10 @@ def detection_targets_graph(Inputs, config):
     """
     #input
     proposals=Inputs[0]
-    gt_class_ids=Inputs[1:6]
-    gt_boxes=Inputs[6]
-    gt_masks=Inputs[7]
-    gt_poses=Inputs[8]
+    gt_class_ids=Inputs[1:7]
+    gt_boxes=Inputs[7]
+    gt_masks=Inputs[8]
+    gt_poses=Inputs[9]
     # Assertions
     asserts = [
         tf.Assert(tf.greater(tf.shape(proposals)[0], 0), [proposals],
@@ -500,9 +502,14 @@ def detection_targets_graph(Inputs, config):
     # Remove zero padding
     proposals, _ = trim_zeros_graph(proposals, name="trim_proposals")
     gt_boxes, non_zeros = trim_zeros_graph(gt_boxes, name="trim_gt_boxes")
-    for i in range(config.NUM_FEATURES):
+    for i in range(config.NUM_FEATURES-2):
         gt_class_ids[i] = tf.boolean_mask(gt_class_ids[i], non_zeros,
                                     name="trim_gt_class_ids"+str(i))
+                                    
+    gt_class_ids[5]=tf.gather(gt_class_ids[5], tf.where(non_zeros)[:, 0], axis=0,
+                         name="trim_gt_relations0")
+    gt_class_ids[5]=tf.gather(gt_class_ids[5], tf.where(non_zeros)[:, 0], axis=1,
+                         name="trim_gt_relations1")
     gt_poses=tf.gather(gt_poses, tf.where(non_zeros)[:, 0], axis=0,
                          name="trim_gt_poses")
     gt_masks = tf.gather(gt_masks, tf.where(non_zeros)[:, 0], axis=2,
@@ -515,8 +522,11 @@ def detection_targets_graph(Inputs, config):
     non_crowd_ix = tf.where(gt_class_ids[0] > 0)[:, 0]
     crowd_boxes = tf.gather(gt_boxes, crowd_ix)
     crowd_masks = tf.gather(gt_masks, crowd_ix, axis=2)
-    for i in range(config.NUM_FEATURES):
+    for i in range(config.NUM_FEATURES-2):
         gt_class_ids[i] = tf.gather(gt_class_ids[i], non_crowd_ix)
+        
+    gt_class_ids[5] = tf.gather(gt_class_ids[5], non_crowd_ix, axis=0)
+    gt_class_ids[5] = tf.gather(gt_class_ids[5], non_crowd_ix, axis=1)
     gt_boxes = tf.gather(gt_boxes, non_crowd_ix)
     gt_poses = tf.gather(gt_poses, non_crowd_ix)
     gt_masks = tf.gather(gt_masks, non_crowd_ix, axis=2)
@@ -557,9 +567,9 @@ def detection_targets_graph(Inputs, config):
     roi_gt_boxes = tf.gather(gt_boxes, roi_gt_box_assignment)
     roi_gt_poses = tf.gather(gt_poses, roi_gt_box_assignment)
     roi_gt_class_ids=[]
-    for i in range(config.NUM_FEATURES):
+    for i in range(config.NUM_FEATURES-2):
         roi_gt_class_ids.append(tf.gather(gt_class_ids[i], roi_gt_box_assignment))
-
+    roi_gt_class_ids.append(tf.gather(tf.gather(gt_class_ids[5], roi_gt_box_assignment,axis=0),roi_gt_box_assignment,axis=1))
     # Compute bbox refinement for positive ROIs
     deltas = utils.box_refinement_graph(positive_rois, roi_gt_boxes)
     deltas /= config.BBOX_STD_DEV
@@ -603,8 +613,9 @@ def detection_targets_graph(Inputs, config):
     rois = tf.pad(rois, [(0, P), (0, 0)])
     roi_gt_boxes = tf.pad(roi_gt_boxes, [(0, N + P), (0, 0)])
     roi_gt_poses = tf.pad(roi_gt_poses, [(0, N + P), (0, 0)])
-    for i in range(config.NUM_FEATURES):
+    for i in range(config.NUM_FEATURES-2):
         roi_gt_class_ids[i] = tf.pad(roi_gt_class_ids[i], [(0, N + P)])
+    roi_gt_class_ids[5] = tf.pad(roi_gt_class_ids[5], [(0, N + P),(0, N + P),(0, 0)])
     deltas = tf.pad(deltas, [(0, N + P), (0, 0)])
     masks = tf.pad(masks, [[0, N + P], (0, 0), (0, 0)])
 
@@ -619,6 +630,7 @@ class DetectionTargetLayer(KE.Layer):
     proposals: [batch, N, (y1, x1, y2, x2)] in normalized coordinates. Might
                be zero padded if there are not enough proposals.
     gt_class_ids: [batch,NUM_FEATURES, MAX_GT_INSTANCES] Integer class IDs/output feature.
+    relations: [batch,MAX_GT_INSTANCES,MAX_GT_INSTANCES,4]
     gt_boxes: [batch, MAX_GT_INSTANCES, (y1, x1, y2, x2)] in normalized
               coordinates.
     gt_masks: [batch, height, width, MAX_GT_INSTANCES] of boolean type
@@ -628,6 +640,7 @@ class DetectionTargetLayer(KE.Layer):
     rois: [batch, TRAIN_ROIS_PER_IMAGE, (y1, x1, y2, x2)] in normalized
           coordinates
     target_class_ids: [batch, TRAIN_ROIS_PER_IMAGE]. Integer class IDs.
+    relations: [batch,TRAIN_ROIS_PER_IMAGE,TRAIN_ROIS_PER_IMAGE,4]
     target_deltas: [batch, TRAIN_ROIS_PER_IMAGE, NUM_CLASSES,
                     (dy, dx, log(dh), log(dw), class_id)]
                    Class-specific bbox refinements.
@@ -645,10 +658,10 @@ class DetectionTargetLayer(KE.Layer):
 
     def call(self, inputs):
         proposals = inputs[0]
-        gt_class_ids = inputs[1:6]
-        gt_boxes = inputs[6]
-        gt_masks = inputs[7]
-        gt_poses = inputs[8]
+        gt_class_ids = inputs[1:7]
+        gt_boxes = inputs[7]
+        gt_masks = inputs[8]
+        gt_poses = inputs[9]
 
         # Slice the batch and run a graph for each slice
         # TODO: Rename target_bbox to target_deltas for clarity
@@ -665,6 +678,7 @@ class DetectionTargetLayer(KE.Layer):
             (None, 1),  # class_ids/shape
             (None, 1),  # class_ids/material
             (None, 1),  # class_ids/openability
+            (None,self.config.TRAIN_ROIS_PER_IMAGE, self.config.TRAIN_ROIS_PER_IMAGE, 4),# relations
             (None, self.config.TRAIN_ROIS_PER_IMAGE, 4),  # deltas
             (None, self.config.TRAIN_ROIS_PER_IMAGE, self.config.MASK_SHAPE[0],
             self.config.MASK_SHAPE[1]) , # masks
@@ -672,7 +686,7 @@ class DetectionTargetLayer(KE.Layer):
         ]
 
     def compute_mask(self, inputs, mask=None):
-        return [None,None, None, None, None, None, None, None,None]
+        return [None,None, None, None, None, None, None, None,None,None]
 
 
 ############################################################
@@ -928,7 +942,7 @@ def build_rpn_model(anchor_stride, anchors_per_location, depth):
 #  Feature Pyramid Network Heads
 ############################################################
 
-def fpn_classifier_graph(rois, feature_maps,
+def fpn_classifier_graph(transform_func,rois, feature_maps,
                          image_shape, pool_size, num_classes):
     """Builds the computation graph of the feature pyramid network classifier
     and regressor heads.
@@ -965,6 +979,17 @@ def fpn_classifier_graph(rois, feature_maps,
 
     shared = KL.Lambda(lambda x: K.squeeze(K.squeeze(x, 3), 2),
                        name="pool_squeeze")(x)
+                       
+    #input for relational network
+    batch_size,nber_boxes,obj_feature_size=shared.get_shape()
+    relational_graph_input=[]
+    for i in range(1,5):
+        relational_graph_input.append(transform_func(shared,i))
+        print(relational_graph_input[i-1].shape)
+    
+    #output for relational network
+    relational_graph_output={'probs':[],'logits':[]}
+            
 
     # Classifier head
     mrcnn_class_logits=[]
@@ -978,7 +1003,19 @@ def fpn_classifier_graph(rois, feature_maps,
                                             name='mrcnn_class_logits3')(shared))
     mrcnn_class_logits.append(KL.TimeDistributed(KL.Dense(num_classes[4]),
                                             name='mrcnn_class_logits4')(shared))
-                                            
+    
+    print('fpn',[nber_boxes,nber_boxes,num_classes[5]])
+    
+    relational_graph_reshape=KL.Reshape([int(nber_boxes),int(nber_boxes),int(num_classes[5])],name="rel_reshape0")
+    relational_graph_logits=KL.TimeDistributed(KL.Dense(num_classes[5]),name='mrcnn_class_logits5')                                        
+    for i in range(len(relational_graph_input)):
+        y= relational_graph_logits(relational_graph_input[i])
+        print('y',y.shape)
+        relational_graph_output['logits'].append(relational_graph_reshape(y))
+   
+    
+    
+                                    
     mrcnn_probs = []
     mrcnn_probs.append(KL.TimeDistributed(KL.Activation("softmax"),
                                      name="mrcnn_class0")(mrcnn_class_logits[0]))
@@ -990,7 +1027,23 @@ def fpn_classifier_graph(rois, feature_maps,
                                      name="mrcnn_class3")(mrcnn_class_logits[3]))
     mrcnn_probs.append(KL.TimeDistributed(KL.Activation("softmax"),
                                      name="mrcnn_class4")(mrcnn_class_logits[4]))
-
+               
+                                     
+    relational_graph_probs=KL.TimeDistributed(KL.Activation("softmax"),name="mrcnn_class5")                                        
+    for i in range(len(relational_graph_input)):
+        z=relational_graph_probs(relational_graph_output['logits'][i])
+        relational_graph_output['probs'].append(relational_graph_reshape(z))
+        
+    
+    rel_logits=KL.Lambda(lambda x: K.stack(x,axis=4), name="rel_logits_stack1")(relational_graph_output['logits'])    
+    mrcnn_class_logits.append(rel_logits) 
+    
+    rel_probs=KL.Lambda(lambda x: K.stack(x,axis=4), name="rel_probs_stack2")(relational_graph_output['probs'])    
+    mrcnn_probs.append(rel_probs) 
+    
+    
+    print('checkup',mrcnn_class_logits[5].shape)
+    print('checkup1',mrcnn_probs[5].shape)
     # BBox head
     # [batch, boxes, num_classes * (dy, dx, log(dh), log(dw))]
     x = KL.TimeDistributed(KL.Dense(num_classes[0] * 4, activation='linear'),
@@ -1008,7 +1061,7 @@ def fpn_classifier_graph(rois, feature_maps,
     # Reshape to [batch, boxes, num_classes, (tx,ty,tz,x,y,z)]
     s = K.int_shape(x)
     mrcnn_poses = KL.Reshape((s[1], num_classes[0], 6), name="mrcnn_poses")(x)
-    
+    print('checkup2',mrcnn_poses.shape)
 
     return mrcnn_class_logits, mrcnn_probs, mrcnn_bbox, mrcnn_poses
 
@@ -1147,6 +1200,7 @@ def mrcnn_class_loss_graph(target_class_ids, pred_class_logits,
         classes that are in the dataset of the image, and 0
         for classes that are not in the dataset.
     """
+    print('shapwssssssss',target_class_ids.shape)
     target_class_ids = tf.cast(target_class_ids, 'int64')
 
     # Find predictions of classes that are not in the dataset.
@@ -1166,6 +1220,7 @@ def mrcnn_class_loss_graph(target_class_ids, pred_class_logits,
     # Computer loss mean. Use only predictions that contribute
     # to the loss to get a correct mean.
     loss = tf.reduce_sum(loss) / tf.reduce_sum(pred_active)
+    print('lossss',loss)
     return loss
 
 
@@ -1174,21 +1229,57 @@ def mrcnn_class_rel_loss_graph(target_class_ids, pred_class_logits,
                            active_class_ids):
     """Loss for the classifier head of Mask RCNN.
 
-    target_class_ids: [batch, num_rois]. Integer class IDs. Uses zero
+    target_class_ids: [batch, num_rois, num_rois,4]. Integer class IDs. Uses zero
         padding to fill in the array.
-    pred_class_logits: [batch, num_rois, num_classes]
+    pred_class_logits: [batch, num_rois,num_rois,num_classes,4]
     active_class_ids: [batch, num_classes]. Has a value of 1 for
         classes that are in the dataset of the image, and 0
         for classes that are not in the dataset.
     """
+    
+    #remove adversary relationships
+    
+    #transform target_class_ids from [batch, num_rois, num_rois,4] to [batch, num_rois*num_rois*4]
+    
+    _,nber_boxes,nber_boxes,channels=target_class_ids.get_shape()
+    batch_size=1
+    print(batch_size,nber_boxes,nber_boxes,channels)
+    channels=4
+    obj_feature_pairs=[]
+    list_of_valid_obj=[]
+    for k in range(batch_size):
+        list_of_valid_obj.append(tf.reshape(tf.where(tf.count_nonzero(tf.count_nonzero(target_class_ids[k],2),0)),[-1]))
+        print(list_of_valid_obj[k].shape)
+        if(list_of_valid_obj[k].shape[0]==0):
+            #All are adversary relationships/No backpropagation
+            return K.constant(value=0.0,shape=[])
+        obj_feature_pairs.append(tf.reshape(tf.concat(values=[tf.gather(tf.gather(target_class_ids[k,:,:,i],list_of_valid_obj[k],axis=0),list_of_valid_obj[k],axis=1) for i in range(channels)],axis=1),[-1]))
+    target_class_ids=tf.stack(obj_feature_pairs,axis=0)
+    print('target_class_ids',target_class_ids.shape)
+    print('hello')
+    #transform pred_class_logits from [batch, num_rois, num_rois,num_classes,4] to [batch, num_rois*num_rois*4,num_classes]
+    print('=pred_class_logits',pred_class_logits.shape)
+    _,nber_boxes,nber_boxes,num_classes,channels=pred_class_logits.get_shape()
+    channels=4
+    print('=pred_class_logits',pred_class_logits.shape)
+    del obj_feature_pairs[:]
+    obj_feature_pairs=[]
+    print('batch_size',batch_size)
+    for k in range(batch_size):
+        print('batch_size',batch_size)
+        obj_feature_pairs.append(tf.reshape(tf.concat(values=[tf.gather(tf.gather(pred_class_logits[k,:,:,:,i],list_of_valid_obj[k],axis=0),list_of_valid_obj[k],axis=1) for i in range(channels)],axis=1),[-1,num_classes]))
+    pred_class_logits=tf.stack(obj_feature_pairs,axis=0)
+    print('pred_class_logits',pred_class_logits.shape)
+    
     target_class_ids = tf.cast(target_class_ids, 'int64')
 
     # Find predictions of classes that are not in the dataset.
     pred_class_ids = tf.argmax(pred_class_logits, axis=2)
     # TODO: Update this line to work with batch > 1. Right now it assumes all
     #       images in a batch have the same active_class_ids
+    print('bonbien')
     pred_active = tf.gather(active_class_ids[0], pred_class_ids)
-
+    print('bonjour')
     # Loss
     loss = tf.nn.sparse_softmax_cross_entropy_with_logits(
         labels=target_class_ids, logits=pred_class_logits)
@@ -1196,11 +1287,13 @@ def mrcnn_class_rel_loss_graph(target_class_ids, pred_class_logits,
     # Erase losses of predictions of classes that are not in the active
     # classes of the image.
     loss = loss * pred_active
-
+    print('bonsoir',pred_active.shape)
     # Computer loss mean. Use only predictions that contribute
     # to the loss to get a correct mean.
     loss = tf.reduce_sum(loss) / tf.reduce_sum(pred_active)
-    return los
+    print('bonsoirhoo')
+    print(loss)
+    return loss
 
 
 
@@ -2223,7 +2316,7 @@ class RobotVQA():
             
             #classifiers and regressors
             robotvqa_class_logits, robotvqa_class, robotvqa_bbox,robotvqa_poses =\
-                fpn_classifier_graph(rois, robotvqa_feature_maps, config.IMAGE_SHAPE,
+                fpn_classifier_graph(self.get_relational_graph_input,rois, robotvqa_feature_maps, config.IMAGE_SHAPE,
                                      config.POOL_SIZE, config.NUM_CLASSES)
                                      
             [robotvqa_class_cat_logits,robotvqa_class_col_logits,robotvqa_class_sha_logits,robotvqa_class_mat_logits,robotvqa_class_opn_logits,robotvqa_class_rel_logits]=\
@@ -2251,11 +2344,17 @@ class RobotVQA():
             class_cat_loss = KL.Lambda(lambda x: mrcnn_class_loss_graph(*x), name="mrcnn_class_loss")(
                 [target_class_cat_ids, robotvqa_class_cat_logits, active_class_cat_ids])
                 
+            print('shapuuuu',class_cat_loss.shape)
+                
             class_col_loss = KL.Lambda(lambda x: mrcnn_class_loss_graph(*x), name="mrcnn_class_col_loss")(
                 [target_class_col_ids, robotvqa_class_col_logits, active_class_col_ids])
                 
+            print('shapuuuu',class_col_loss.shape)
+                
             class_sha_loss = KL.Lambda(lambda x: mrcnn_class_loss_graph(*x), name="mrcnn_class_sha_loss")(
                 [target_class_sha_ids, robotvqa_class_sha_logits, active_class_sha_ids])
+                
+            print('shapuuuu',class_sha_loss.shape)
                 
             class_mat_loss = KL.Lambda(lambda x: mrcnn_class_loss_graph(*x), name="mrcnn_class_mat_loss")(
                 [target_class_mat_ids, robotvqa_class_mat_logits, active_class_mat_ids])
@@ -2265,17 +2364,22 @@ class RobotVQA():
                 
             class_rel_loss = KL.Lambda(lambda x: mrcnn_class_rel_loss_graph(*x), name="mrcnn_class_rel_loss")(
                 [target_class_rel_ids, robotvqa_class_rel_logits, active_class_rel_ids])
-                
+           
+            print('Here, we go0')
             bbox_loss = KL.Lambda(lambda x: mrcnn_bbox_loss_graph(*x), name="mrcnn_bbox_loss")(
                 [target_bbox, target_class_cat_ids, robotvqa_bbox])
                 
+            print('Here, we go0')
+                
             poses_loss = KL.Lambda(lambda x: mrcnn_poses_loss_graph(*x), name="mrcnn_poses_loss")(
                 [target_poses, target_class_cat_ids, robotvqa_poses])
+            print('Here, we go1')
                 
             mask_loss = KL.Lambda(lambda x: mrcnn_mask_loss_graph(*x), name="mrcnn_mask_loss")(
                 [target_mask, target_class_cat_ids, robotvqa_mask])
-
+            print('Here, we go')
             # Model
+            print('\n\n\n',robotvqa_class_cat._keras_history,'\n\n\n')  
             inputs = [input_image, input_image_meta,
                       input_rpn_match, input_rpn_bbox,
                        input_gt_class_cat_ids,input_gt_class_col_ids,input_gt_class_sha_ids, input_gt_class_mat_ids,input_gt_class_opn_ids,input_gt_class_rel_ids,
@@ -2285,13 +2389,14 @@ class RobotVQA():
             if not config.USE_RPN_ROIS:
                 inputs.append(input_rois)
             outputs = [rpn_class_logits, rpn_class, rpn_bbox,
-                       robotvqa_class_cat_logits,robotvqa_class_col_logits,robotvqa_class_sha_logits,robotvqa_class_mat_logits,robotvqa_class_opn_logits,robotvqa_class_rel_logits,
-                        class_cat_loss,class_col_loss,class_sha_loss,class_mat_loss,class_opn_loss,class_rel_loss,
+                       robotvqa_class_cat_logits,robotvqa_class_col_logits,robotvqa_class_sha_logits,robotvqa_class_mat_logits,robotvqa_class_opn_logits,
+                        class_cat_loss,class_col_loss,class_sha_loss,class_mat_loss,class_opn_loss,
                         robotvqa_class_cat,robotvqa_class_col,robotvqa_class_sha,robotvqa_class_mat,robotvqa_class_opn,robotvqa_class_rel,
                         robotvqa_bbox,
                         robotvqa_mask,
                        rpn_rois, output_rois,
                        rpn_class_loss, rpn_bbox_loss, bbox_loss, mask_loss,robotvqa_poses,poses_loss]
+            print(inputs,outputs)
             model = KM.Model(inputs, outputs, name='mask_rcnn')
         else:
 
@@ -2300,7 +2405,7 @@ class RobotVQA():
             
             #classifiers and regressors
             robotvqa_class_logits, robotvqa_class, robotvqa_bbox,robotvqa_poses =\
-                fpn_classifier_graph(rpn_rois, robotvqa_feature_maps, config.IMAGE_SHAPE,
+                fpn_classifier_graph(self.get_relational_graph_input,rpn_rois, robotvqa_feature_maps, config.IMAGE_SHAPE,
                                      config.POOL_SIZE, config.NUM_CLASSES)
                                      
             [robotvqa_class_cat_logits,robotvqa_class_col_logits,robotvqa_class_sha_logits,robotvqa_class_mat_logits,robotvqa_class_opn_logits,robotvqa_class_rel_logits]=\
@@ -2350,6 +2455,21 @@ class RobotVQA():
             model = ParallelModel(model, config.GPU_COUNT)
 
         return model
+        
+        
+    def get_relational_graph_input(self,objects,questions):
+        #input for relational network
+        batch_size,nber_boxes,obj_feature_size=objects.get_shape()
+        print(batch_size,nber_boxes,obj_feature_size)
+        obj_feature_pairs=[]
+        for i in range(nber_boxes):
+            for j in range(nber_boxes):
+                obj_feature_pairs.append(KL.Concatenate(axis=1)\
+                ([KL.Lambda(lambda x:x[:,i,:])(objects),KL.Lambda(lambda x:x[:,j,:])(objects)]))
+                
+        relational_graph_input=KL.Lambda(lambda x: K.stack(x,axis=1), name="rel_stack0")(obj_feature_pairs)  
+        print('\n\n\n',relational_graph_input._keras_history,'\n\n\n')  
+        return relational_graph_input
 
     def find_last(self):
         """Finds the last checkpoint file of the last trained model in the
@@ -2463,7 +2583,7 @@ class RobotVQA():
         self.keras_model._per_input_losses = {}
         loss_names = ["rpn_class_loss", "rpn_bbox_loss",
                       "mrcnn_class_loss","mrcnn_class_col_loss",
-                      "mrcnn_class_sha_loss","mrcnn_class_mat_loss","mrcnn_class_opn_loss",
+                      "mrcnn_class_sha_loss","mrcnn_class_mat_loss","mrcnn_class_opn_loss","mrcnn_class_rel_loss",
                        "mrcnn_bbox_loss", "mrcnn_mask_loss",'mrcnn_poses_loss']
         for name in loss_names:
             layer = self.keras_model.get_layer(name)
