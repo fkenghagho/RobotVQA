@@ -131,9 +131,27 @@ class ExtendedDatasetLoader(utils.Dataset):
                 print('Image '+str(images[i])+' could not be registered:'+str(e))
         del classes[:]
         print('\nImages found:',len(images), '\n')
-           
-        
     
+    def reduce_relation(self,relation):
+        x=np.count_nonzero(relation,axis=2)
+        x=np.count_nonzero(x,axis=0)
+        return x.nonzero()
+           
+    def make_transition(self,relation):
+        N,C=relation.shape[1:]   
+        for c in range(C):
+            stable=False
+            while not stable:
+                stable=True
+                for i in range(N):
+                    for j in range(N):
+                        for k in range(N):
+                                if(relation[i][j][c]==relation[j][k][c] and relation[i][j][c]!=0 and relation[i][j][c]!=relation[i][k][c]):
+                                    relation[i][k][c]=relation[i][j][c]
+                                    print('ok')
+                                    stable=False
+        return relation
+        
     def load_mask(self, image_id,config):
         """Generate instance masks for objects of the given image ID.
         """
@@ -204,7 +222,24 @@ class ExtendedDatasetLoader(utils.Dataset):
                    
                         
             del id_name_map[:]
-            return masks,classes,poses,relations
+            #augment dataset through transitivity property of relations
+            relations=self.make_transition(relations)
+            #only select objects participating in a relationship
+            valid_obj=self.reduce_relation(relations)
+            #take away all non valid objects masks,poses,...
+            relations=relations.take(valid_obj[0],axis=1).take(valid_obj[0],axis=0)
+            masks=masks.take(valid_obj[0],axis=2)
+            poses=poses.take(valid_obj[0],axis=0)
+            for i in range(len(classes)):
+                classes[i]=classes[i].take(valid_obj[0],axis=0)
+            #merge all relation categories into a single one
+            z=np.where(relations[:,:,3]>0)
+            relations[:,:,2][z]=(relations[:,:,3][z])
+            z=np.where(relations[:,:,2]>0)
+            relations[:,:,1][z]=(relations[:,:,2][z])
+            z=np.where(relations[:,:,1]>0)
+            relations[:,:,0][z]=(relations[:,:,1][z])
+            return masks,classes,poses,relations[:,:,0]
         except Exception as e:
             print('\n\n Data '+str(annotationPath)+' could not be processed:'+str(e))
             return super(self.__class__,self).load_mask(image_id)
@@ -257,13 +292,18 @@ class ExtendedRobotVQAConfig(RobotVQAConfig):
 
     # Reduce training ROIs per image because the images are small and have
     # few objects. Aim to allow ROI sampling to pick 33% positive ROIs.
-    TRAIN_ROIS_PER_IMAGE = 2
+    TRAIN_ROIS_PER_IMAGE =10
 
     # Maximum number of ground truth instances to use in one image
-    MAX_GT_INSTANCES = 2
+    MAX_GT_INSTANCES = 10
     
     # Max number of final detections
-    DETECTION_MAX_INSTANCES = 2
+    DETECTION_MAX_INSTANCES = 10
+    
+
+    # ROIs kept after non-maximum supression (training and inference)
+    POST_NMS_ROIS_TRAINING = 2000
+    POST_NMS_ROIS_INFERENCE = 10
 
     # Use a small epoch since the data is simple
     STEPS_PER_EPOCH = 100
@@ -347,8 +387,10 @@ class TaskManager(object):
             # See README for instructions to download the COCO weights
             model_path=self.ROBOTVQA_WEIGHTS_PATH
             model.load_weights(model_path, by_name=True,
-                            exclude=["mrcnn_class_logits", "mrcnn_bbox_fc", 
-                                        "mrcnn_bbox", "mrcnn_mask"])
+                            exclude=["mrcnn_class_logits0", "mrcnn_class_logits1","mrcnn_class_logits2","mrcnn_class_logits3","mrcnn_class_logits4","mrcnn_class_logits5",
+                                        "mrcnn_class_logits5_1",
+                                        "mrcnn_bbox_fc","mrcnn_bbox","mrcnn_poses_fc", "mrcnn_poses",
+                                        "mrcnn_mask","mrcnn_class0","mrcnn_class1","mrcnn_class2","mrcnn_class3","mrcnn_class4","mrcnn_class5"])
         elif init_with == "last":
             # Load the last model you trained and continue training
             model_path=model.find_last()[1]
@@ -357,7 +399,7 @@ class TaskManager(object):
                           
         #first training phase: only dataset specific layers(error) are trained
         #the second dataset is dedicated to evaluation and consequenty needs to be set differently than the first one
-        model.train(dataset, dataset,learning_rate=self.config.LEARNING_RATE, epochs=5,layers='heads')
+        model.train(dataset, dataset,learning_rate=self.config.LEARNING_RATE, epochs=1,layers='heads')
         #second training phase:all layers are revisited for fine-tuning
         #the second dataset is dedicated to evaluation and consequenty needs to be set differently than the first one
         #model.train(dataset, dataset,learning_rate=self.config.LEARNING_RATE/10, epochs=1,layers='all')
@@ -399,7 +441,7 @@ class TaskManager(object):
         dst=self.getDataset('c:/MSCOCO/val2014','litImage','annotation')
         class_ids=[r['class_cat_ids'],r['class_col_ids'],r['class_sha_ids'],r['class_mat_ids'],r['class_opn_ids'],r['class_rel_ids']]
         scores=[r['scores_cat'],r['scores_col'],r['scores_sha'],r['scores_mat'],r['scores_opn'],r['scores_rel']]
-        visualize.display_instances(image, r['rois'], r['masks'], class_ids, dst.class_names,r['poses'], scores=scores, ax=get_ax(cols=2),\
+        visualize.display_instances(image, r['rois'], r['masks'], class_ids, dst.class_names,r['poses'], scores=scores, axs=get_ax(cols=2),\
         title='Object description',title1='Object relationships')
 
 

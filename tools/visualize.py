@@ -107,7 +107,7 @@ def display_instances(image, boxes, masks, class_ids, class_names,poses,
         class_ids[3].shape[0]==class_ids[4].shape[0]==scores[0].shape[0]==scores[1].shape[0]==scores[2].shape[0]==\
         scores[3].shape[0]==scores[4].shape[0]==poses.shape[0]
 
-    if not ax:
+    if not np.any(axs):
         _, axs = plt.subplots(1,2, figsize=figsize)
     ax=axs[0]
     ax1=axs[1]
@@ -117,14 +117,15 @@ def display_instances(image, boxes, masks, class_ids, class_names,poses,
     titles=[title,title1]
     # Show area outside image boundaries.
     height, width = image.shape[:2]
-    for i in range(cols*rows):
+    for i in range(axs.size):
         axs[i].set_ylim(height + 10, -10)
         axs[i].set_xlim(-10, width + 10)
         axs[i].axis('off')
         axs[i].set_title(titles[i])
     masked_image = image.astype(np.uint32).copy()
-    x2=40
-    y2=40
+    back_img=image.astype(np.uint32).copy()*0+255
+    x3=10
+    y3=10
     for i in range(N):
         color = colors[i]
         # Bounding box
@@ -152,13 +153,14 @@ def display_instances(image, boxes, masks, class_ids, class_names,poses,
                 color='black', size=7, backgroundcolor="none")
                 
         #object relationship
+        #class_ids[len(class_ids)-1]=class_ids[len(class_ids)-1]+1
         for k in range(N):
-            for l in range(4):
-                if(class_ids[len(class_ids)-1][i][k][l]!=0):
-                    caption=str(i)+'.'+class_names[0][class_ids[0][i]]+' is '+class_names[5][class_ids[len(class_ids)-1][i][k][l]]+' '+str(k)+\
-                    '.'+class_names[0][class_ids[0][k]]+': '+str((scores[len(class_ids)-1][i][k][l]))+'.'
-                    ax1.text(x2, y2, caption,color='black', size=12, backgroundcolor="white")
-                    y2+=10
+                if(class_ids[len(class_ids)-1][i][k]!=0):
+                    caption=str(i)+'.'+class_names[0][class_ids[0][i]]+' is '+class_names[5][class_ids[len(class_ids)-1][i][k]]+' '+str(k)+\
+                    '.'+class_names[0][class_ids[0][k]]+': '+str((scores[len(class_ids)-1][i][k]))+'.'
+                    print('RELATION:'+caption)
+                    ax1.text(x3, y3, caption,color='black', size=10, backgroundcolor="none")
+                    y3+=20
 
         # Mask
         mask = masks[:, :, i]
@@ -176,6 +178,7 @@ def display_instances(image, boxes, masks, class_ids, class_names,poses,
             p = Polygon(verts, facecolor="none", edgecolor=color)
             ax.add_patch(p)
     ax.imshow(masked_image.astype(np.uint8))
+    ax1.imshow(back_img)
     plt.show()
     
 
