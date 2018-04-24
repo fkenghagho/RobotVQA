@@ -98,14 +98,15 @@ def display_instances(image, boxes, masks, class_ids, class_names,poses,
     scores: [NUM_FEATURES,num_instances],(optional) confidence scores for each box/feature
     figsize: (optional) the size of the image.
     """
+    KEY_RELATIONS=[5,8]
     # Number of instances
     N = boxes.shape[0]
     if not N:
         print("\n*** No instances to display *** \n")
     else:
         assert boxes.shape[0] == masks.shape[-1] == class_ids[0].shape[0]==class_ids[1].shape[0]==class_ids[2].shape[0]==\
-        class_ids[3].shape[0]==class_ids[4].shape[0]==scores[0].shape[0]==scores[1].shape[0]==scores[2].shape[0]==\
-        scores[3].shape[0]==scores[4].shape[0]==poses.shape[0]
+        class_ids[3].shape[0]==class_ids[4].shape[0]==class_ids[5].shape[0]==scores[0].shape[0]==scores[1].shape[0]==scores[2].shape[0]==\
+        scores[3].shape[0]==scores[4].shape[0]==scores[5].shape[0]==poses.shape[0]
 
     if not np.any(axs):
         _, axs = plt.subplots(1,2, figsize=figsize)
@@ -126,6 +127,8 @@ def display_instances(image, boxes, masks, class_ids, class_names,poses,
     back_img=image.astype(np.uint32).copy()*0+255
     x3=10
     y3=10
+    #class_ids[len(class_ids)-1]=class_ids[len(class_ids)-1]+1
+    best_relations=np.argmax(scores[len(class_ids)-1],axis=1)
     for i in range(N):
         color = colors[i]
         # Bounding box
@@ -140,7 +143,7 @@ def display_instances(image, boxes, masks, class_ids, class_names,poses,
 
         # Label
         caption=str(i)+'. '
-        if scores!=None:
+        if scores!=None and False:
             for j in range(len(class_ids)-1):
                 caption=caption+class_names[j][class_ids[j][i]]+' '+str(scores[j][i])+'\n'
         else:
@@ -153,14 +156,14 @@ def display_instances(image, boxes, masks, class_ids, class_names,poses,
                 color='black', size=7, backgroundcolor="none")
                 
         #object relationship
-        #class_ids[len(class_ids)-1]=class_ids[len(class_ids)-1]+1
-        for k in range(N):
-                if(class_ids[len(class_ids)-1][i][k]!=0):
-                    caption=str(i)+'.'+class_names[0][class_ids[0][i]]+' is '+class_names[5][class_ids[len(class_ids)-1][i][k]]+' '+str(k)+\
-                    '.'+class_names[0][class_ids[0][k]]+': '+str((scores[len(class_ids)-1][i][k]))+'.'
-                    print('RELATION:'+caption)
-                    ax1.text(x3, y3, caption,color='black', size=10, backgroundcolor="none")
-                    y3+=20
+  
+        k=best_relations[i]
+        if(class_ids[len(class_ids)-1][i][k]!=0 and i!=k):
+            caption=str(i)+'.'+class_names[0][class_ids[0][i]]+' is '+class_names[5][class_ids[len(class_ids)-1][i][k]]+' '+str(k)+\
+            '.'+class_names[0][class_ids[0][k]]+': '+str((scores[len(class_ids)-1][i][k]))+'.'
+            print('RELATION:'+caption)
+            ax1.text(x3, y3, caption,color='black', size=10, backgroundcolor="none")
+            y3+=50
 
         # Mask
         mask = masks[:, :, i]
