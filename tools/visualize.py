@@ -98,11 +98,12 @@ def display_instances(image, boxes, masks, class_ids, class_names,poses,
     scores: [NUM_FEATURES,num_instances],(optional) confidence scores for each box/feature
     figsize: (optional) the size of the image.
     """
-    KEY_RELATIONS=[5,8]
+    KEY_RELATIONS=['In']
     # Number of instances
     N = boxes.shape[0]
     if not N:
         print("\n*** No instances to display *** \n")
+        return 0
     else:
         assert boxes.shape[0] == masks.shape[-1] == class_ids[0].shape[0]==class_ids[1].shape[0]==class_ids[2].shape[0]==\
         class_ids[3].shape[0]==class_ids[4].shape[0]==class_ids[5].shape[0]==scores[0].shape[0]==scores[1].shape[0]==scores[2].shape[0]==\
@@ -162,9 +163,9 @@ def display_instances(image, boxes, masks, class_ids, class_names,poses,
             caption=str(i)+'.'+class_names[0][class_ids[0][i]]+' is '+class_names[5][class_ids[len(class_ids)-1][i][k]]+' '+str(k)+\
             '.'+class_names[0][class_ids[0][k]]+': '+str((scores[len(class_ids)-1][i][k]))+'.'
             print('RELATION:'+caption)
-            ax1.text(x3, y3, caption,color='black', size=10, backgroundcolor="none")
-            y3+=50
-
+            ax1.text(x3, y3, caption,color='black', size=8, backgroundcolor="none")
+            y3+=30
+     
         # Mask
         mask = masks[:, :, i]
         masked_image = apply_mask(masked_image, mask, color)

@@ -216,10 +216,12 @@ class ExtendedDatasetLoader(utils.Dataset):
                     classes[j][i]=self.class_names[j].index(classes[j][i])
                 classes[j]=np.array(classes[j],dtype='int32')
             for rel in jsonImage['objectRelationship']:
-                if(rel['object1'] in id_name_map) and (rel['object2'] in id_name_map):
-                    relations[id_name_map.index(rel['object1'])][id_name_map.index(rel['object2'])][self.class_names[6].index(config.OBJECT_RELATION_DICO[self.normalize(rel['relation'])])-1]=self.class_names[5].index(self.normalize(rel['relation']))
+                try:
+                    if(rel['object1'] in id_name_map) and (rel['object2'] in id_name_map):
+                        relations[id_name_map.index(rel['object1'])][id_name_map.index(rel['object2'])][self.class_names[6].index(config.OBJECT_RELATION_DICO[self.normalize(rel['relation'])])-1]=self.class_names[5].index(self.normalize(rel['relation']))
                    
-                        
+                except Exception as e:
+                    print('An object relationship could not be processed: '+str(e))
             del id_name_map[:]
             #augment dataset through transitivity property of relations
             relations=self.make_transition(relations)
@@ -321,10 +323,6 @@ class ExtendedRobotVQAConfig(RobotVQAConfig):
     # train the RPN.
     USE_RPN_ROIS = True
 
-
-
-
-
 ################ Task Manager Class(TMC)##############
 class TaskManager(object):
     def __init__(self,modeldir=None,rootdir=None,weightpath=None,pythonpath=None):
@@ -380,7 +378,7 @@ class TaskManager(object):
         except Exception as e:
             print('Error-Could not visualize dataset: '+str(e))
     
-    def train(self,dataset,init_with='last'):
+    def train(self,dataset,init_with='coco'):
         #config= should be adequately set for training
         model = modellib.RobotVQA(mode="training", config=self.config,
                           model_dir=self.MODEL_DIR)
@@ -398,7 +396,7 @@ class TaskManager(object):
                             exclude=["mrcnn_class_logits0", "mrcnn_class_logits1","mrcnn_class_logits2","mrcnn_class_logits3","mrcnn_class_logits4","mrcnn_class_logits5",
                                         "mrcnn_class_logits5_1",'mrcnn_class_bn2','mrcnn_class_conv2',
                                         "mrcnn_bbox_fc","mrcnn_bbox","mrcnn_poses_fc", "mrcnn_poses",
-                                        "mrcnn_bbox_fc0","mrcnn_bbox_fc1","mrcnn_bbox_fc2",
+                                        "mrcnn_poses_fc0","mrcnn_poses_fc1","mrcnn_poses_fc2",
                                         "mrcnn_mask","mrcnn_class0","mrcnn_class1","mrcnn_class2","mrcnn_class3","mrcnn_class4","mrcnn_class5"])
         elif init_with == "last":
             # Load the last model you trained and continue training
