@@ -34,6 +34,8 @@ def get_ax(rows=1, cols=1, size=8):
     """
     _, ax = plt.subplots(rows, cols, figsize=(size*cols, size*rows))
     return ax
+    
+    
 
 
 

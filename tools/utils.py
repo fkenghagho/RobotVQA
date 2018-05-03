@@ -18,7 +18,7 @@ import skimage.color
 import skimage.io
 import urllib.request
 import shutil
-
+import cv2
 # URL from which to download the latest COCO trained weights
 COCO_MODEL_URL = "https://github.com/matterport/Mask_RCNN/releases/download/v2.0/mask_rcnn_coco.h5"
 
@@ -224,6 +224,48 @@ def box_refinement(box, gt_box):
     return np.stack([dy, dx, dh, dw], axis=1)
 
 
+def normalSurface(depth,max_distance):
+    #we assume depth is of type CV_8UC3
+    depthImg=cv2.imread(depth,cv2.IMREAD_ANYDEPTH)
+    x,y=np.where(depthImg>max_distance)
+    depthImg[x,y]=max_distance
+    if max_distance!=0.:
+        depthImg=depthImg/max_distance
+    depthImg=depthImg-1.0
+    #sobel x
+    sobelx=cv2.Sobel(depthImg,cv2.CV_32F,1,0,ksize=15)
+    sobely=cv2.Sobel(depthImg,cv2.CV_32F,0,1,ksize=15)
+    normalImg=np.zeros([depthImg.shape[0],depthImg.shape[1],3],dtype='float32')
+    cols=depthImg.shape[1]
+    rows=depthImg.shape[0]
+    for y in range(rows):
+        for x in range(cols):
+            normalImg[y][x][2]=-sobely[y][x]
+            normalImg[y][x][1]=-sobelx[y][x]
+            normalImg[y][x][0]=1
+            normalImg[y][x]=normalImg[y][x]/np.linalg.norm(normalImg[y][x])
+            normalImg[y][x]=(0.5*normalImg[y][x]+0.5)*255.0
+    normalImg=np.array(normalImg,dtype='uint8')    
+    return cv2.cvtColor(normalImg,cv2.COLOR_BGR2RGB)
+
+
+def load_image(litImg,depthImg,max_distance):
+        # Load image
+        image = skimage.io.imread(litImg)
+        # If grayscale. Convert to RGB for consistency.
+        if image.ndim != 3:
+            image =np.array(skimage.color.gray2rgb(image),dtype='float32')
+        try:
+            depthImage=normalSurface(depthImg,max_distance)
+        except Exception as e:
+            depthImage=np.zeros(image.shape,dtype='float32')
+        shape=list(image.shape)
+        shape[len(shape)-1]=shape[len(shape)-1]+3
+        finalImage=np.zeros(shape,dtype='float32')
+        finalImage[:,:,:3]=image
+        finalImage[:,:,3:]=depthImage
+        return finalImage
+
 ############################################################
 #  Dataset
 ############################################################
@@ -368,16 +410,16 @@ class Dataset(object):
         debugging.
         """
         return self.image_info[image_id]["path"]
+        
+   
 
-    def load_image(self, image_id):
+    def load_image(self, image_id,max_distance):
         """Load the specified image and return a [H,W,3] Numpy array.
         """
         # Load image
-        image = skimage.io.imread(self.image_info[image_id]['path'])
-        # If grayscale. Convert to RGB for consistency.
-        if image.ndim != 3:
-            image = skimage.color.gray2rgb(image)
-        return image
+        litImg = self.image_info[image_id]['path']
+        depthImg = self.image_info[image_id]['depthPath']
+        return load_image(litImg,depthImg,max_distance)
 
     def load_mask(self, image_id):
         """Load instance masks for the given image.

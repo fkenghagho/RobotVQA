@@ -157,20 +157,26 @@ def conv_block(input_tensor, kernel_size, filters, stage, block,
 def resnet_graph(input_image, architecture, stage5=False):
     assert architecture in ["resnet50", "resnet101"]
     # Stage 1
+    #z is common feature or RGBD-Image
+    #x is RGB-Image and y is D-Image
     x = KL.ZeroPadding2D((3, 3))(input_image)
+    print('Input: ',K.int_shape(x))
     x = KL.Conv2D(64, (7, 7), strides=(2, 2), name='conv1', use_bias=True)(x)
     x = BatchNorm(axis=3, name='bn_conv1')(x)
     x = KL.Activation('relu')(x)
     C1 = x = KL.MaxPooling2D((3, 3), strides=(2, 2), padding="same")(x)
+    
     # Stage 2
     x = conv_block(x, 3, [64, 64, 256], stage=2, block='a', strides=(1, 1))
     x = identity_block(x, 3, [64, 64, 256], stage=2, block='b')
     C2 = x = identity_block(x, 3, [64, 64, 256], stage=2, block='c')
+    
     # Stage 3
     x = conv_block(x, 3, [128, 128, 512], stage=3, block='a')
     x = identity_block(x, 3, [128, 128, 512], stage=3, block='b')
     x = identity_block(x, 3, [128, 128, 512], stage=3, block='c')
     C3 = x = identity_block(x, 3, [128, 128, 512], stage=3, block='d')
+    
     # Stage 4
     x = conv_block(x, 3, [256, 256, 1024], stage=4, block='a')
     block_count = {"resnet50": 5, "resnet101": 22}[architecture]
@@ -182,6 +188,7 @@ def resnet_graph(input_image, architecture, stage5=False):
         x = conv_block(x, 3, [512, 512, 2048], stage=5, block='a')
         x = identity_block(x, 3, [512, 512, 2048], stage=5, block='b')
         C5 = x = identity_block(x, 3, [512, 512, 2048], stage=5, block='c')
+        
     else:
         C5 = None
     return [C1, C2, C3, C4, C5]
@@ -1282,8 +1289,8 @@ def mrcnn_class_rel_loss_graph(target_class_ids, pred_class_logits,
     obj_feature_pairs=[]
     list_of_valid_obj=[]
     #only consider first Image in the batch
-    target_class_ids=tf.concat([tf.cast(tf.reshape(target_class_ids,[1,-1]),'int32'),tf.ones([1,1],dtype='int32')],axis=1) 
-    epsilon=tf.concat([tf.ones([1,1,1],dtype='float32'),tf.zeros([1,1,num_classes-1],dtype='float32')],axis=2)
+    target_class_ids=tf.concat([tf.cast(tf.reshape(target_class_ids,[1,-1]),'int32'),tf.constant(1,shape=[1,1],dtype='int32')],axis=1) 
+    epsilon=tf.concat([tf.constant(-1000,shape=[1,1,1],dtype='float32'),tf.constant(1000,shape=[1,1,1],dtype='float32'),tf.constant(-1000,shape=[1,1,num_classes-2],dtype='float32')],axis=2)
     pred_class_logits=tf.concat([tf.reshape(pred_class_logits,[1,-1,num_classes]),epsilon],axis=1)
     #remove invalid relation
     list_of_valid_obj=tf.reshape(tf.where(target_class_ids[0]),[-1])
@@ -1306,7 +1313,8 @@ def mrcnn_class_rel_loss_graph(target_class_ids, pred_class_logits,
     loss = loss * pred_active
     # Computer loss mean. Use only predictions that contribute
     # to the loss to get a correct mean.
-    loss = tf.reduce_sum(loss) / (tf.reduce_sum(pred_active)+1.0)
+    loss = tf.reduce_sum(loss)/ (tf.reduce_sum(pred_active))
+    #loss= tf.reduce_sum(pred_active)
     return loss
 
 
@@ -1433,7 +1441,7 @@ def load_image_gt(dataset, config, image_id, augment=False,
         object and resizing it to MINI_MASK_SHAPE.
 
     Returns:
-    image: [height, width, 3]
+    image: [height, width, 4or3]
     shape: the original shape of the image before resizing and cropping.
     class_ids: [NUM_FEATURES,instance_count], list of Integer class IDs
     relations:[instance_count,instance_count]
@@ -1445,7 +1453,7 @@ def load_image_gt(dataset, config, image_id, augment=False,
     poses: [instance_count, (tetax,tetay,tetaz,x,y,z)]
     """
     # Load image and mask
-    image = dataset.load_image(image_id)
+    image = dataset.load_image(image_id,config.MAX_CAMERA_CENTER_TO_PIXEL_DISTANCE)
     mask, class_ids,poses,class_rel_ids = dataset.load_mask(image_id,config)
     shape = image.shape
     image, window, scale, padding = utils.resize_image(
@@ -1896,7 +1904,7 @@ def generate_random_rois(image_shape, count, gt_class_ids, gt_boxes):
     return rois
 
 
-def data_generator(dataset, config, shuffle=True, augment=True, random_rois=0,
+def data_generator(dataset, config, shuffle=False, augment=True, random_rois=0,
                    batch_size=1, detection_targets=False):
     """A generator that returns images and corresponding target class ids,
     bounding box deltas, and masks.
@@ -2172,40 +2180,40 @@ class RobotVQA():
         input_image = KL.Input(
             shape=config.IMAGE_SHAPE.tolist(), name="input_image")
         #meta infos
-        input_image_meta = KL.Input(shape=[None], name="input_image_meta")
+        input_image_meta = KL.Input(batch_shape=[1,None], name="input_image_meta")
         if mode == "training":
             # RPN GT
             input_rpn_match = KL.Input(
-                shape=[None, 1], name="input_rpn_match", dtype=tf.int32)
+                batch_shape=[1,None, 1], name="input_rpn_match", dtype=tf.int32)
             input_rpn_bbox = KL.Input(
-                shape=[None, 4], name="input_rpn_bbox", dtype=tf.float32)
+                batch_shape=[1,None, 4], name="input_rpn_bbox", dtype=tf.float32)
 
             # Detection GT (class IDs, bounding boxes, and masks)
             # 1.1. GT Category Class IDs (zero padded)
             input_gt_class_cat_ids = KL.Input(
-                shape=[None], name="input_gt_class_cat_ids", dtype=tf.int32)
+                batch_shape=[1,None], name="input_gt_class_cat_ids", dtype=tf.int32)
             # 1.2. GT Color Class IDs (zero padded)
             input_gt_class_col_ids = KL.Input(
-                shape=[None], name="input_gt_class_col_ids", dtype=tf.int32)
+                batch_shape=[1,None], name="input_gt_class_col_ids", dtype=tf.int32)
             # 1.3. GT Shape Class IDs (zero padded)
             input_gt_class_sha_ids = KL.Input(
-                shape=[None], name="input_gt_class_sha_ids", dtype=tf.int32)
+                batch_shape=[1,None], name="input_gt_class_sha_ids", dtype=tf.int32)
             # 1.4. GT Material Class IDs (zero padded)
             input_gt_class_mat_ids = KL.Input(
-                shape=[None], name="input_gt_class_mat_ids", dtype=tf.int32)
+                batch_shape=[1,None], name="input_gt_class_mat_ids", dtype=tf.int32)
             # 1.5. GT Openability Class IDs (zero padded)
             input_gt_class_opn_ids = KL.Input(
-                shape=[None], name="input_gt_class_opn_ids", dtype=tf.int32)
+                batch_shape=[1,None], name="input_gt_class_opn_ids", dtype=tf.int32)
             # 1.6. GT 6D-Poses(orientation in ]-pi,pi] radians and position's coordinates in cm)
             input_gt_poses = KL.Input(
-                shape=[None, 6], name="input_gt_poses", dtype=tf.float32)
+                batch_shape=[1,None, 6], name="input_gt_poses", dtype=tf.float32)
             # 1.7. GT relations Class IDs (zero padded)
             input_gt_class_rel_ids = KL.Input(
-                shape=[None,None], name="input_gt_class_rel_ids", dtype=tf.int32)
+                batch_shape=[1,None,None], name="input_gt_class_rel_ids", dtype=tf.int32)
             # 2. GT Boxes in pixels (zero padded)
             # [batch, MAX_GT_INSTANCES, (y1, x1, y2, x2)] in image coordinates
             input_gt_boxes = KL.Input(
-                shape=[None, 4], name="input_gt_boxes", dtype=tf.float32)
+                batch_shape=[1,None, 4], name="input_gt_boxes", dtype=tf.float32)
             # Normalize coordinates
             h, w = K.shape(input_image)[1], K.shape(input_image)[2]
             image_scale = K.cast(K.stack([h, w, h, w], axis=0), tf.float32)
@@ -2226,28 +2234,33 @@ class RobotVQA():
         # Bottom-up Layers
         # Returns a list of the last layers of each stage, 5 in total.
         # Don't create the thead (stage 5), so we pick the 4th item in the list.
-        _, C2, C3, C4, C5 = resnet_graph(input_image, "resnet101", stage5=True)
+        with tf.device('/cpu:0'):
+            _, C2, C3, C4, C5 = resnet_graph(input_image, "resnet101", stage5=True)
         # Top-down Layers
         # TODO: add assert to varify feature map sizes match what's in config
         P5 = KL.Conv2D(256, (1, 1), name='fpn_c5p5')(C5)
+        
         P4 = KL.Add(name="fpn_p4add")([
             KL.UpSampling2D(size=(2, 2), name="fpn_p5upsampled")(P5),
             KL.Conv2D(256, (1, 1), name='fpn_c4p4')(C4)])
+       
         P3 = KL.Add(name="fpn_p3add")([
             KL.UpSampling2D(size=(2, 2), name="fpn_p4upsampled")(P4),
             KL.Conv2D(256, (1, 1), name='fpn_c3p3')(C3)])
+            
         P2 = KL.Add(name="fpn_p2add")([
             KL.UpSampling2D(size=(2, 2), name="fpn_p3upsampled")(P3),
             KL.Conv2D(256, (1, 1), name='fpn_c2p2')(C2)])
+        
         # Attach 3x3 conv to all P layers to get the final feature maps.
         P2 = KL.Conv2D(256, (3, 3), padding="SAME", name="fpn_p2")(P2)
         P3 = KL.Conv2D(256, (3, 3), padding="SAME", name="fpn_p3")(P3)
         P4 = KL.Conv2D(256, (3, 3), padding="SAME", name="fpn_p4")(P4)
         P5 = KL.Conv2D(256, (3, 3), padding="SAME", name="fpn_p5")(P5)
+        
         # P6 is used for the 5th anchor scale in RPN. Generated by
         # subsampling from P5 with stride of 2.
         P6 = KL.MaxPooling2D(pool_size=(1, 1), strides=2, name="fpn_p6")(P5)
-
         # Note that P6 is used in RPN, but not in the classifier heads.
         rpn_feature_maps = [P2, P3, P4, P5, P6]
         robotvqa_feature_maps = [P2, P3, P4, P5]
@@ -2282,16 +2295,17 @@ class RobotVQA():
         # and zero padded.
         proposal_count = config.POST_NMS_ROIS_TRAINING if mode == "training"\
             else config.POST_NMS_ROIS_INFERENCE
-        rpn_rois = ProposalLayer(proposal_count=proposal_count,
-                                 nms_threshold=config.RPN_NMS_THRESHOLD,
-                                 name="ROI",
-                                 anchors=self.anchors,
-                                 config=config)([rpn_class, rpn_bbox])
+        with tf.device('/cpu:0'):
+            rpn_rois = ProposalLayer(proposal_count=proposal_count,
+                                    nms_threshold=config.RPN_NMS_THRESHOLD,
+                                    name="ROI",
+                                    anchors=self.anchors,
+                                    config=config)([rpn_class, rpn_bbox])
 
         if mode == "training":
             # Class ID mask to mark class IDs supported by the dataset the image
             # came from.
-            #category
+            # category
             print('\n\n Dim: ',input_image_meta.get_shape(),'\n\n')
             output = KL.Lambda(lambda x: self.parse_image_meta_graph(x),
             mask=[None,None,None,None,None,None,None,None,None])(input_image_meta)
@@ -2318,6 +2332,7 @@ class RobotVQA():
             input_gt_class_ids=[input_gt_class_cat_ids,input_gt_class_col_ids,input_gt_class_sha_ids,input_gt_class_mat_ids,input_gt_class_opn_ids,input_gt_class_rel_ids]
             DetectionTargetLayer_input=[target_rois]+input_gt_class_ids+[ gt_boxes, input_gt_masks,input_gt_poses]
             #target
+           
             DetectionTargetLayer_output =\
                 DetectionTargetLayer(config, name="proposal_targets")(DetectionTargetLayer_input)
             rois=DetectionTargetLayer_output[0]
@@ -2338,9 +2353,10 @@ class RobotVQA():
             
             
             #classifiers and regressors for object description
+          
             robotvqa_class_logits, robotvqa_class, robotvqa_bbox,robotvqa_poses,shared =\
                 fpn_classifier_graph(rois, robotvqa_feature_maps, config.IMAGE_SHAPE,
-                                     config.POOL_SIZE, config.NUM_CLASSES,config)
+                                    config.POOL_SIZE, config.NUM_CLASSES,config)
             #select indices        
             best_valid_indices=KL.Lambda(lambda x:tf.range(self.config.DETECTION_MAX_INSTANCES))(shared)
             #relational graph                         
@@ -2357,15 +2373,17 @@ class RobotVQA():
             
                                      
             #object segmentation
+           
             robotvqa_mask = build_fpn_mask_graph(rois, robotvqa_feature_maps,
-                                              config.IMAGE_SHAPE,
-                                              config.MASK_POOL_SIZE,
-                                              config.NUM_CLASSES[self.CATEGORY_INDEX])
+                                            config.IMAGE_SHAPE,
+                                            config.MASK_POOL_SIZE,
+                                            config.NUM_CLASSES[self.CATEGORY_INDEX])
 
             # TODO: clean up (use tf.identify if necessary)
             output_rois = KL.Lambda(lambda x: x * 1, name="output_rois")(rois)
 
             # Losses
+           
             rpn_class_loss = KL.Lambda(lambda x: rpn_class_loss_graph(*x), name="rpn_class_loss")(
                 [input_rpn_match, rpn_class_logits])
                 
@@ -2393,8 +2411,8 @@ class RobotVQA():
                 
             class_rel_loss = KL.Lambda(lambda x: mrcnn_class_rel_loss_graph(*x), name="mrcnn_class_rel_loss")(
                 [target_class_rel_ids, robotvqa_class_rel_logits, active_class_rel_ids])
-           
-  
+        
+
             bbox_loss = KL.Lambda(lambda x: mrcnn_bbox_loss_graph(*x), name="mrcnn_bbox_loss")(
                 [target_bbox, target_class_cat_ids, robotvqa_bbox])
 
@@ -2565,7 +2583,7 @@ class RobotVQA():
 
     
 
-    def load_weights(self, filepath, by_name=False, exclude=None):
+    def load_weights(self, filepath, by_name=False, exclude=None,alignment=None):
         """Modified version of the correspoding Keras function with
         the addition of multi-GPU support and the ability to exclude
         some layers from loading.
@@ -2574,6 +2592,7 @@ class RobotVQA():
         import h5py
         from keras.engine import topology
 
+        print('filePath:',filepath)
         if exclude:
             by_name = True
 
@@ -2592,9 +2611,9 @@ class RobotVQA():
         # Exclude some layers
         if exclude:
             layers = filter(lambda l: l.name not in exclude, layers)
-
         if by_name:
             topology.load_weights_from_hdf5_group_by_name(f, layers)
+              
         else:
             topology.load_weights_from_hdf5_group(f, layers)
         if hasattr(f, 'close'):
@@ -2764,7 +2783,7 @@ class RobotVQA():
             layers = layer_regex[layers]
 
         # Data generators
-        train_generator = data_generator(train_dataset, self.config, shuffle=True,
+        train_generator = data_generator(train_dataset, self.config, shuffle=False,
                                          batch_size=self.config.BATCH_SIZE,random_rois=False,
                                          detection_targets=False, augment=False)
         val_generator = data_generator(train_dataset, self.config, shuffle=True,
