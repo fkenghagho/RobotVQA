@@ -412,7 +412,7 @@ class TaskManager(object):
         except Exception as e:
             print('Error-Could not visualize dataset: '+str(e))
     
-    def train(self,dataset,init_with='coco'):
+    def train(self,dataset,init_with='last'):
         #config= should be adequately set for training
         model = modellib.RobotVQA(mode="training", config=self.config,
                           model_dir=self.MODEL_DIR)
@@ -474,7 +474,7 @@ class TaskManager(object):
         #predict
         results = model.detect([image], verbose=1)
         r = results[0]
-        dst=self.getDataset('c:/MSCOCO/val2014','litImage','annotation','depthImage')
+        dst=self.getDataset('c:/Dataset/raw/dataset2','litImage','annotation','depthImage',None)
         class_ids=[r['class_cat_ids'],r['class_col_ids'],r['class_sha_ids'],r['class_mat_ids'],r['class_opn_ids'],r['class_rel_ids']]
         scores=[r['scores_cat'],r['scores_col'],r['scores_sha'],r['scores_mat'],r['scores_opn'],r['scores_rel']]
         visualize.display_instances(image[:,:,:3], r['rois'], r['masks'], class_ids, dst.class_names,r['poses'], scores=scores, axs=get_ax(cols=2),\

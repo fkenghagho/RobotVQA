@@ -9,6 +9,7 @@ import json
 import cv2
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
+from shutil import copyfile
  
 R=[]
 
@@ -674,7 +675,54 @@ class Dataset(object):
             print('Object mask saved successfully.')
         except Exception,e:
             print('Failed to save object mask. '+str(e))
-            
+    
+    def copyIndexedTo(self,indices,destination):
+        try:
+            if not os.path.exists(destination):
+                os.makedirs(destination)
+            for i in range(len(indices)):
+                try:
+                    #copy annotation
+                    copyfile(self.folder+'/'+self.annotation+str(indices[i])+'.'+self.annotExtension,destination+'/'+self.annotation+str(indices[i])+'.'+self.annotExtension)
+                    #copy depth
+                    copyfile(self.folder+'/'+self.depthImage+str(indices[i])+'.'+self.depthExtension,destination+'/'+self.depthImage+str(indices[i])+'.'+self.depthExtension)
+                    #copy litImage
+                    copyfile(self.folder+'/'+self.litImage+str(indices[i])+'.'+self.extension,destination+'/'+self.litImage+str(indices[i])+'.'+self.extension)
+                    #copy mask image
+                    copyfile(self.folder+'/'+self.maskImage+str(indices[i])+'.'+self.extension,destination+'/'+self.maskImage+str(indices[i])+'.'+self.extension)
+
+
+
+                except Exception as e:
+                    print('A failure occured: '+str(e)+' at index '+str(indices[i]))
+            print('Copying successfully terminated!')
+        except Exception as e:
+               print('A failure occured: '+str(e)+' by creating '+str(destination))      
+    
+    def getAllAnnotWithRelation(self):
+        """return all indices of annotations from dataset in self.folder
+           which contain object relations.Since relation annotation is very sparse, this allow
+           a special training of the portion of the dataset containing annotations of relations
+        """
+        listIndex=[]
+        try:
+            annotations=glob.glob(self.folder+'/*.json')
+            total=len(annotations)
+            completed=0
+            for jsonFile in annotations:
+                print(completed,'/',total,' completed')
+                try:
+                    with open(jsonFile,'r') as infile:
+                        jsonImage=json.load(infile)
+                    if len(jsonImage['objectRelationship'])>0:
+                        listIndex.append(int(jsonFile.split(self.folder)[1].split(self.annotation)[1].split('.')[0]))
+                except Exception as e:
+                   print('A failure occured: '+str(e)+' in '+jsonFile)
+                completed+=1
+            return np.array(listIndex,dtype='int32')
+        except Exception as e:
+            print('A failure occured: '+str(e))
+            return np.array(listIndex,dtype='int32')
             
     def cleanRelation(self):
         """make the relations consistent """
@@ -689,8 +737,8 @@ class Dataset(object):
             self.rel_count={'left':0,'right':0,'front':0,'behind':0,'over':0,'under':0,'valign':0,'in':0,'on':0}
             
             #Initialize set of valid categories
-            self.valid_cat=['CookTop','Tea','Juice','Plate','Mug','Bowl','Tray','Tomato','Ketchup','Salz','Milch','Spoon','Spatula','Milk',
-            'Coffee','Cookie','Knife','Cornflakes','Cornflake','Eggholder','EggHolder', 'Cube','Mayonnaise','Cereal','Reis']
+            self.valid_cat==['Cooktop','Tea','Juice','Plate','Mug','Bowl','Tray','Tomato','Ketchup','Salz','Milch','Spoon','Spatula','Milk','Coffee','Cookie','Knife','Cornflakes'
+    ,'EggHolder', 'Cube','Mayonnaise','Cereal','Reis']
             
             #process each file
             
