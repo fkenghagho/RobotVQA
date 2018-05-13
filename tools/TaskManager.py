@@ -300,6 +300,16 @@ class ExtendedRobotVQAConfig(RobotVQAConfig):
     #Max CAMERA_CENTER_TO_PIXEL_DISTANCE in m
     MAX_CAMERA_CENTER_TO_PIXEL_DISTANCE=np.sqrt(3.*(MAX_OBJECT_COORDINATE**2))/100.
     
+    # Learning rate and momentum
+    # The Mask RCNN paper uses lr=0.02, but on TensorFlow it causes
+    # weights to explode. Likely due to differences in optimzer
+    # implementation.
+    LEARNING_RATE = 0.0005
+    LEARNING_MOMENTUM = 0.9
+
+    # Weight decay regularization
+    WEIGHT_DECAY = 0.0001
+    
     # Use small images for faster training. Set the limits of the small side
     # the large side, and that determines the image shape.
     IMAGE_MIN_DIM = 512
@@ -327,7 +337,7 @@ class ExtendedRobotVQAConfig(RobotVQAConfig):
     STEPS_PER_EPOCH = 2050
     
     #Number of epochs
-    NUM_EPOCHS=10
+    NUM_EPOCHS=5
     
 
     # use small validation steps since the epoch is small
@@ -474,7 +484,7 @@ class TaskManager(object):
         #predict
         results = model.detect([image], verbose=1)
         r = results[0]
-        dst=self.getDataset('c:/Dataset/raw/dataset2','litImage','annotation','depthImage',None)
+        dst=self.getDataset('c:/Dataset/raw/dataset2','litImage','annotation','depthImage')
         class_ids=[r['class_cat_ids'],r['class_col_ids'],r['class_sha_ids'],r['class_mat_ids'],r['class_opn_ids'],r['class_rel_ids']]
         scores=[r['scores_cat'],r['scores_col'],r['scores_sha'],r['scores_mat'],r['scores_opn'],r['scores_rel']]
         visualize.display_instances(image[:,:,:3], r['rois'], r['masks'], class_ids, dst.class_names,r['poses'], scores=scores, axs=get_ax(cols=2),\

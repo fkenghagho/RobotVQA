@@ -131,7 +131,8 @@ def display_instances(image, boxes, masks, class_ids, class_names,poses,
     x3=10
     y3=10
     #class_ids[len(class_ids)-1]=class_ids[len(class_ids)-1]+1
-    best_relations=np.argmax(scores[len(class_ids)-1],axis=1)
+    #best_relations=np.argmax(scores[len(class_ids)-1],axis=1)
+    best_relations=utils.relation_graph(boxes)
     for i in range(N):
         color = colors[i]
         # Bounding box

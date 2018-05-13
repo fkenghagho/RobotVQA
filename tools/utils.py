@@ -27,6 +27,58 @@ COCO_MODEL_URL = "https://github.com/matterport/Mask_RCNN/releases/download/v2.0
 #  Bounding Boxes
 ############################################################
 
+def bbox_distance(r1,r2,flags):
+    """Compute spatial relation between two rectangles r1,r2
+    """
+    y1, x1, y2, x2=r1
+    y3, x3, y4, x4=r2
+    if not (((x3>=x1 and x3<=x2) or (x1>=x3 and x1<=x4)) and ((y3>=y1 and y3<=y2) or (y1>=y3 and y1<=y4))):
+        # no intersection between r1 and r2. distance between r1 and r2's centers
+        return np.array([-np.inf,np.sqrt(0.25*(x1+x2-x3-x4)**2+0.25*(y1+y2-y3-y4)**2)])
+    else:
+         #amount ratio of r1 in r2
+         if((x3>=x1 and x3<=x2)):
+             width=abs(x3-np.minimum(x2,x4))
+         else:
+             width=abs(x1-np.minimum(x2,x4))
+             
+         if((y3>=y1 and y3<=y2)):
+             height=abs(y3-np.minimum(y2,y4))
+         else:
+             height=abs(y1-np.minimum(y2,y4))
+         if (width*height)<1e-3:
+            return np.array([-np.inf,np.sqrt(0.25*(x1+x2-x3-x4)**2+0.25*(y1+y2-y3-y4)**2)]) 
+            
+         if(((x2-x1)*(y2-y1)==(x4-x3)*(y4-y3)) and flags) or ((x2-x1)*(y2-y1)>(x4-x3)*(y4-y3)) :
+            return np.array([-np.inf,np.inf]) 
+         return np.array([(width*height)/((x1-x2)*(y1-y2)),np.inf])
+         
+def map_bbox_distance(bbox_list):
+    """Compute the image of the bbox_distance relation over set bbox_list x bbox_list
+    """
+    N,M=bbox_list.shape
+    result=np.zeros([N,N,2],dtype='float32')
+    for i in range(N):
+        for j in range(N):
+            if i!=j:
+                
+                result[i,j]=bbox_distance(bbox_list[i],bbox_list[j],(i>j)*1)
+            else:
+                result[i,j,0]=-np.inf
+                result[i,j,1]=np.inf
+    return result
+    
+def relation_graph(bbox_list):
+    """Summarize the above computed graph through hierarchical clustering
+    """
+    result=map_bbox_distance(bbox_list)
+    res_area=np.argmax(result[:,:,0],axis=1)
+    i=np.where(np.less_equal(np.max(result[:,:,0],axis=1),0))[0]
+    res_dist=np.argmin(result[:,:,1],axis=1)
+    res_area[i]=res_dist[i]
+    return res_area
+
+
 def extract_bboxes(mask):
     """Compute bounding boxes from masks.
     mask: [height, width, num_instances]. Mask pixels are either 1 or 0.
@@ -224,13 +276,17 @@ def box_refinement(box, gt_box):
     return np.stack([dy, dx, dh, dw], axis=1)
 
 
-def normalSurface(depth,max_distance):
+def normalSurface(depthImg,max_distance,depth="float32"):
     #we assume depth is of type CV_8UC3
-    depthImg=cv2.imread(depth,cv2.IMREAD_ANYDEPTH)
-    x,y=np.where(depthImg>max_distance)
-    depthImg[x,y]=max_distance
-    if max_distance!=0.:
-        depthImg=depthImg/max_distance
+    if depth=="float32":
+        depthImg=cv2.imread(depthImg,cv2.IMREAD_ANYDEPTH)
+        x,y=np.where(depthImg>max_distance)
+        depthImg[x,y]=max_distance
+        if max_distance!=0.:
+            depthImg=depthImg/max_distance
+    else:
+        depthImg=np.array(cv2.imread(depthImg)[:,:,0],dtype="float32")
+        depthImg=depthImg/depthImg.max()
     depthImg=depthImg-1.0
     #sobel x
     sobelx=cv2.Sobel(depthImg,cv2.CV_32F,1,0,ksize=15)
@@ -249,14 +305,14 @@ def normalSurface(depth,max_distance):
     return cv2.cvtColor(normalImg,cv2.COLOR_BGR2RGB)
 
 
-def load_image(litImg,depthImg,max_distance):
+def load_image(litImg,depthImg,max_distance,depth="float32"):
         # Load image
         image = skimage.io.imread(litImg)
         # If grayscale. Convert to RGB for consistency.
         if image.ndim != 3:
             image =np.array(skimage.color.gray2rgb(image),dtype='float32')
         try:
-            depthImage=normalSurface(depthImg,max_distance)
+            depthImage=normalSurface(depthImg,max_distance,depth=depth)
         except Exception as e:
             depthImage=np.zeros(image.shape,dtype='float32')
         shape=list(image.shape)
@@ -413,13 +469,13 @@ class Dataset(object):
         
    
 
-    def load_image(self, image_id,max_distance):
+    def load_image(self, image_id,max_distance,depth="float32"):
         """Load the specified image and return a [H,W,3] Numpy array.
         """
         # Load image
         litImg = self.image_info[image_id]['path']
         depthImg = self.image_info[image_id]['depthPath']
-        return load_image(litImg,depthImg,max_distance)
+        return load_image(litImg,depthImg,max_distance,depth=depth)
 
     def load_mask(self, image_id):
         """Load instance masks for the given image.
