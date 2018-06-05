@@ -279,10 +279,9 @@ class ExtendedRobotVQAConfig(RobotVQAConfig):
     # Number of classes per features(object's category/name, color, shape, material, openability) (including background)
     NUM_CLASSES =[1+21,1+8,1+5,1+5,1+2,1+9,1+4]  # background + 3 shapes
     #categories
-    OBJECT_NAME_DICO=['Cooktop','Tea','Juice','Plate','Mug','Bowl','Tray','Tomato','Ketchup','Salz','Milch','Spoon','Spatula','Milk','Coffee','Cookie','Knife','Cornflakes'
-    ,'EggHolder', 'Cube','Mayonnaise','Cereal','Reis']#Any other is part of background
+    OBJECT_NAME_DICO=['Tea','Juice','Plate','Mug','Bowl','Tray','Tomato','Ketchup','Salt','Muesli','Spoon','Spatula','Milk','Coffee','Knife','Cornflakes','EggHolder', ,'Pancake','Cereal','Rice']#Any other is part of background
     #colors
-    OBJECT_COLOR_DICO=['Red', 'Orange', 'Brown', 'Yellow', 'Green', 'Blue', 'White', 'Gray', 'Black', 'Transparent']
+    OBJECT_COLOR_DICO=['Red', 'Orange', 'Brown', 'Yellow', 'Green', 'Blue', 'White', 'Gray', 'Black', 'Violet','Pink']
     #shape
     OBJECT_SHAPE_DICO=['Cubic', 'Pyramidal','Conical', 'Spherical', 'Cylindrical', 'Filiform', 'Flat']
     #material

@@ -14,3 +14,14 @@ This file holds information about the post-processing of the dataset:
   *Duplication elimination
 -Dataset compression
 
+-Classes of equivalence:
+   
+	+Milch=Milk
+   
+	+Cookie=Muesli
+   
+	+Transparent=White
+   
+	+Mayonnaise=Pancake
+   
+	+Reis=Rice
