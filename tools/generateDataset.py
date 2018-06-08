@@ -10,32 +10,39 @@ import cv2
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from shutil import copyfile
- 
+from DatasetClasses import DatasetClasses
 R=[]
 
 
-objectColor=['pink','red','orange','brown','yellow','olive','green','blue','purple','white','gray','black']
+objectColor=DatasetClasses.OBJECT_COLOR_DICO
 class Dataset(object):
     #mode=offline(without connection to image server. Used when processing existing data)/online(With connection to image server)
     #state=continue/restart
-    def __init__(self,folder,nberOfImages,offset,cameraId,mode="offline", state="continue"):
+    def __init__(self):
         self.T=[]
-        self.folder=folder
-        self.litImage='litImage'
-        self.normalImage='normalImage'
-        self.depthImage='depthImage'
-        self.maskImage='maskImage'
-        self.annotation='annotation'
-        self.annotExtension='json'
-        self.index=offset
-        self.extension='jpg'
-        self.depthExtension='exr'
-        self.nberOfImages=nberOfImages
-        self.cameraId=cameraId
+        self.folder=DatasetClasses.DATASET_FOLDER
+        self.screenshot=DatasetClasses.SCREENSHOT_FOLDER
+        self.litImage=DatasetClasses.LIT_IMAGE_NAME_ROOT
+        self.normalImage=DatasetClasses.NORMAL_IMAGE_NAME_ROOT
+        self.depthImage=DatasetClasses.DEPTH_IMAGE_NAME_ROOT
+        self.maskImage=DatasetClasses.MASK_IMAGE_NAME_ROOT
+        self.annotation=DatasetClasses.ANNOTATION_IMAGE_NAME_ROOT
+        self.annotExtension=DatasetClasses.ANNOTATION_FILE_EXTENSION
+        self.index=DatasetClasses.INDEX
+        self.extension=DatasetClasses.IMAGE_FILE_EXTENSION
+        self.depthExtension=DatasetClasses.DEPTH_FILE_EXTENSION
+        self.nberOfImages=DatasetClasses.NUMBER_IMAGES
+        self.cameraId=DatasetClasses.CAMERA_ID
+        mode=DatasetClasses.MODE
+        state=DatasetClasses.STATE
         self.objectColor={}
         self.listObjects={}
         self.objectIndex={}
+        self.Distribution={}
         self.objectColorMatch=np.ones([256,256,256],dtype='int')*(-1)
+        #Canonical relationships between object in the scene
+        self.actor_ids=DatasetClasses.ACTOR_IDS
+        self.relationship_map=DatasetClasses.RELATIONSHIP_MAP
         if mode=="online":
                 #make dataset directory
                 try:
@@ -54,10 +61,17 @@ class Dataset(object):
                     client.connect()
                     print('Status: \n'+client.request('vget /unrealcv/status'))
                     #set field of view
-                    client.request('vset /camera/'+str(self.cameraId)+'/horizontal_fieldofview '+str(70.0))
-                    objects=client.request('vget /objects').split(' ')
+                    client.request('vset /camera/'+str(self.cameraId)+'/horizontal_fieldofview '+str(DatasetClasses.FIELD_OF_VIEW))
+                    lObjects=client.request('vget /objects').split(' ')
+                    objects=[]
+                    for objId in lObjects:
+                        if len(objId)>=2:
+                            if objId[:2]=='A_':
+                                objects.append(objId)
                     print(objects)
                     print(str(len(objects))+' objects found in the scene.')
+                    #compute dristribution of properties over set of objects
+                    self.computeDistribution(objects)
                     #map object to color
                     for i in range(len(objects)):
                         #convert '(R=127,G=191,B=127,A=255)' to [127, 191, 127, 255]
@@ -81,7 +95,78 @@ class Dataset(object):
                 except Exception,e:
                     print('Error: Problem with unrealcv .'+str(e))
         else:
-            pass        
+            pass    
+    
+    #Compute the distribution of properties over a given set of object
+    def computeDistribution(self,listObjects):
+        self.Distribution={}
+        #1. distriution of category
+        for cat in DatasetClasses.OBJECT_NAME_DICO:
+            self.Distribution[cat]={}
+            
+            for col in DatasetClasses.OBJECT_COLOR_DICO:
+                self.Distribution[cat][col]={}
+                
+                for mat in DatasetClasses.OBJECT_MATERIAL_DICO:
+                    self.Distribution[cat][col][mat]={}
+                    
+                    for sha in DatasetClasses.OBJECT_SHAPE_DICO:
+                        self.Distribution[cat][col][mat][sha]={} 
+                        
+                        for opn in list(DatasetClasses.OBJECT_OPENABILITY_DICO.keys()):
+                            self.Distribution[cat][col][mat][sha][opn]=[]  
+            
+        for objId in listObjects:
+            if len(objId)>=2:
+                if objId[:2]=='A_':#only select handable objects
+                    #get object tags template
+                    objTagTemp={"objectShape":"","objectExternalMaterial":"","objectInternalMaterial":"","objectHardness":"",
+                                "objectPickability":"","objectGraspability":"","objectStackability":"","objectOpenability":"","objectColor":"","objectName":""}
+                    #get object tags,global Position and orientation
+                    try:
+                        objTags=client.request('vget /object/'+objId+'/tags')
+                        #split tags
+                        objTags=objTags.split(';')
+                        for elt in objTags:
+                                elt=elt.split(':')
+                                elt[0]=elt[0].rstrip().lstrip()#remove border spaces
+                                elt[1]=elt[1].rstrip().lstrip()
+                                objTagTemp[elt[0]]=elt[1][:1].upper()+elt[1][1:]
+                        self.Distribution[objTagTemp["objectName"]][objTagTemp["objectColor"]][objTagTemp["objectExternalMaterial"]]\
+                        [objTagTemp["objectShape"]][objTagTemp["objectOpenability"]].append(objId)
+                    except Exception,e:
+                        print('Error occured when accessing  tags of '+objId+'. '+str(e))
+                        
+        #1.remove not appearing properties from the distriution
+        for cat in DatasetClasses.OBJECT_NAME_DICO:
+            self.Distribution[cat]={}
+            
+            for col in DatasetClasses.OBJECT_COLOR_DICO:
+                self.Distribution[cat][col]={}
+                
+                for mat in DatasetClasses.OBJECT_MATERIAL_DICO:
+                    self.Distribution[cat][col][mat]={}
+                    
+                    for sha in DatasetClasses.OBJECT_SHAPE_DICO:
+                        self.Distribution[cat][col][mat][sha]={} 
+                        
+                        for opn in list(DatasetClasses.OBJECT_OPENABILITY_DICO.keys()):
+                           if len(self.Distribution[cat][col][mat][sha][opn])==0:
+                               del self.Distribution[cat][col][mat][sha][opn]
+                    
+                        if len(self.Distribution[cat][col][mat][sha])==0:
+                            del self.Distribution[cat][col][mat][sha]
+                
+                    if len(self.Distribution[cat][col][mat])==0:
+                        del self.Distribution[cat][col][mat]
+                        
+                if len(self.Distribution[cat][col])==0:
+                    del self.Distribution[cat][col]
+            
+            if len(self.Distribution[cat])==0:
+                del self.Distribution[cat]
+        return self.Distribution
+    
     #convert from raw to RGB image matrix
     def read_png(self,res):
         img = PIL.Image.open(StringIO.StringIO(res))
@@ -111,12 +196,14 @@ class Dataset(object):
         for i in range(n):
             for j in range(m):
                 color=list(img[i][j])
-                key=self.objectIndex[self.objectColorMatch[color[0]][color[1]][color[2]]]
-                if key in self.listObjects.keys():
-                    self.listObjects[key].append([i,j])
-                else:
-                    self.listObjects[key]=[[i,j]]
-        
+                object_address=self.objectColorMatch[color[0]][color[1]][color[2]]
+                if object_address>-1:
+                    key=self.objectIndex[object_address]
+                    if key in self.listObjects.keys():
+                        self.listObjects[key].append([i,j])
+                    else:
+                        self.listObjects[key]=[[i,j]]
+            
     #object name from id
     def getName(self,objectId):
         return objectId
@@ -166,6 +253,8 @@ class Dataset(object):
                 for elt in objTags:
                     try:
                         elt=elt.split(':')
+                        elt[0]=elt[0].rstrip().lstrip()#remove border spaces
+                        elt[1]=elt[1].rstrip().lstrip()
                         objTagTemp[elt[0]]=elt[1]
                     except Exception,e:
                          print('Error occured when parsing object tags. '+str(e))
@@ -218,9 +307,20 @@ class Dataset(object):
         try:
             #convert from plain to json
             jsonImage=json.loads(jsonImage)
+            #Add relationship map
+            """uncomment the statement below if you want to ignore any existing relational map
+            """
+            #del annot['objectRelationship'][:]
+            for elt in self.relationship_map:
+                rel=elt[1][:1].lower()+elt[1][1:]
+                jsonImage['objectRelationship'].append(
+                json.loads(
+                            '{"object1":"'+self.actor_ids[elt[0]]+'","relation":"'+rel+'","object2":"'+self.actor_ids[elt[2]]+'"}'
+                          )
+                )
             #write json annotation to file
             with open(os.path.join(self.folder,self.annotation+str(self.index)+'.'+self.annotExtension),'w') as outfile:
-                json.dump(jsonImage,outfile,indent=5)
+                json.dump(jsonImage,outfile)
             print('Annotation saved successfully.')
             del jsonArray[:]
             return True
@@ -384,12 +484,12 @@ class Dataset(object):
         
     #save nberOfImages images
     def scan(self):
-        X=np.arange(-267,-208,23)
-        Y=np.arange(182,308,21)
-        Z=np.arange(140,216,11)
-        TETAX=np.arange(-90,91,45)
-        TETAY=np.arange(-60,-33,13)
-        TETAZ=np.arange(-35,48,17)
+        X=np.arange(-168,-120,30)
+        Y=np.arange(114,90,-21)
+        Z=np.arange(164,150,-30)
+        TETAX=np.arange(0,3,20)
+        TETAY=np.arange(300,317,15)
+        TETAZ=np.arange(240,260,17)
         i=self.index
         for x in X:
             for y in Y:
@@ -407,9 +507,29 @@ class Dataset(object):
                                         client.request('vset /camera/'+str(self.cameraId)+'/rotation '+str(tetay)+' '+str(tetaz)+' '+str(tetax))
                                         #take lit image
                                         client.request('vset /viewmode lit')
-                                        img=client.request('vget /camera/'+str(self.cameraId)+'/lit png')
-                                        #convert image properly . remove unused A channel  
-                                        img=cv2.cvtColor(self.read_png(img),cv2.COLOR_RGBA2BGR)
+                                        
+                                        #free screenshot folder
+                                        for the_file in os.listdir(self.screenshot):
+                                            file_path = os.path.join(self.screenshot, the_file)
+                                            if os.path.isfile(file_path):
+                                                os.unlink(file_path)
+                                            
+                                        #take a screenshot: This option provides a better resolution than the 'vget/camera/id/lit png' option        
+                                        client.request('vget /vrun shot')
+            
+                                        #get the screenshot path
+                                        while os.listdir(self.screenshot)==[]:
+                                            pass
+                                        the_file=os.listdir(self.screenshot)[0]
+                                        file_path = os.path.join(self.screenshot, the_file)
+                                        print self.screenshot,the_file,file_path
+                                        #get the image
+                                        img=None
+                                        while img==None:
+                                            img=cv2.imread(file_path)
+                                        #convert image properly . remove unused A channel 
+                                        if img.shape[2]>3:
+                                            img=cv2.cvtColor(img,cv2.COLOR_RGBA2BGR)
                                         #save image
                                         if not(cv2.imwrite(os.path.join(self.folder,self.litImage)+str(i)+'.'+self.extension,img)):
                                             raise Exception('Failed to save lit image!!!')
@@ -737,8 +857,7 @@ class Dataset(object):
             self.rel_count={'left':0,'right':0,'front':0,'behind':0,'over':0,'under':0,'valign':0,'in':0,'on':0}
             
             #Initialize set of valid categories
-            self.valid_cat==['Cooktop','Tea','Juice','Plate','Mug','Bowl','Tray','Tomato','Ketchup','Salz','Milch','Spoon','Spatula','Milk','Coffee','Cookie','Knife','Cornflakes'
-    ,'EggHolder', 'Cube','Mayonnaise','Cereal','Reis']
+            self.valid_cat==DatasetClasses.OBJECT_NAME_DICO
             
             #process each file
             

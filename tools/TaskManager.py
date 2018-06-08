@@ -10,6 +10,7 @@
 
 #@Author:   Frankln Kenghagho
 #@Date:     19.03.2018
+from DatasetClasses import DatasetClasses
 import pickle
 import glob
 import os
@@ -273,31 +274,32 @@ class ExtendedRobotVQAConfig(RobotVQAConfig):
     IMAGES_PER_GPU = 1
     
     #Number of target feature
-    NUM_FEATURES=7
+    NUM_FEATURES=DatasetClasses.NUM_FEATURES
     #Target features
-    FEATURES_INDEX={'CATEGORY':0,'COLOR':1,'SHAPE':2,'MATERIAL':3,'OPENABILITY':4,'RELATION':5,'RELATION_CATEGORY':6}
+    FEATURES_INDEX=DatasetClasses.FEATURES_INDEX
     # Number of classes per features(object's category/name, color, shape, material, openability) (including background)
-    NUM_CLASSES =[1+21,1+8,1+5,1+5,1+2,1+9,1+4]  # background + 3 shapes
+    NUM_CLASSES =DatasetClasses.NUM_CLASSES # background + 3 shapes
     #categories
-    OBJECT_NAME_DICO=['Tea','Juice','Plate','Mug','Bowl','Tray','Tomato','Ketchup','Salt','Muesli','Spoon','Spatula','Milk','Coffee','Knife','Cornflakes','EggHolder', ,'Pancake','Cereal','Rice']#Any other is part of background
+    OBJECT_NAME_DICO=DatasetClasses.OBJECT_NAME_DICO
     #colors
-    OBJECT_COLOR_DICO=['Red', 'Orange', 'Brown', 'Yellow', 'Green', 'Blue', 'White', 'Gray', 'Black', 'Violet','Pink']
+    OBJECT_COLOR_DICO=DatasetClasses.OBJECT_COLOR_DICO
     #shape
-    OBJECT_SHAPE_DICO=['Cubic', 'Pyramidal','Conical', 'Spherical', 'Cylindrical', 'Filiform', 'Flat']
+    OBJECT_SHAPE_DICO=DatasetClasses.OBJECT_SHAPE_DICO
     #material
-    OBJECT_MATERIAL_DICO=['Plastic', 'Wood', 'Glass', 'Steel', 'Cartoon', 'Ceramic']
+    OBJECT_MATERIAL_DICO=DatasetClasses.OBJECT_MATERIAL_DICO
     #openability
-    OBJECT_OPENABILITY_DICO={'True':'Openable','False':'Non-Openable'}
+    OBJECT_OPENABILITY_DICO=DatasetClasses.OBJECT_OPENABILITY_DICO
     #object relationships
-    OBJECT_RELATION_DICO={'Left':'LeftRight','Right':'LeftRight','Front':'FrontBehind','Behind':'FrontBehind','Over':'OverUnder','Under':'OverUnder','Valign':'OverUnder','In':'OnIn','On':'OnIn'}
+    OBJECT_RELATION_DICO=DatasetClasses.OBJECT_RELATION_DICO
+    
     #relationship categories
-    RELATION_CATEGORY_DICO={0+1:'LeftRight',1+1:'FrontBehind',2+1:'OverUnder',3+1:'OnIn'}
+    RELATION_CATEGORY_DICO=DatasetClasses.RELATION_CATEGORY_DICO
 
     #Max Object Coordinate in cm
-    MAX_OBJECT_COORDINATE=420
+    MAX_OBJECT_COORDINATE=DatasetClasses.MAX_OBJECT_COORDINATE
     
     #Max CAMERA_CENTER_TO_PIXEL_DISTANCE in m
-    MAX_CAMERA_CENTER_TO_PIXEL_DISTANCE=np.sqrt(3.*(MAX_OBJECT_COORDINATE**2))/100.
+    MAX_CAMERA_CENTER_TO_PIXEL_DISTANCE=DatasetClasses.MAX_CAMERA_CENTER_TO_PIXEL_DISTANCE
     
     # Learning rate and momentum
     # The Mask RCNN paper uses lr=0.02, but on TensorFlow it causes
@@ -311,8 +313,8 @@ class ExtendedRobotVQAConfig(RobotVQAConfig):
     
     # Use small images for faster training. Set the limits of the small side
     # the large side, and that determines the image shape.
-    IMAGE_MIN_DIM = 512
-    IMAGE_MAX_DIM = 640
+    IMAGE_MIN_DIM = DatasetClasses.IMAGE_MIN_DIM
+    IMAGE_MAX_DIM = DatasetClasses.IMAGE_MAX_DIM
 
     # Use smaller anchors because our image and objects are small
     RPN_ANCHOR_SCALES = (16, 32, 64, 128,256)  # anchor side in pixels
@@ -350,10 +352,10 @@ class ExtendedRobotVQAConfig(RobotVQAConfig):
     USE_RPN_ROIS = True
     
     # Input image size:RGBD-Images
-    IMAGE_SHAPE = [IMAGE_MAX_DIM, IMAGE_MAX_DIM, 6]
+    IMAGE_SHAPE = [IMAGE_MAX_DIM, IMAGE_MAX_DIM, DatasetClasses.IMAGE_MAX_CHANNEL]
     
     # Image mean (RGB)
-    MEAN_PIXEL = np.array([123.7, 116.8, 103.9,173., 122., 127.])
+    MEAN_PIXEL = DatasetClasses.MEAN_PIXEL
     
     #                           
     EXCLUDE=["mrcnn_class_logits0", "mrcnn_class_logits1","mrcnn_class_logits2","mrcnn_class_logits3","mrcnn_class_logits4","mrcnn_class_logits5",
