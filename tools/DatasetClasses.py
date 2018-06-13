@@ -1,5 +1,4 @@
 import numpy as np
-
 class DatasetClasses(object):
     """This class is platform independent and holds 
        information about classes found in the dataset
@@ -71,20 +70,29 @@ class DatasetClasses(object):
     IMAGE_FILE_EXTENSION='jpg'
     DEPTH_FILE_EXTENSION='exr'
     NUMBER_IMAGES=0
-    INDEX=0
+    INDEX=1427
     CAMERA_ID=0
+    ORIENTATION_DELTA=5
     #with or without connection to UE4: values={'offline','online'}
     MODE='online'
     #resume from actual scene or restart for a new scene:values={'continue','restart'}
-    STATE='restart' 
+    STATE='continue' 
     
     #Canonical relationships between object in the scene
-    ACTOR_IDS={0:'A_Albi_Juice_1',1:'A_Mug_32',2:'A_Bowl_35',3:'A_Spoon_14'}
+    ACTOR_IDS={0:'A_Tray_6',1:'A_Cereal_Nesquik_1',2:'A_Mug_13',3:'A_Spoon_1',4:'A_Coffee_Cappuccino_7',5:'A_Plate_35',6:'A_Milch_Ja_9'}
     # Only use relations={ 'left','front','under','on','in','has','valign'} for optimization.
     # The other relationships will be deductively generated. if A is left B,then B is right A.
-    RELATIONSHIP_MAP=[[0,'left',1],[2,'front',0],[3,'front',0],[2,'front',1],[3,'front',1],[3,'in',2]]
+    RELATIONSHIP_MAP=[[0,'left',4],[0,'left',6],[1,'in',0],[2,'in',0],[3,'in',2],[4,'left',5],[4,'front',6],[5,'front',6]]
+    #Actors' stacking graph: shows how actors are stacked in the scene
+    ACTOR_STACKING_GRAPH={0:0,1:0,2:0,3:2,4:4,5:5,6:6}#i:j means actor i is directly contained(on/in) by actor j. j=i implies no contenance.
+    #Contenance relationships
+    CONTENANCE_RELATIONSHIPS=['on','in']
+    #Actor common temporary pose
+    ACTOR_COMMON_TEMP_LOCATION='-651 -701 30'
+    ACTOR_COMMON_TEMP_ROTATION='0 0 0'
     
     
+   
     
     def __init__(self):
         pass

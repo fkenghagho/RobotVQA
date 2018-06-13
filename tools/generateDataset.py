@@ -13,6 +13,12 @@ from shutil import copyfile
 from DatasetClasses import DatasetClasses
 R=[]
 
+def randomIndex(N):
+    assert N>0
+    sum=0
+    for i in range(N):
+        sum+=int(os.urandom(5).encode('hex'),16)
+    return sum%N
 
 objectColor=DatasetClasses.OBJECT_COLOR_DICO
 class Dataset(object):
@@ -33,12 +39,18 @@ class Dataset(object):
         self.depthExtension=DatasetClasses.DEPTH_FILE_EXTENSION
         self.nberOfImages=DatasetClasses.NUMBER_IMAGES
         self.cameraId=DatasetClasses.CAMERA_ID
+        self.actor_stacking_graph=DatasetClasses.ACTOR_STACKING_GRAPH
+        self.contenance_relationships=DatasetClasses.CONTENANCE_RELATIONSHIPS
+        #Actor common temporary pose
+        self.actor_common_temp_location=DatasetClasses.ACTOR_COMMON_TEMP_LOCATION
+        self.actor_common_temp_rotation=DatasetClasses.ACTOR_COMMON_TEMP_ROTATION
         mode=DatasetClasses.MODE
         state=DatasetClasses.STATE
         self.objectColor={}
         self.listObjects={}
         self.objectIndex={}
         self.Distribution={}
+        self.actor_properties={}
         self.objectColorMatch=np.ones([256,256,256],dtype='int')*(-1)
         #Canonical relationships between object in the scene
         self.actor_ids=DatasetClasses.ACTOR_IDS
@@ -58,11 +70,11 @@ class Dataset(object):
                     print('Error: Problem with dataset directory. '+str(e))
                 
                 try:
-                    client.connect()
-                    print('Status: \n'+client.request('vget /unrealcv/status'))
+                    self.connect()
+                    print('Status: \n'+self.request('vget /unrealcv/status'))
                     #set field of view
-                    client.request('vset /camera/'+str(self.cameraId)+'/horizontal_fieldofview '+str(DatasetClasses.FIELD_OF_VIEW))
-                    lObjects=client.request('vget /objects').split(' ')
+                    self.request('vset /camera/'+str(self.cameraId)+'/horizontal_fieldofview '+str(DatasetClasses.FIELD_OF_VIEW))
+                    lObjects=self.request('vget /objects').split(' ')
                     objects=[]
                     for objId in lObjects:
                         if len(objId)>=2:
@@ -76,7 +88,7 @@ class Dataset(object):
                     for i in range(len(objects)):
                         #convert '(R=127,G=191,B=127,A=255)' to [127, 191, 127, 255]
                         self.objectIndex[i]=objects[i]
-                        e=client.request('vget /object/'+objects[i]+'/color')
+                        e=self.request('vget /object/'+objects[i]+'/color')
                         t=e.split('(')[1].split(')')[0].split(',')
                         t=[int(t[0].split('=')[1]),int(t[1].split('=')[1]),int(t[2].split('=')[1]),int(t[3].split('=')[1])]
                         #t=np.array(t,dtype='uint8')
@@ -97,6 +109,185 @@ class Dataset(object):
         else:
             pass    
     
+    #Alternate the sceen
+    def alternateScene(self):
+        
+        #commute actors#
+        
+        #update relationships between objects#
+        old_baseActors=[]#base actors are not contained
+        
+        #get base actors
+        for actor_index in self.actor_stacking_graph.keys():
+            if self.actor_stacking_graph[actor_index]==actor_index:
+                old_baseActors.append(actor_index)
+        copy_old_baseActors=list(old_baseActors)
+        
+        #new positioning of base actors
+        new_baseActors=[]
+        while(copy_old_baseActors!=[]):
+            new_baseActors.append(copy_old_baseActors.pop(self.randomIndex(len(copy_old_baseActors))))
+            
+        #matching#    
+        actor_matching={}
+        for i in range(len(self.actor_ids)):
+            actor_matching[i]=i
+            
+        #update matching
+        for i in range(len( old_baseActors)):
+            actor_matching[old_baseActors[i]]=new_baseActors[i]
+            
+        
+        #update relationship
+        for i in range(len(self.relationship_map)):
+            if(self.relationship_map[i][1] not in self.contenance_relationships):
+                if (self.baseActor(self.relationship_map[i][0])==self.relationship_map[i][0] and self.baseActor(self.relationship_map[i][2])==self.relationship_map[i][2]):
+                    self.relationship_map[i][0]=actor_matching[self.baseActor(self.relationship_map[i][0])]
+                    self.relationship_map[i][2]=actor_matching[self.baseActor(self.relationship_map[i][2])]
+                
+        #compute old poses and move actors to temporary pose
+        old_poses={}
+        for i in range(len(self.actor_ids)):
+            actor_id=self.actor_ids[i]
+            #get actors' coordinates
+            x,y,z=self.request('vget /object/'+actor_id+'/location').split(' ')
+            x=float(x)
+            y=float(y)
+            z=float(z)
+            ty,tz,tx=self.request('vget /object/'+actor_id+'/rotation').split(' ')
+            tx=float(tx)
+            ty=float(ty)
+            tz=float(tz)
+            old_poses[i]=[x,y,z,tx,ty,tz]
+            #move actor to temporary pose
+            self.request('vset /object/'+actor_id+'/hide')
+            self.request('vset /object/'+actor_id+'/hide')
+        
+        print('old_poses:',old_poses)
+        #compute new poses and move actors to temporary pose
+        for i in range(len(actor_matching)):
+            #get actors' coordinates
+            actor_id=self.actor_ids[actor_matching[i]]
+            x1,y1,z1,tx1,ty1,tz1=old_poses[i]
+            if actor_matching[i] in old_baseActors:
+                x2,y2,z2,tx2,ty2,tz2=old_poses[actor_matching[i]]
+                x=x1
+                y=y1
+                z=z2
+                tx=tx2
+                ty=ty2
+                tz=tz2+[-1,1][self.randomIndex(2)]*self.randomIndex(DatasetClasses.ORIENTATION_DELTA)
+            else:
+                base_actor_index=self.baseActor(i)
+                for j in range(len(actor_matching)):
+                    if actor_matching[j]==base_actor_index:
+                        target_index=j
+                        break
+                x2,y2,z2,tx2,ty2,tz2=old_poses[base_actor_index]
+                x3,y3,z3,tx3,ty3,tz3=old_poses[target_index]
+                x=x1+x3-x2
+                y=y1 +y3-y2
+                z=z1
+                tx=tx1
+                ty=ty1
+                tz=tz1+[-1,1][self.randomIndex(2)]*self.randomIndex(DatasetClasses.ORIENTATION_DELTA)
+            #move actor to new pose
+            self.request('vset /object/'+actor_id+'/location '+str(x)+' '+str(y)+' '+str(z))
+            self.request('vset /object/'+actor_id+'/rotation '+str(ty)+' '+str(tz)+' '+str(tx))
+            self.request('vset /object/'+actor_id+'/show')
+        
+        #alternate the scene
+        newScene={}
+        for  i in range(len(self.actor_ids)):
+            actor_id=self.actor_ids[i]
+            newScene[actor_id]=self.alternateActor(actor_id)
+        
+        #placement of actors in the scene
+        for  i in range(len(self.actor_ids)):
+            actor_id=self.actor_ids[i]
+            #get actors' coordinates
+            old_objPosition=self.request('vget /object/'+actor_id+'/location')
+            old_objOrientation=self.request('vget /object/'+actor_id+'/rotation')
+            
+            new_objPosition=self.request('vget /object/'+newScene[actor_id]+'/location')
+            new_objOrientation=self.request('vget /object/'+newScene[actor_id]+'/rotation')
+            
+            #update scene#
+            
+            #remove old actor from the scene
+            self.request('vset /object/'+actor_id+'/location '+new_objPosition)
+            self.request('vset /object/'+actor_id+'/rotation '+new_objOrientation)
+            self.request('vset /object/'+actor_id+'/hide')
+
+            #insert new actor into the scene
+            self.request('vset /object/'+newScene[actor_id]+'/location '+old_objPosition)
+            self.request('vset /object/'+newScene[actor_id]+'/rotation '+old_objOrientation)
+            self.request('vset /object/'+newScene[actor_id]+'/show')
+        
+        #update actors' list
+        for i in range(len(self.actor_ids)):
+            self.actor_ids[i]=newScene[self.actor_ids[i]]
+        
+                    
+              
+    #return the base actor of an actor
+    def baseActor(self,actor_index):
+        if self.actor_stacking_graph[actor_index]==actor_index:
+            return actor_index
+        else:
+            return self.baseActor(self.actor_stacking_graph[actor_index])
+            
+        
+    #return an alternative of a particular actor
+    def alternateActor(self,actor_id):
+        try:
+            #get the actor category
+            actor_name=self.actor_properties[actor_id]['objectName']
+            
+            #choosing a color
+            N=len(self.Distribution[actor_name])
+            colorIndex=self.randomIndex(N)
+            colors=self.Distribution[actor_name].keys()
+            colors.sort()
+            
+            #choosing a material
+            N=len(self.Distribution[actor_name][colors[colorIndex]])
+            materialIndex=self.randomIndex(N)
+            materials=self.Distribution[actor_name][colors[colorIndex]].keys()
+            materials.sort()
+            
+            #choosing a shape
+            N=len(self.Distribution[actor_name][colors[colorIndex]][materials[materialIndex]])
+            shapeIndex=self.randomIndex(N)
+            shapes=self.Distribution[actor_name][colors[colorIndex]][materials[materialIndex]].keys()
+            shapes.sort()
+            
+            #choosing an accessing mode: openable or not
+            N=len(self.Distribution[actor_name][colors[colorIndex]][materials[materialIndex]][shapes[shapeIndex]])
+            accessModeIndex=self.randomIndex(N)
+            accessModes=self.Distribution[actor_name][colors[colorIndex]][materials[materialIndex]][shapes[shapeIndex]].keys()
+            accessModes.sort()
+            
+            #choosing an alternative actor
+            N=len(self.Distribution[actor_name][colors[colorIndex]][materials[materialIndex]][shapes[shapeIndex]][accessModes[accessModeIndex]])
+            actorIndex=self.randomIndex(N)
+            actors=self.Distribution[actor_name][colors[colorIndex]][materials[materialIndex]][shapes[shapeIndex]][accessModes[accessModeIndex]]
+            actors.sort()
+            
+            return actors[actorIndex]
+        except Exception,e:
+            return None
+     
+    #high-randomly choose a number from [0,1,..,N-1]
+    def randomIndex(self,N):
+        try:
+            sum=0
+            for i in range(N):
+                sum+=int(os.urandom(5).encode('hex'),16)
+            return sum%N
+        except Exception,e:
+            return -1
+        
     #Compute the distribution of properties over a given set of object
     def computeDistribution(self,listObjects):
         self.Distribution={}
@@ -124,7 +315,7 @@ class Dataset(object):
                                 "objectPickability":"","objectGraspability":"","objectStackability":"","objectOpenability":"","objectColor":"","objectName":""}
                     #get object tags,global Position and orientation
                     try:
-                        objTags=client.request('vget /object/'+objId+'/tags')
+                        objTags=self.request('vget /object/'+objId+'/tags')
                         #split tags
                         objTags=objTags.split(';')
                         for elt in objTags:
@@ -134,21 +325,18 @@ class Dataset(object):
                                 objTagTemp[elt[0]]=elt[1][:1].upper()+elt[1][1:]
                         self.Distribution[objTagTemp["objectName"]][objTagTemp["objectColor"]][objTagTemp["objectExternalMaterial"]]\
                         [objTagTemp["objectShape"]][objTagTemp["objectOpenability"]].append(objId)
+                        self.actor_properties[objId]=objTagTemp
                     except Exception,e:
                         print('Error occured when accessing  tags of '+objId+'. '+str(e))
                         
-        #1.remove not appearing properties from the distriution
+        #1.remove not appearing properties from the distribution
         for cat in DatasetClasses.OBJECT_NAME_DICO:
-            self.Distribution[cat]={}
             
             for col in DatasetClasses.OBJECT_COLOR_DICO:
-                self.Distribution[cat][col]={}
                 
                 for mat in DatasetClasses.OBJECT_MATERIAL_DICO:
-                    self.Distribution[cat][col][mat]={}
                     
                     for sha in DatasetClasses.OBJECT_SHAPE_DICO:
-                        self.Distribution[cat][col][mat][sha]={} 
                         
                         for opn in list(DatasetClasses.OBJECT_OPENABILITY_DICO.keys()):
                            if len(self.Distribution[cat][col][mat][sha][opn])==0:
@@ -217,10 +405,10 @@ class Dataset(object):
         questionId=""
         try:
             #get camera Position x,y,z
-            camPosition=client.request('vget /camera/'+str(self.cameraId)+'/location').split(' ')
+            camPosition=self.request('vget /camera/'+str(self.cameraId)+'/location').split(' ')
             camPosition=[float(camPosition[0]),float(camPosition[1]),float(camPosition[2])]
             #get camera orientation teta,beta,phi
-            camOrientation=client.request('vget /camera/'+str(self.cameraId)+'/rotation').split(' ')
+            camOrientation=self.request('vget /camera/'+str(self.cameraId)+'/rotation').split(' ')
             camOrientation=[float(camOrientation[2]),float(camOrientation[0]),float(camOrientation[1])]
         except Exception,e:
             print('Error occured when requesting camera properties. '+str(e))
@@ -247,7 +435,7 @@ class Dataset(object):
             objLocalPosition=[]
             #get object tags,global Position and orientation
             try:
-                objTags=client.request('vget /object/'+objId+'/tags')
+                objTags=self.request('vget /object/'+objId+'/tags')
                 #split tags
                 objTags=objTags.split(';')
                 for elt in objTags:
@@ -259,10 +447,10 @@ class Dataset(object):
                     except Exception,e:
                          print('Error occured when parsing object tags. '+str(e))
                 #get object Position x,y,z
-                objPosition=client.request('vget /object/'+objId+'/location').split(' ')
+                objPosition=self.request('vget /object/'+objId+'/location').split(' ')
                 objPosition=[float(objPosition[0]),float(objPosition[1]),float(objPosition[2])]
                 #get object orientation teta,beta,phi
-                objOrientation=client.request('vget /object/'+objId+'/rotation').split(' ')
+                objOrientation=self.request('vget /object/'+objId+'/rotation').split(' ')
                 objOrientation=[float(objOrientation[2]),float(objOrientation[0]),float(objOrientation[1])]
                 #compute object pose in camera coordinate system
                 [objLocalPosition,objLocalOrientation]=self.getCameraObjectPose(np.array(camPosition),self.dToR(np.array(camOrientation)),np.array(objPosition),self.dToR(np.array(objOrientation)))
@@ -329,7 +517,7 @@ class Dataset(object):
             return False
     
     def cleanup(self):
-        client.disconnect()
+        self.disconnect()
         
     #get object pixels
     def getObjectColor(self, jsonFile,objName,imageName):
@@ -449,8 +637,50 @@ class Dataset(object):
             return [],''
     
     
-    
-    
+    #secure data request client
+    def connect(self):
+        try:
+            res=None
+            res=client.connect()
+            assert res!=None
+            assert str(res).upper().find('ERROR:')<0
+            return res
+        except Exception,e:
+            print('Error when connecting. Wait for a new try: '+str(e))
+            time.sleep(1.0)
+            return self.connect()
+    def request(self,req):
+        try:
+            res=None
+            res=client.request(req)
+            assert res!=None
+            return res
+        except Exception,e:
+            print('Error when requesting. Wait for a new try: '+str(e))
+            time.sleep(1.0)
+            return self.request(req)
+            
+    def disconnect(self):
+        try:
+            res=None
+            res=client.disconnect()
+            assert res!=None
+            return res
+        except Exception,e:
+            print('Error when disconnecting. Wait for a new try: '+str(e))
+            time.sleep(1.0)
+            return self.disconnect()
+            
+    def isconnected(self):
+        try:
+            res=client.isconnected()
+            assert res!=None
+            return res
+        except Exception,e:
+            print('Error when checking connection. Wait for a new try: '+str(e))
+            time.sleep(1.0)
+            return self.isconnected()
+            
     #compute  RGB-color of an image
     def computeRGBColor(self, imageName):
         #weighted sum of pixels' RGB color
@@ -484,12 +714,12 @@ class Dataset(object):
         
     #save nberOfImages images
     def scan(self):
-        X=np.arange(-168,-120,30)
-        Y=np.arange(114,90,-21)
-        Z=np.arange(164,150,-30)
-        TETAX=np.arange(0,3,20)
-        TETAY=np.arange(300,317,15)
-        TETAZ=np.arange(240,260,17)
+        X=np.arange(-313,-290,11)
+        Y=np.arange(290,324,11)
+        Z=np.arange(143,180,16)
+        TETAX=np.arange(-30,30,15)
+        TETAY=np.arange(-38,-27,10)
+        TETAZ=np.arange(-41,10,16)
         i=self.index
         for x in X:
             for y in Y:
@@ -498,15 +728,15 @@ class Dataset(object):
                         for tetay in TETAY:
                             for tetaz in TETAZ:
                                 try:
-                                    if (x,y,z,tetax,tetay,tetaz)>(-221,224,140,45,-47,-18): 
+                                    if (x,y,z,tetax,tetay,tetaz)>(-291.0, 312.0, 175.0,0.0, -28.0, 7.0): 
                                         i=i+1
                                         self.index=i
                                         #set camera position
-                                        client.request('vset /camera/'+str(self.cameraId)+'/location '+str(x)+' '+str(y)+' '+str(z))                              
+                                        self.request('vset /camera/'+str(self.cameraId)+'/location '+str(x)+' '+str(y)+' '+str(z))                              
                                         #set camera orientation
-                                        client.request('vset /camera/'+str(self.cameraId)+'/rotation '+str(tetay)+' '+str(tetaz)+' '+str(tetax))
+                                        self.request('vset /camera/'+str(self.cameraId)+'/rotation '+str(tetay)+' '+str(tetaz)+' '+str(tetax))
                                         #take lit image
-                                        client.request('vset /viewmode lit')
+                                        self.request('vset /viewmode lit')
                                         
                                         #free screenshot folder
                                         for the_file in os.listdir(self.screenshot):
@@ -515,7 +745,7 @@ class Dataset(object):
                                                 os.unlink(file_path)
                                             
                                         #take a screenshot: This option provides a better resolution than the 'vget/camera/id/lit png' option        
-                                        client.request('vget /vrun shot')
+                                        self.request('vget /vrun shot')
             
                                         #get the screenshot path
                                         while os.listdir(self.screenshot)==[]:
@@ -535,7 +765,7 @@ class Dataset(object):
                                             raise Exception('Failed to save lit image!!!')
                                         
                                         #take depth Float32
-                                        img=client.request('vget /camera/'+str(self.cameraId)+'/depth npy')
+                                        img=self.request('vget /camera/'+str(self.cameraId)+'/depth npy')
                                         #convert image properly .  
                                         img=self.read_npy(img)
                                         #save image
@@ -550,8 +780,8 @@ class Dataset(object):
                                         imgc[:,:,2]=img
                                         imgc=np.array(imgc,dtype='uint8')
                                         #take depth image
-                                        #client.request('vset /viewmode depth') 
-                                        #img=client.request('vget /camera/'+str(self.cameraId)+'/depth png')
+                                        #self.request('vset /viewmode depth') 
+                                        #img=self.request('vget /camera/'+str(self.cameraId)+'/depth png')
                                         #img=self.read_png(img)
                                         #convert image properly . remove unused A channel  
                                         #print img
@@ -562,8 +792,8 @@ class Dataset(object):
                                         
                                     
                                         #take normal image 
-                                        client.request('vset /viewmode normal')
-                                        img=client.request('vget /camera/'+str(self.cameraId)+'/normal png')
+                                        self.request('vset /viewmode normal')
+                                        img=self.request('vget /camera/'+str(self.cameraId)+'/normal png')
                                         #convert image properly . remove unused A channel  
                                         img=cv2.cvtColor(self.read_png(img),cv2.COLOR_RGBA2BGR)
                                         #save image
@@ -572,8 +802,8 @@ class Dataset(object):
                                             
                                             
                                         #take mask image 
-                                        client.request('vset /viewmode object_mask')
-                                        img=client.request('vget /camera/'+str(self.cameraId)+'/object_mask png')
+                                        self.request('vset /viewmode object_mask')
+                                        img=self.request('vget /camera/'+str(self.cameraId)+'/object_mask png')
                                         img=self.read_png(img)
                                         imgc=img.copy()
                                         #convert image properly . remove unused A channel  
@@ -589,6 +819,10 @@ class Dataset(object):
                                         #not
                                         if not self.annotate():
                                             raise Exception('Annotation failed!!!')
+                                       
+                                        #update scene
+                                        self.alternateScene()
+                                        
                                         print('Image saved with success.')
                                 except Exception,e:
                                         if  os.path.exists(os.path.join(self.folder,self.litImage)+str(i)+'.'+self.extension):
