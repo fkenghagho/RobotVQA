@@ -59,7 +59,7 @@ class DatasetClasses(object):
     
     #Properties of image files 
     
-    DATASET_FOLDER='D:/dataset16'
+    DATASET_FOLDER='D:/dataset35'
     SCREENSHOT_FOLDER='C:\\Users\\Franklin\\Desktop\\masterthesis\\P12-VisionScanning-UR16\\VisionScanning\\Saved\\Screenshots\\Windows'
     LIT_IMAGE_NAME_ROOT='litImage'
     NORMAL_IMAGE_NAME_ROOT='normalImage'
@@ -75,7 +75,7 @@ class DatasetClasses(object):
     ORIENTATION_DELTA=360
     ALTER_CHOICE_MAX_ITERATION=50
     #with or without connection to UE4: values={'offline','online'}
-    MODE='online'
+    MODE='offline'
     #resume from actual scene or restart for a new scene:values={'continue','restart'}
     STATE='continue' 
     
