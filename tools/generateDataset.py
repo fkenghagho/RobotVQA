@@ -613,6 +613,8 @@ class Dataset(object):
             with open(jsonFile,'r') as infile:
                 jsonImage=json.load(infile)
             listObjectId=[]
+            #objects centers
+            obj_centers={}
             #load image to be overwritten with objects ids
             img=cv2.imread(imageName)
             #explore all objects
@@ -629,8 +631,13 @@ class Dataset(object):
                 #object's central point
                 Xc=int(np.average(lign))
                 Yc=int(np.average(col))
+                #save object  center
+                obj_centers[obj["objectId"]]=(Yc,Xc)
                 #overwrite image with this object id at point (Xc,Yc)
                 cv2.putText(img, str(len(listObjectId)-1), (Yc,Xc),cv2.FONT_HERSHEY_SCRIPT_SIMPLEX, size, (0, 255, 0), 1, cv2.LINE_AA)
+            #draw relationships among objects
+            for rel in jsonImage['objectRelationship']:
+                cv2.arrowedLine(img,obj_centers[rel['object1']],obj_centers[rel['object2']],DatasetClasses.RELATION_COLOR_DICO[rel['relation']],2,cv2.LINE_AA)
             if mode=="indirect":
                 cv2.imwrite(outImageName,img)
             else:

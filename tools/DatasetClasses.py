@@ -33,6 +33,9 @@ class DatasetClasses(object):
     
     #relationship categories
     RELATION_CATEGORY_DICO={0+1:'LeftRight',1+1:'FrontBehind',2+1:'OverUnder',3+1:'OnIn'}
+    
+    #relation to color mapping
+    RELATION_COLOR_DICO={'in':(0,0,0),'on':(255,0,0),'left':(0,255,0),'front':(0,0,255)}
 
     # Number of classes per features(object's category/name, color, shape, material, openability) (including background)
     NUM_CLASSES =[1+len(OBJECT_NAME_DICO),

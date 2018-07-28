@@ -12,7 +12,7 @@ class ObjectRelationAnnotator(object):
 		
 		#globale Variablen##########################################
 		self.listRelation=[]
-		self.index=0
+		self.index=27309
 		self.step=1
 		self.annotFile=""
 		self.imageFile=""
@@ -23,7 +23,7 @@ class ObjectRelationAnnotator(object):
 		if datasetGenerator!=None:
 			self.datasetGenerator=datasetGenerator
 		else:
-			self.datasetGenerator=Dataset('C:/Dataset/raw/newdata',1,0,0,mode='offline')
+			self.datasetGenerator=Dataset()
 		self.outputImage=self.datasetGenerator.folder+'ModifieD'+'/'+'modified.'+self.datasetGenerator.extension
 		#window construction
 		self.topWindow = Tk()
