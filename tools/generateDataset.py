@@ -53,6 +53,7 @@ class Dataset(object):
         self.actor_properties={}
         self.objectColorMatch=np.ones([256,256,256],dtype='int')*(-1)
         #Canonical relationships between object in the scene
+        self.alter_choice_max_iteration=DatasetClasses.ALTER_CHOICE_MAX_ITERATION
         self.actor_ids=DatasetClasses.ACTOR_IDS
         self.relationship_map=DatasetClasses.RELATIONSHIP_MAP
         if mode=="online":
@@ -200,7 +201,14 @@ class Dataset(object):
         newScene={}
         for  i in range(len(self.actor_ids)):
             actor_id=self.actor_ids[i]
-            newScene[actor_id]=self.alternateActor(actor_id)
+            self.alter_choice_max_iteration=DatasetClasses.ALTER_CHOICE_MAX_ITERATION
+            while(self.alter_choice_max_iteration>0):
+                alt_actor_id=self.alternateActor(actor_id) 
+                if (alt_actor_id not in self.actor_ids.values()) and  (alt_actor_id not in newScene.values()):
+                    actor_id=alt_actor_id
+                    break
+                self.alter_choice_max_iteration=self.alter_choice_max_iteration-1
+            newScene[self.actor_ids[i]]=actor_id
         
         #placement of actors in the scene
         for  i in range(len(self.actor_ids)):
@@ -714,12 +722,12 @@ class Dataset(object):
         
     #save nberOfImages images
     def scan(self):
-        X=np.arange(-313,-290,11)
-        Y=np.arange(290,324,11)
-        Z=np.arange(143,180,16)
-        TETAX=np.arange(-30,30,15)
-        TETAY=np.arange(-38,-27,10)
-        TETAZ=np.arange(-41,10,16)
+        X=np.arange(-181,-180,10)
+        Y=np.arange(50,72,7.2)
+        Z=np.arange(147,181,11.2)
+        TETAX=np.arange(-69,70,23)
+        TETAY=np.arange(-51,-42,1.15)
+        TETAZ=np.arange(-125,-54,14)
         i=self.index
         for x in X:
             for y in Y:
@@ -728,7 +736,7 @@ class Dataset(object):
                         for tetay in TETAY:
                             for tetaz in TETAZ:
                                 try:
-                                    if (x,y,z,tetax,tetay,tetaz)>(-291.0, 312.0, 175.0,0.0, -28.0, 7.0): 
+                                    if (x,y,z,tetax,tetay,tetaz)>(-181.0, 50.0, 147.0,-46.0, -51.0, -111.0): 
                                         i=i+1
                                         self.index=i
                                         #set camera position
@@ -1078,7 +1086,7 @@ class Dataset(object):
             print('A failure occured: '+str(e))
             return np.array(listIndex,dtype='int32')
             
-    def cleanRelation(self):
+    def cleanRelation2(self):
         """make the relations consistent """
         try:
             #load annotation files
@@ -1104,6 +1112,7 @@ class Dataset(object):
                     
                     #Modify json file
                     if jsonImage['objectRelationship']!=[]:
+                        
                         #Complete the id-cat dictionary
                         print('Updating id-cat dictionary ...')
                         for obj in jsonImage['objects']:
@@ -1199,6 +1208,88 @@ class Dataset(object):
             print('Relation clean-up successfully terminated!')
         except Exception,e:
             print('\n\n Failed to clean up relations among objects: '+str(e))
+    
+    
+    
+    def cleanRelation(self):
+        """make the relations consistent """
+        try:
+            #load annotation files
+            annotation_files=glob.glob(self.folder+'/*.json')
+            print annotation_files
+           
+            #Initialize counter for number of relations group by relation types
+            self.rel_count={'left':0,'right':0,'front':0,'behind':0,'over':0,'under':0,'valign':0,'in':0,'on':0}
+                        
+            #process each file
+            for jsonFile in annotation_files:
+                try:
+                    
+                    #open json file
+                    with open(jsonFile,'r') as infile:
+                        jsonImage=json.load(infile)
+                    infile.close()
+                    
+                    #Modify json file
+                    if jsonImage['objectRelationship']!=[]:
+                        #List of valid objects
+                        list_of_valid_objects=[]
+                        for obj in jsonImage['objects']:
+                            try:
+                                list_of_valid_objects.append(obj['objectId'])
+                            except Exception,e:
+                                print('An object processing failed: '+str(e))
+                                
+                        #Remove all the relations involving invalid objects
+                        newObjectRelationship=[]
+                        relId=0
+                        while relId<len(jsonImage['objectRelationship']):
+                            try:
+                                #get the next relation
+                                rel=jsonImage['objectRelationship'][relId]
+                                #check whether the involved objects are valid
+                                if (rel['object1'] not in list_of_valid_objects)  or (rel['object2'] not in list_of_valid_objects):
+                                    #check whether the involved object 1 is valid
+                                    if (rel['object1'] not in list_of_valid_objects):
+                                        objId=0
+                                        while(objId<len(jsonImage['objectRelationship'])):
+                                            rel1=jsonImage['objectRelationship'][objId]
+                                            if rel1['object2']==rel['object1'] and 
+                                                rel1['relation'] in DatasetClasses.CONTENANCE_RELATIONSHIPS and 
+                                                rel1['object1'] in list_of_valid_objects:
+                                                jsonImage['objectRelationship'].append({"object1": rel1['object1'], "object2": rel['object2'], "relation": rel['relation']})
+                                            objId+=1
+                                    #check whether the involved object 2 is valid
+                                    if (rel['object2'] not in list_of_valid_objects):
+                                        objId=0
+                                        while(objId<len(jsonImage['objectRelationship'])):
+                                            rel1=jsonImage['objectRelationship'][objId]
+                                            if rel1['object2']==rel['object2'] and 
+                                                rel1['relation'] in DatasetClasses.CONTENANCE_RELATIONSHIPS and 
+                                                rel1['object1'] in list_of_valid_objects:
+                                                jsonImage['objectRelationship'].append({"object1": rel['object1'], "object2": rel1['object1'], "relation": rel['relation']})
+                                            objId+=1   
+                                    #Remove the invalid relation
+                                    rel=jsonImage['objectRelationship'].pop(relId)
+                                else:
+                                    #Actualise the relation counter
+                                    self.rel_count[rel['relation']]+=1
+                                    #Move forward in the list with normalization(consistency)
+                                    relId+=1
+                            except Exception,e:
+                                print('Failed to process relation ',rel,': '+str(e)
+                                
+                        #Save changes committed in the json file
+                        print('Saving changes ...')
+                        with open(jsonFile,'w') as infile:
+                            json.dump(jsonImage,infile)
+                        infile.close()   
+                except Exception,e:
+                    print('Failed to clean up '+jsonFile+': '+str(e))
+            print('Relation clean-up successfully terminated!')
+        except Exception,e:
+            print('\n\n Failed to clean up relations among objects: '+str(e))
+    
     
     def BigNum(self,x):
         return (x)
