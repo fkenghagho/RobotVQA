@@ -12,7 +12,7 @@ class ObjectRelationAnnotator(object):
 		
 		#globale Variablen##########################################
 		self.listRelation=[]
-		self.index=1026
+		self.index=13
 		self.step=1
 		self.annotFile=""
 		self.imageFile=""
@@ -23,7 +23,7 @@ class ObjectRelationAnnotator(object):
 		if datasetGenerator!=None:
 			self.datasetGenerator=datasetGenerator
 		else:
-			self.datasetGenerator=Dataset('C:/Dataset/raw/newdata',1,0,0,mode='offline')
+			self.datasetGenerator=Dataset()
 		self.outputImage=self.datasetGenerator.folder+'ModifieD'+'/'+'modified.'+self.datasetGenerator.extension
 		#window construction
 		self.topWindow = Tk()
@@ -122,11 +122,13 @@ class ObjectRelationAnnotator(object):
 					annot=json.load(f)
 				f.close()
 				#empty list
-				del annot['objectRelationship'][:]
+				"""uncomment the statement below if you want to ignore any existing relational map
+				"""
+				#del annot['objectRelationship'][:]
 				for elt in self.listRelation:
 					annot['objectRelationship'].append(json.loads('{"object1":"'+elt[0]+'","relation":"'+elt[1]+'","object2":"'+elt[2]+'"}'))
 				with open(self.annotationFile,"w") as f:
-					json.dump(annot,f,indent=5)
+					json.dump(annot,f)
 				f.close()
 				tkMessageBox.showinfo("Relationships-Save","Relationships saved successfully!!!")
 				del self.listRelation[:]

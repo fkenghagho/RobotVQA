@@ -10,7 +10,8 @@
 
 #@Author:   Frankln Kenghagho
 #@Date:     19.03.2018
-
+from DatasetClasses import DatasetClasses
+import pickle
 import glob
 import os
 import sys
@@ -51,11 +52,16 @@ class ExtendedDatasetLoader(utils.Dataset):
     def normalize(self,s):
         """Capitalize first letter of string s
         """
+        s=s.rstrip().lstrip()
         return s[0].upper()+s[1:]
         
             
-    def register_images(self,folder,imgNameRoot,annotNameRoot,config):
+    def register_images(self,folder,imgNameRoot,annotNameRoot,depthNameRoot,config):
         """get all image files that pass the filter
+            
+           inputs:
+                  mode: how to build the dataset: from a dataset file(file) or from a raw dataset(data) made up of images and annotations
+                        For a quick access to large dataset, the latter is preloaded into a binary file
         """
         image_filter=folder+'/'+imgNameRoot+'*.*'
         annotation_filter=folder+'/'+annotNameRoot+'*.json'
@@ -101,29 +107,61 @@ class ExtendedDatasetLoader(utils.Dataset):
         print('\n',nbsuccess,' Objects successfully found and ',nbfails,' Objects failed!', '\n')
         print('\nClasses found:',classes, '\n')
         print('\nRegistering classes ...\n')
-        for feature_id in range(config.NUM_FEATURES):
+        for feature_id in range(config.NUM_FEATURES-2):
             for i in range(len(classes[feature_id])):
                 self.add_class(feature_id,"robotVQA",i+1,classes[feature_id][i])
+        
+        print('\nAdding object relationships ...\n')        
+        #Add relationships
+        feature_id=5
+        for i in range(config.NUM_CLASSES[feature_id]-1):
+                 self.add_class(feature_id,"robotVQA",i+1,self.normalize(list(config.OBJECT_RELATION_DICO.keys())[i]))
+                 
+        print('\nAdding relationship categories ...\n')        
+        #Add relationship categories
+        feature_id=6
+        for i in range(config.NUM_CLASSES[feature_id]-1):
+                 self.add_class(feature_id,"robotVQA",i+1,self.normalize(list(config.RELATION_CATEGORY_DICO.values())[i]))
+        
         print('\nAdding images ...\n')
         #Add images      
         for i in range(len(images)):
             index=images[i].split(imgNameRoot)[1].split('.')[0]
             annotationPath=folder+'/'+annotNameRoot+index+'.json'
+            depthPath=folder+'/'+depthNameRoot+index+'.exr'
             try:
                 image = skimage.io.imread(images[i])
-                if os.path.exists(annotationPath):
-                    self.add_image("robotVQA",i,images[i],annotPath=annotationPath,dataFolder=folder,shape=image.shape)
+                if os.path.exists(depthPath) and os.path.exists(annotationPath):
+                    self.add_image("robotVQA",i,images[i],depthPath=depthPath,annotPath=annotationPath,dataFolder=folder,shape=image.shape)
             except Exception as e:
                 print('Image '+str(images[i])+' could not be registered:'+str(e))
         del classes[:]
         print('\nImages found:',len(images), '\n')
-           
-        
     
+    def reduce_relation(self,relation):
+        x=np.count_nonzero(relation,axis=2)
+        x=np.count_nonzero(x,axis=0)+np.count_nonzero(x,axis=1)
+        return x.nonzero()
+           
+    def make_transition(self,relation):
+        N,C=relation.shape[1:]   
+        for c in range(C):
+            stable=False
+            while not stable:
+                stable=True
+                for i in range(N):
+                    for j in range(N):
+                        for k in range(N):
+                                if(relation[i][j][c]==relation[j][k][c] and relation[i][j][c]!=0 and relation[i][j][c]!=relation[i][k][c]):
+                                    relation[i][k][c]=relation[i][j][c]
+                                    stable=False
+        return relation
+        
     def load_mask(self, image_id,config):
         """Generate instance masks for objects of the given image ID.
         """
         info = self.image_info[image_id]
+        
         annotationPath = info['annotPath']
         shape=info['shape']
         shape=[shape[0],shape[1]]
@@ -132,6 +170,7 @@ class ExtendedDatasetLoader(utils.Dataset):
         nbfail=0
         nbsuccess=0
         classes=[[],[],[],[],[]]
+        id_name_map=[]
         try:
             with open(annotationPath,'r') as infile:
                 jsonImage=json.load(infile)
@@ -151,8 +190,13 @@ class ExtendedDatasetLoader(utils.Dataset):
                         ori[2]=utils.principal_angle(ori[2])
                         pos=obj['objectLocalPosition']
                         opn=self.normalize(config.OBJECT_OPENABILITY_DICO[opn])
+                        #check that objects are defined in the right bound
+                        assert abs(pos[0])<=config.MAX_OBJECT_COORDINATE and \
+                               abs(pos[1])<=config.MAX_OBJECT_COORDINATE and \
+                               abs(pos[2])<=config.MAX_OBJECT_COORDINATE
                         if((cat in config.OBJECT_NAME_DICO) and (col in config.OBJECT_COLOR_DICO) and (sha in config.OBJECT_SHAPE_DICO) and \
                             (mat in config.OBJECT_MATERIAL_DICO) and (opn in list(config.OBJECT_OPENABILITY_DICO.values()))):
+                                    id_name_map.append(obj['objectId'])
                                     classes[0].append(cat)
                                     classes[1].append(col)
                                     classes[2].append(sha)
@@ -172,6 +216,7 @@ class ExtendedDatasetLoader(utils.Dataset):
             print('\nShape:\n',shape)
             masks=np.zeros(shape,dtype='uint8')
             poses=np.zeros([nbInstances,6],dtype='float32')
+            relations=np.zeros([nbInstances,nbInstances,DatasetClasses.NUM_CLASSES[6]-1],dtype='int32')
             for i in range(nbInstances):
                 masks[:,:,i]=mask[i].copy()
                 poses[i,:]=pose[i].copy()
@@ -181,7 +226,32 @@ class ExtendedDatasetLoader(utils.Dataset):
                 for i in range(len(classes[j])):
                     classes[j][i]=self.class_names[j].index(classes[j][i])
                 classes[j]=np.array(classes[j],dtype='int32')
-            return masks,classes,poses 
+            for rel in jsonImage['objectRelationship']:
+                try:
+                    if(rel['object1'] in id_name_map) and (rel['object2'] in id_name_map):
+                        relations[id_name_map.index(rel['object1'])][id_name_map.index(rel['object2'])][self.class_names[6].index(config.OBJECT_RELATION_DICO[self.normalize(rel['relation'])])-1]=self.class_names[5].index(self.normalize(rel['relation']))
+                   
+                except Exception as e:
+                    print('An object relationship could not be processed: '+str(e))
+            del id_name_map[:]
+            #Further processing if there are relations
+            if relations.sum()!=0.:
+                #augment dataset through transitivity property of relations
+                #relations=self.make_transition(relations)
+                #only select objects participating in a relationship                
+                valid_obj=self.reduce_relation(relations)
+                #take away all non valid objects masks,poses,...
+                relations=relations.take(valid_obj[0],axis=1).take(valid_obj[0],axis=0)
+                masks=masks.take(valid_obj[0],axis=2)
+                poses=poses.take(valid_obj[0],axis=0)
+                for i in range(len(classes)):
+                    classes[i]=classes[i].take(valid_obj[0],axis=0)
+                #merge all relation categories into a single one
+                z=np.where(relations[:,:,2]>0)
+                relations[:,:,1][z]=(relations[:,:,2][z])
+                z=np.where(relations[:,:,1]>0)
+                relations[:,:,0][z]=(relations[:,:,1][z])
+            return masks,classes,poses,relations[:,:,0]
         except Exception as e:
             print('\n\n Data '+str(annotationPath)+' could not be processed:'+str(e))
             return super(self.__class__,self).load_mask(image_id)
@@ -202,47 +272,98 @@ class ExtendedRobotVQAConfig(RobotVQAConfig):
     IMAGES_PER_GPU = 1
     
     #Number of target feature
-    NUM_FEATURES=5
+    NUM_FEATURES=DatasetClasses.NUM_FEATURES
     #Target features
-    FEATURES_INDEX={'CATEGORY':0,'COLOR':1,'SHAPE':2,'MATERIAL':3,'OPENABILITY':4}
+    FEATURES_INDEX=DatasetClasses.FEATURES_INDEX
     # Number of classes per features(object's category/name, color, shape, material, openability) (including background)
-    NUM_CLASSES =[1+16,1+7,1+5,1+5,1+2]  # background + 3 shapes
+    NUM_CLASSES =DatasetClasses.NUM_CLASSES # background + 3 shapes
     #categories
-    OBJECT_NAME_DICO=['CookTop','Tea','Juice','Plate','Mug','Bowl','Tray','Tomato','Ketchup','Salz','Milch','Spoon','Spatula','Milk','Coffee','Cookie','Knife','Cornflakes','Cornflake','Eggholder','EggHolder', 'Cube','Mayonnaise','Cereal','Reis']#Any other is part of background
+    OBJECT_NAME_DICO=DatasetClasses.OBJECT_NAME_DICO
     #colors
-    OBJECT_COLOR_DICO=['Red', 'Orange', 'Brown', 'Yellow', 'Green', 'Blue', 'White', 'Gray', 'Black', 'Transparent']
+    OBJECT_COLOR_DICO=DatasetClasses.OBJECT_COLOR_DICO
     #shape
-    OBJECT_SHAPE_DICO=['Cubic', 'Pyramidal','Conical', 'Spherical', 'Cylindrical', 'Filiform', 'Flat']
+    OBJECT_SHAPE_DICO=DatasetClasses.OBJECT_SHAPE_DICO
     #material
-    OBJECT_MATERIAL_DICO=['Plastic', 'Wood', 'Glass', 'Steel', 'Cartoon', 'Ceramic']
+    OBJECT_MATERIAL_DICO=DatasetClasses.OBJECT_MATERIAL_DICO
     #openability
-    OBJECT_OPENABILITY_DICO={'True':'Openable','False':'Non-Openable'}
+    OBJECT_OPENABILITY_DICO=DatasetClasses.OBJECT_OPENABILITY_DICO
+    #object relationships
+    OBJECT_RELATION_DICO=DatasetClasses.OBJECT_RELATION_DICO
     
-    
+    #relationship categories
+    RELATION_CATEGORY_DICO=DatasetClasses.RELATION_CATEGORY_DICO
 
+    #Max Object Coordinate in cm
+    MAX_OBJECT_COORDINATE=DatasetClasses.MAX_OBJECT_COORDINATE
+    
+    #Max CAMERA_CENTER_TO_PIXEL_DISTANCE in m
+    MAX_CAMERA_CENTER_TO_PIXEL_DISTANCE=DatasetClasses.MAX_CAMERA_CENTER_TO_PIXEL_DISTANCE
+    
+    # Learning rate and momentum
+    # The Mask RCNN paper uses lr=0.02, but on TensorFlow it causes
+    # weights to explode. Likely due to differences in optimzer
+    # implementation.
+    LEARNING_RATE = 0.001
+    LEARNING_MOMENTUM = 0.9
+
+    # Weight decay regularization
+    WEIGHT_DECAY = 0.00008
+    
     # Use small images for faster training. Set the limits of the small side
     # the large side, and that determines the image shape.
-    IMAGE_MIN_DIM = 512
-    IMAGE_MAX_DIM = 640
+    IMAGE_MIN_DIM = DatasetClasses.IMAGE_MIN_DIM
+    IMAGE_MAX_DIM = DatasetClasses.IMAGE_MAX_DIM
 
     # Use smaller anchors because our image and objects are small
-    RPN_ANCHOR_SCALES = (8, 16, 32, 64, 128)  # anchor side in pixels
+    RPN_ANCHOR_SCALES = (16, 32, 64, 128,256)  # anchor side in pixels
 
     # Reduce training ROIs per image because the images are small and have
     # few objects. Aim to allow ROI sampling to pick 33% positive ROIs.
-    TRAIN_ROIS_PER_IMAGE = 100
+    TRAIN_ROIS_PER_IMAGE =20
+
+    # Maximum number of ground truth instances to use in one image
+    MAX_GT_INSTANCES = 20
+    
+    # Max number of final detections
+    DETECTION_MAX_INSTANCES = 20
+    
+
+    # ROIs kept after non-maximum supression (training and inference)
+    POST_NMS_ROIS_TRAINING = 2000
+    POST_NMS_ROIS_INFERENCE = 1000
 
     # Use a small epoch since the data is simple
-    STEPS_PER_EPOCH = 100
+    STEPS_PER_EPOCH = 200
+    
+    #Number of epochs
+    NUM_EPOCHS=500
+    
 
     # use small validation steps since the epoch is small
-    VALIDATION_STEPS = 5
+    VALIDATION_STEPS = 20
     
+    # Use RPN ROIs or externally generated ROIs for training
+    # Keep this True for most situations. Set to False if you want to train
+    # the head branches on ROI generated by code rather than the ROIs from
+    # the RPN. For example, to debug the classifier head without having to
+    # train the RPN.
+    USE_RPN_ROIS = True
     
-
-
-
-
+    # Input image size:RGBD-Images
+    IMAGE_SHAPE = [IMAGE_MAX_DIM, IMAGE_MAX_DIM, DatasetClasses.IMAGE_MAX_CHANNEL]
+    
+    # Image mean (RGB)
+    MEAN_PIXEL = DatasetClasses.MEAN_PIXEL
+    
+    # With depth information?
+    WITH_DEPTH_INFORMATION=False 
+    
+    #                           
+    EXCLUDE=["robotvqa_class_logits0", "robotvqa_class_logits1","robotvqa_class_logits2","robotvqa_class_logits3","robotvqa_class_logits4",
+                                        "robotvqa_class_logits5_1",'robotvqa_class_logits5_2','robotvqa_class_bn2','robotvqa_class_conv2',
+                                        "mrcnn_bbox_fc","mrcnn_bbox","robotvqa_poses_fc", "robotvqa_poses",
+                                        "robotvqa_poses_fc0","robotvqa_poses_fc1","robotvqa_poses_fc2",
+                                        "mrcnn_mask","robotvqa_class0","robotvqa_class1","robotvqa_class2","robotvqa_class3","robotvqa_class4","robotvqa_class5"]
 
 ################ Task Manager Class(TMC)##############
 class TaskManager(object):
@@ -278,28 +399,32 @@ class TaskManager(object):
     
     
     
-    def getDataset(self,folder, imgNameRoot, annotNameRoot):
+    def getDataset(self,folder=DatasetClasses.DATASET_FOLDER, imgNameRoot=DatasetClasses.LIT_IMAGE_NAME_ROOT, annotNameRoot=DatasetClasses.ANNOTATION_IMAGE_NAME_ROOT,depthNameRoot=DatasetClasses.DEPTH_IMAGE_NAME_ROOT,binary_dataset=os.path.join(DatasetClasses.DATASET_FOLDER,DatasetClasses.DATASET_BINARY_FILE)):
         try:
-            dataset=ExtendedDatasetLoader()
-            dataset.register_images(folder,imgNameRoot,annotNameRoot,self.config)
-            dataset.prepare()
-            return dataset
-        except Exception as e:
-            print('Dataset creation failed: '+str(e))
-            return None
-    
+            with open(binary_dataset,'rb') as f:
+                return pickle.load(f)
+        except Exception as exc:
+                try:
+                    dataset=ExtendedDatasetLoader()
+                    dataset.register_images(folder,imgNameRoot,annotNameRoot,depthNameRoot,self.config)
+                    dataset.prepare()
+                    return dataset
+                except Exception as e:
+                    print('Dataset creation failed: '+str(e))
+                    return None
+            
     
     def visualize_dataset(self,dataset,nbImages):
         try:
             image_ids = np.random.choice(dataset.image_ids, nbImages)
             for image_id in image_ids:
-                image = dataset.load_image(image_id)
+                image = dataset.load_image(image_id,0)[:,:,:3]
                 mask, class_ids = dataset.load_mask(image_id)
                 visualize.display_top_masks(image, mask, class_ids, dataset.class_names)
         except Exception as e:
             print('Error-Could not visualize dataset: '+str(e))
     
-    def train(self,dataset,init_with='coco'):
+    def train(self,dataset,init_with='last'):
         #config= should be adequately set for training
         model = modellib.RobotVQA(mode="training", config=self.config,
                           model_dir=self.MODEL_DIR)
@@ -314,8 +439,7 @@ class TaskManager(object):
             # See README for instructions to download the COCO weights
             model_path=self.ROBOTVQA_WEIGHTS_PATH
             model.load_weights(model_path, by_name=True,
-                            exclude=["mrcnn_class_logits", "mrcnn_bbox_fc", 
-                                        "mrcnn_bbox", "mrcnn_mask"])
+                            exclude=ExtendedRobotVQAConfig.EXCLUDE)
         elif init_with == "last":
             # Load the last model you trained and continue training
             model_path=model.find_last()[1]
@@ -324,7 +448,7 @@ class TaskManager(object):
                           
         #first training phase: only dataset specific layers(error) are trained
         #the second dataset is dedicated to evaluation and consequenty needs to be set differently than the first one
-        model.train(dataset, dataset,learning_rate=self.config.LEARNING_RATE, epochs=5,layers='heads')
+        model.train(dataset, dataset,learning_rate=self.config.LEARNING_RATE, epochs=self.config.NUM_EPOCHS,layers='5+')
         #second training phase:all layers are revisited for fine-tuning
         #the second dataset is dedicated to evaluation and consequenty needs to be set differently than the first one
         #model.train(dataset, dataset,learning_rate=self.config.LEARNING_RATE/10, epochs=1,layers='all')
@@ -341,32 +465,29 @@ class TaskManager(object):
         #Weights initialization imagenet, coco, or last
         if init_with == "imagenet":
             model_path=model.get_imagenet_weights()
-            model.load_weights(model_path, by_name=True)
+            model.load_weights(model_path, by_name=True,exclude=ExtendedRobotVQAConfig.EXCLUDE)
         elif init_with == "coco":
             # Load weights trained on MS COCO, but skip layers that
             # are different due to the different number of classes
             # See README for instructions to download the COCO weights
             model_path=self.ROBOTVQA_WEIGHTS_PATH
             model.load_weights(model_path, by_name=True,
-                            exclude=["mrcnn_class_logits", "mrcnn_bbox_fc", 
-                                        "mrcnn_bbox", "mrcnn_mask"])
+                            exclude=ExtendedRobotVQAConfig.EXCLUDE)
         elif init_with == "last":
             # Load the last model you trained and continue training
             model_path=model.find_last()[1]
             model.load_weights(model_path, by_name=True)
         print('Weights loaded successfully from '+str(model_path))
         #load image
-        image = skimage.io.imread(input_image_path)
-        # If grayscale. Convert to RGB for consistency.
-        if image.ndim != 3:
-            image = skimage.color.gray2rgb(image)
+        image = utils.load_image(input_image_path[0],input_image_path[1],self.config.MAX_CAMERA_CENTER_TO_PIXEL_DISTANCE)
         #predict
         results = model.detect([image], verbose=1)
         r = results[0]
-        dst=self.getDataset('c:/MSCOCO/val2014','litImage','annotation')
-        class_ids=[r['class_cat_ids'],r['class_col_ids'],r['class_sha_ids'],r['class_mat_ids'],r['class_opn_ids']]
-        scores=[r['scores_cat'],r['scores_col'],r['scores_sha'],r['scores_mat'],r['scores_opn']]
-        visualize.display_instances(image, r['rois'], r['masks'], class_ids, dst.class_names,r['poses'], scores=scores, ax=get_ax())
+        dst=self.getDataset()
+        class_ids=[r['class_cat_ids'],r['class_col_ids'],r['class_sha_ids'],r['class_mat_ids'],r['class_opn_ids'],r['class_rel_ids']]
+        scores=[r['scores_cat'],r['scores_col'],r['scores_sha'],r['scores_mat'],r['scores_opn'],r['scores_rel']]
+        visualize.display_instances(image[:,:,:3], r['rois'], r['masks'], class_ids, dst.class_names,r['poses'], scores=scores, axs=get_ax(cols=2),\
+        title='Object description',title1='Object relationships')
 
 
 

@@ -16,7 +16,7 @@ import tensorflow as tf
 import scipy.misc
 import skimage.color
 import skimage.io
-import urllib.request
+import urllib
 import shutil
 import cv2
 # URL from which to download the latest COCO trained weights
@@ -861,7 +861,7 @@ def download_trained_weights(coco_model_path, verbose=1):
     """
     if verbose > 0:
         print("Downloading pretrained model to " + coco_model_path + " ...")
-    with urllib.request.urlopen(COCO_MODEL_URL) as resp, open(coco_model_path, 'wb') as out:
+    with urllib.urlopen(COCO_MODEL_URL) as resp, open(coco_model_path, 'wb') as out:
         shutil.copyfileobj(resp, out)
     if verbose > 0:
         print("... done downloading pretrained model!")

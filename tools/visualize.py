@@ -34,6 +34,8 @@ def get_ax(rows=1, cols=1, size=8):
     """
     _, ax = plt.subplots(rows, cols, figsize=(size*cols, size*rows))
     return ax
+    
+    
 
 
 
@@ -87,8 +89,8 @@ def apply_mask(image, mask, color, alpha=0.5):
 
 
 def display_instances(image, boxes, masks, class_ids, class_names,poses,
-                      scores=None, title="",
-                      figsize=(16, 16), ax=None):
+                      scores=None, title="",title1='',
+                      figsize=(16, 16), axs=None):
     """
     boxes: [num_instance, (y1, x1, y2, x2, class_id)] in image coordinates.
     poses: [num_instance, (tetax,tetay,tetaz,x,y,z)] in radians and cm.
@@ -98,28 +100,39 @@ def display_instances(image, boxes, masks, class_ids, class_names,poses,
     scores: [NUM_FEATURES,num_instances],(optional) confidence scores for each box/feature
     figsize: (optional) the size of the image.
     """
+    
     # Number of instances
     N = boxes.shape[0]
     if not N:
         print("\n*** No instances to display *** \n")
+        return 0
     else:
         assert boxes.shape[0] == masks.shape[-1] == class_ids[0].shape[0]==class_ids[1].shape[0]==class_ids[2].shape[0]==\
-        class_ids[3].shape[0]==class_ids[4].shape[0]==scores[0].shape[0]==scores[1].shape[0]==scores[2].shape[0]==\
-        scores[3].shape[0]==scores[4].shape[0]==poses.shape[0]
+        class_ids[3].shape[0]==class_ids[4].shape[0]==class_ids[5].shape[0]==scores[0].shape[0]==scores[1].shape[0]==scores[2].shape[0]==\
+        scores[3].shape[0]==scores[4].shape[0]==scores[5].shape[0]==poses.shape[0]
 
-    if not ax:
-        _, ax = plt.subplots(1, figsize=figsize)
+    if not np.any(axs):
+        _, axs = plt.subplots(1,2, figsize=figsize)
+    ax=axs[0]
+    ax1=axs[1]
 
     # Generate random colors
     colors = random_colors(N)
-
+    titles=[title,title1]
     # Show area outside image boundaries.
     height, width = image.shape[:2]
-    ax.set_ylim(height + 10, -10)
-    ax.set_xlim(-10, width + 10)
-    ax.axis('off')
-    ax.set_title(title)
+    for i in range(axs.size):
+        axs[i].set_ylim(height + 10, -10)
+        axs[i].set_xlim(-10, width + 10)
+        axs[i].axis('off')
+        axs[i].set_title(titles[i])
     masked_image = image.astype(np.uint32).copy()
+    back_img=image.astype(np.uint32).copy()*0+255
+    x3=10
+    y3=10
+    #class_ids[len(class_ids)-1]=class_ids[len(class_ids)-1]+1
+    #best_relations=np.argmax(scores[len(class_ids)-1],axis=1)
+    #best_relations=utils.relation_graph(boxes)
     for i in range(N):
         color = colors[i]
         # Bounding box
@@ -133,19 +146,29 @@ def display_instances(image, boxes, masks, class_ids, class_names,poses,
         ax.add_patch(p)
 
         # Label
-        caption=''
-        if scores!=None:
-            for j in range(len(class_ids)):
+        caption=str(i)+'. '
+        if scores!=None and False:
+            for j in range(len(class_ids)-1):
                 caption=caption+class_names[j][class_ids[j][i]]+' '+str(scores[j][i])+'\n'
         else:
-            for j in range(len(class_ids)):
+            for j in range(len(class_ids)-1):
                 caption=caption+class_names[j][class_ids[j][i]]+'\n'
         caption=caption+'Orientation: ('+str(poses[i][0])+','+str(poses[i][1])+','+str(poses[i][2])+')\n'
         caption=caption+'Position: ('+str(poses[i][3])+','+str(poses[i][4])+','+str(poses[i][5])+')'
         x = random.randint(x1, (x1 + x2) // 2)
         ax.text(x1, y1 + 8, caption,
                 color='black', size=7, backgroundcolor="none")
-
+                
+        #object relationship
+        for k in range(N):
+            #k=best_relations[i]
+            if(class_ids[len(class_ids)-1][i][k]!=0 and i!=k):
+                caption=str(i)+'.'+class_names[0][class_ids[0][i]]+' is '+class_names[5][class_ids[len(class_ids)-1][i][k]]+' '+str(k)+\
+                '.'+class_names[0][class_ids[0][k]]+': '+str((scores[len(class_ids)-1][i][k]))+'.'
+                print('RELATION:'+caption)
+                ax1.text(x3, y3, caption,color='black', size=8, backgroundcolor="none")
+                y3+=30
+     
         # Mask
         mask = masks[:, :, i]
         masked_image = apply_mask(masked_image, mask, color)
@@ -162,6 +185,7 @@ def display_instances(image, boxes, masks, class_ids, class_names,poses,
             p = Polygon(verts, facecolor="none", edgecolor=color)
             ax.add_patch(p)
     ax.imshow(masked_image.astype(np.uint8))
+    ax1.imshow(back_img)
     plt.show()
     
 

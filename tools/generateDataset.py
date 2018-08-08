@@ -9,32 +9,53 @@ import json
 import cv2
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
- 
+from shutil import copyfile
+from DatasetClasses import DatasetClasses
 R=[]
 
+def randomIndex(N):
+    assert N>0
+    sum=0
+    for i in range(N):
+        sum+=int(os.urandom(5).encode('hex'),16)
+    return sum%N
 
-objectColor=['pink','red','orange','brown','yellow','olive','green','blue','purple','white','gray','black']
+objectColor=DatasetClasses.OBJECT_COLOR_DICO
 class Dataset(object):
     #mode=offline(without connection to image server. Used when processing existing data)/online(With connection to image server)
     #state=continue/restart
-    def __init__(self,folder,nberOfImages,offset,cameraId,mode="offline", state="continue"):
+    def __init__(self):
         self.T=[]
-        self.folder=folder
-        self.litImage='litImage'
-        self.normalImage='normalImage'
-        self.depthImage='depthImage'
-        self.maskImage='maskImage'
-        self.annotation='annotation'
-        self.annotExtension='json'
-        self.index=offset
-        self.extension='jpg'
-        self.depthExtension='exr'
-        self.nberOfImages=nberOfImages
-        self.cameraId=cameraId
+        self.folder=DatasetClasses.DATASET_FOLDER
+        self.screenshot=DatasetClasses.SCREENSHOT_FOLDER
+        self.litImage=DatasetClasses.LIT_IMAGE_NAME_ROOT
+        self.normalImage=DatasetClasses.NORMAL_IMAGE_NAME_ROOT
+        self.depthImage=DatasetClasses.DEPTH_IMAGE_NAME_ROOT
+        self.maskImage=DatasetClasses.MASK_IMAGE_NAME_ROOT
+        self.annotation=DatasetClasses.ANNOTATION_IMAGE_NAME_ROOT
+        self.annotExtension=DatasetClasses.ANNOTATION_FILE_EXTENSION
+        self.index=DatasetClasses.INDEX
+        self.extension=DatasetClasses.IMAGE_FILE_EXTENSION
+        self.depthExtension=DatasetClasses.DEPTH_FILE_EXTENSION
+        self.nberOfImages=DatasetClasses.NUMBER_IMAGES
+        self.cameraId=DatasetClasses.CAMERA_ID
+        self.actor_stacking_graph=DatasetClasses.ACTOR_STACKING_GRAPH
+        self.contenance_relationships=DatasetClasses.CONTENANCE_RELATIONSHIPS
+        #Actor common temporary pose
+        self.actor_common_temp_location=DatasetClasses.ACTOR_COMMON_TEMP_LOCATION
+        self.actor_common_temp_rotation=DatasetClasses.ACTOR_COMMON_TEMP_ROTATION
+        mode=DatasetClasses.MODE
+        state=DatasetClasses.STATE
         self.objectColor={}
         self.listObjects={}
         self.objectIndex={}
+        self.Distribution={}
+        self.actor_properties={}
         self.objectColorMatch=np.ones([256,256,256],dtype='int')*(-1)
+        #Canonical relationships between object in the scene
+        self.alter_choice_max_iteration=DatasetClasses.ALTER_CHOICE_MAX_ITERATION
+        self.actor_ids=DatasetClasses.ACTOR_IDS
+        self.relationship_map=DatasetClasses.RELATIONSHIP_MAP
         if mode=="online":
                 #make dataset directory
                 try:
@@ -50,18 +71,25 @@ class Dataset(object):
                     print('Error: Problem with dataset directory. '+str(e))
                 
                 try:
-                    client.connect()
-                    print('Status: \n'+client.request('vget /unrealcv/status'))
+                    self.connect()
+                    print('Status: \n'+self.request('vget /unrealcv/status'))
                     #set field of view
-                    client.request('vset /camera/'+str(self.cameraId)+'/horizontal_fieldofview '+str(70.0))
-                    objects=client.request('vget /objects').split(' ')
+                    self.request('vset /camera/'+str(self.cameraId)+'/horizontal_fieldofview '+str(DatasetClasses.FIELD_OF_VIEW))
+                    lObjects=self.request('vget /objects').split(' ')
+                    objects=[]
+                    for objId in lObjects:
+                        if len(objId)>=2:
+                            if objId[:2]=='A_':
+                                objects.append(objId)
                     print(objects)
                     print(str(len(objects))+' objects found in the scene.')
+                    #compute dristribution of properties over set of objects
+                    self.computeDistribution(objects)
                     #map object to color
                     for i in range(len(objects)):
                         #convert '(R=127,G=191,B=127,A=255)' to [127, 191, 127, 255]
                         self.objectIndex[i]=objects[i]
-                        e=client.request('vget /object/'+objects[i]+'/color')
+                        e=self.request('vget /object/'+objects[i]+'/color')
                         t=e.split('(')[1].split(')')[0].split(',')
                         t=[int(t[0].split('=')[1]),int(t[1].split('=')[1]),int(t[2].split('=')[1]),int(t[3].split('=')[1])]
                         #t=np.array(t,dtype='uint8')
@@ -80,7 +108,261 @@ class Dataset(object):
                 except Exception,e:
                     print('Error: Problem with unrealcv .'+str(e))
         else:
-            pass        
+            pass    
+    
+    #Alternate the sceen
+    def alternateScene(self):
+        
+        #commute actors#
+        
+        #update relationships between objects#
+        old_baseActors=[]#base actors are not contained
+        
+        #get base actors
+        for actor_index in self.actor_stacking_graph.keys():
+            if self.actor_stacking_graph[actor_index]==actor_index:
+                old_baseActors.append(actor_index)
+        copy_old_baseActors=list(old_baseActors)
+        
+        #new positioning of base actors
+        new_baseActors=[]
+        while(copy_old_baseActors!=[]):
+            new_baseActors.append(copy_old_baseActors.pop(self.randomIndex(len(copy_old_baseActors))))
+            
+        #matching#    
+        actor_matching={}
+        for i in range(len(self.actor_ids)):
+            actor_matching[i]=i
+            
+        #update matching
+        for i in range(len( old_baseActors)):
+            actor_matching[old_baseActors[i]]=new_baseActors[i]
+            
+        
+        #update relationship
+        for i in range(len(self.relationship_map)):
+            if(self.relationship_map[i][1] not in self.contenance_relationships):
+                if (self.baseActor(self.relationship_map[i][0])==self.relationship_map[i][0] and self.baseActor(self.relationship_map[i][2])==self.relationship_map[i][2]):
+                    self.relationship_map[i][0]=actor_matching[self.baseActor(self.relationship_map[i][0])]
+                    self.relationship_map[i][2]=actor_matching[self.baseActor(self.relationship_map[i][2])]
+                
+        #compute old poses and move actors to temporary pose
+        old_poses={}
+        for i in range(len(self.actor_ids)):
+            actor_id=self.actor_ids[i]
+            #get actors' coordinates
+            x,y,z=self.request('vget /object/'+actor_id+'/location').split(' ')
+            x=float(x)
+            y=float(y)
+            z=float(z)
+            ty,tz,tx=self.request('vget /object/'+actor_id+'/rotation').split(' ')
+            tx=float(tx)
+            ty=float(ty)
+            tz=float(tz)
+            old_poses[i]=[x,y,z,tx,ty,tz]
+            #move actor to temporary pose
+            self.request('vset /object/'+actor_id+'/hide')
+            self.request('vset /object/'+actor_id+'/hide')
+        
+        print('old_poses:',old_poses)
+        #compute new poses and move actors to temporary pose
+        for i in range(len(actor_matching)):
+            #get actors' coordinates
+            actor_id=self.actor_ids[actor_matching[i]]
+            x1,y1,z1,tx1,ty1,tz1=old_poses[i]
+            if actor_matching[i] in old_baseActors:
+                x2,y2,z2,tx2,ty2,tz2=old_poses[actor_matching[i]]
+                x=x1
+                y=y1
+                z=z2
+                tx=tx2
+                ty=ty2
+                tz=tz2+[-1,1][self.randomIndex(2)]*self.randomIndex(DatasetClasses.ORIENTATION_DELTA)
+            else:
+                base_actor_index=self.baseActor(i)
+                for j in range(len(actor_matching)):
+                    if actor_matching[j]==base_actor_index:
+                        target_index=j
+                        break
+                x2,y2,z2,tx2,ty2,tz2=old_poses[base_actor_index]
+                x3,y3,z3,tx3,ty3,tz3=old_poses[target_index]
+                x=x1+x3-x2
+                y=y1 +y3-y2
+                z=z1
+                tx=tx1
+                ty=ty1
+                tz=tz1+[-1,1][self.randomIndex(2)]*self.randomIndex(DatasetClasses.ORIENTATION_DELTA)
+            #move actor to new pose
+            self.request('vset /object/'+actor_id+'/location '+str(x)+' '+str(y)+' '+str(z))
+            self.request('vset /object/'+actor_id+'/rotation '+str(ty)+' '+str(tz)+' '+str(tx))
+            self.request('vset /object/'+actor_id+'/show')
+        
+        #alternate the scene
+        newScene={}
+        for  i in range(len(self.actor_ids)):
+            actor_id=self.actor_ids[i]
+            self.alter_choice_max_iteration=DatasetClasses.ALTER_CHOICE_MAX_ITERATION
+            while(self.alter_choice_max_iteration>0):
+                alt_actor_id=self.alternateActor(actor_id) 
+                if (alt_actor_id not in self.actor_ids.values()) and  (alt_actor_id not in newScene.values()):
+                    actor_id=alt_actor_id
+                    break
+                self.alter_choice_max_iteration=self.alter_choice_max_iteration-1
+            newScene[self.actor_ids[i]]=actor_id
+        
+        #placement of actors in the scene
+        for  i in range(len(self.actor_ids)):
+            actor_id=self.actor_ids[i]
+            #get actors' coordinates
+            old_objPosition=self.request('vget /object/'+actor_id+'/location')
+            old_objOrientation=self.request('vget /object/'+actor_id+'/rotation')
+            
+            new_objPosition=self.request('vget /object/'+newScene[actor_id]+'/location')
+            new_objOrientation=self.request('vget /object/'+newScene[actor_id]+'/rotation')
+            
+            #update scene#
+            
+            #remove old actor from the scene
+            self.request('vset /object/'+actor_id+'/location '+new_objPosition)
+            self.request('vset /object/'+actor_id+'/rotation '+new_objOrientation)
+            self.request('vset /object/'+actor_id+'/hide')
+
+            #insert new actor into the scene
+            self.request('vset /object/'+newScene[actor_id]+'/location '+old_objPosition)
+            self.request('vset /object/'+newScene[actor_id]+'/rotation '+old_objOrientation)
+            self.request('vset /object/'+newScene[actor_id]+'/show')
+        
+        #update actors' list
+        for i in range(len(self.actor_ids)):
+            self.actor_ids[i]=newScene[self.actor_ids[i]]
+        
+                    
+              
+    #return the base actor of an actor
+    def baseActor(self,actor_index):
+        if self.actor_stacking_graph[actor_index]==actor_index:
+            return actor_index
+        else:
+            return self.baseActor(self.actor_stacking_graph[actor_index])
+            
+        
+    #return an alternative of a particular actor
+    def alternateActor(self,actor_id):
+        try:
+            #get the actor category
+            actor_name=self.actor_properties[actor_id]['objectName']
+            
+            #choosing a color
+            N=len(self.Distribution[actor_name])
+            colorIndex=self.randomIndex(N)
+            colors=self.Distribution[actor_name].keys()
+            colors.sort()
+            
+            #choosing a material
+            N=len(self.Distribution[actor_name][colors[colorIndex]])
+            materialIndex=self.randomIndex(N)
+            materials=self.Distribution[actor_name][colors[colorIndex]].keys()
+            materials.sort()
+            
+            #choosing a shape
+            N=len(self.Distribution[actor_name][colors[colorIndex]][materials[materialIndex]])
+            shapeIndex=self.randomIndex(N)
+            shapes=self.Distribution[actor_name][colors[colorIndex]][materials[materialIndex]].keys()
+            shapes.sort()
+            
+            #choosing an accessing mode: openable or not
+            N=len(self.Distribution[actor_name][colors[colorIndex]][materials[materialIndex]][shapes[shapeIndex]])
+            accessModeIndex=self.randomIndex(N)
+            accessModes=self.Distribution[actor_name][colors[colorIndex]][materials[materialIndex]][shapes[shapeIndex]].keys()
+            accessModes.sort()
+            
+            #choosing an alternative actor
+            N=len(self.Distribution[actor_name][colors[colorIndex]][materials[materialIndex]][shapes[shapeIndex]][accessModes[accessModeIndex]])
+            actorIndex=self.randomIndex(N)
+            actors=self.Distribution[actor_name][colors[colorIndex]][materials[materialIndex]][shapes[shapeIndex]][accessModes[accessModeIndex]]
+            actors.sort()
+            
+            return actors[actorIndex]
+        except Exception,e:
+            return None
+     
+    #high-randomly choose a number from [0,1,..,N-1]
+    def randomIndex(self,N):
+        try:
+            sum=0
+            for i in range(N):
+                sum+=int(os.urandom(5).encode('hex'),16)
+            return sum%N
+        except Exception,e:
+            return -1
+        
+    #Compute the distribution of properties over a given set of object
+    def computeDistribution(self,listObjects):
+        self.Distribution={}
+        #1. distriution of category
+        for cat in DatasetClasses.OBJECT_NAME_DICO:
+            self.Distribution[cat]={}
+            
+            for col in DatasetClasses.OBJECT_COLOR_DICO:
+                self.Distribution[cat][col]={}
+                
+                for mat in DatasetClasses.OBJECT_MATERIAL_DICO:
+                    self.Distribution[cat][col][mat]={}
+                    
+                    for sha in DatasetClasses.OBJECT_SHAPE_DICO:
+                        self.Distribution[cat][col][mat][sha]={} 
+                        
+                        for opn in list(DatasetClasses.OBJECT_OPENABILITY_DICO.keys()):
+                            self.Distribution[cat][col][mat][sha][opn]=[]  
+            
+        for objId in listObjects:
+            if len(objId)>=2:
+                if objId[:2]=='A_':#only select handable objects
+                    #get object tags template
+                    objTagTemp={"objectShape":"","objectExternalMaterial":"","objectInternalMaterial":"","objectHardness":"",
+                                "objectPickability":"","objectGraspability":"","objectStackability":"","objectOpenability":"","objectColor":"","objectName":""}
+                    #get object tags,global Position and orientation
+                    try:
+                        objTags=self.request('vget /object/'+objId+'/tags')
+                        #split tags
+                        objTags=objTags.split(';')
+                        for elt in objTags:
+                                elt=elt.split(':')
+                                elt[0]=elt[0].rstrip().lstrip()#remove border spaces
+                                elt[1]=elt[1].rstrip().lstrip()
+                                objTagTemp[elt[0]]=elt[1][:1].upper()+elt[1][1:]
+                        self.Distribution[objTagTemp["objectName"]][objTagTemp["objectColor"]][objTagTemp["objectExternalMaterial"]]\
+                        [objTagTemp["objectShape"]][objTagTemp["objectOpenability"]].append(objId)
+                        self.actor_properties[objId]=objTagTemp
+                    except Exception,e:
+                        print('Error occured when accessing  tags of '+objId+'. '+str(e))
+                        
+        #1.remove not appearing properties from the distribution
+        for cat in DatasetClasses.OBJECT_NAME_DICO:
+            
+            for col in DatasetClasses.OBJECT_COLOR_DICO:
+                
+                for mat in DatasetClasses.OBJECT_MATERIAL_DICO:
+                    
+                    for sha in DatasetClasses.OBJECT_SHAPE_DICO:
+                        
+                        for opn in list(DatasetClasses.OBJECT_OPENABILITY_DICO.keys()):
+                           if len(self.Distribution[cat][col][mat][sha][opn])==0:
+                               del self.Distribution[cat][col][mat][sha][opn]
+                    
+                        if len(self.Distribution[cat][col][mat][sha])==0:
+                            del self.Distribution[cat][col][mat][sha]
+                
+                    if len(self.Distribution[cat][col][mat])==0:
+                        del self.Distribution[cat][col][mat]
+                        
+                if len(self.Distribution[cat][col])==0:
+                    del self.Distribution[cat][col]
+            
+            if len(self.Distribution[cat])==0:
+                del self.Distribution[cat]
+        return self.Distribution
+    
     #convert from raw to RGB image matrix
     def read_png(self,res):
         img = PIL.Image.open(StringIO.StringIO(res))
@@ -110,12 +392,14 @@ class Dataset(object):
         for i in range(n):
             for j in range(m):
                 color=list(img[i][j])
-                key=self.objectIndex[self.objectColorMatch[color[0]][color[1]][color[2]]]
-                if key in self.listObjects.keys():
-                    self.listObjects[key].append([i,j])
-                else:
-                    self.listObjects[key]=[[i,j]]
-        
+                object_address=self.objectColorMatch[color[0]][color[1]][color[2]]
+                if object_address>-1:
+                    key=self.objectIndex[object_address]
+                    if key in self.listObjects.keys():
+                        self.listObjects[key].append([i,j])
+                    else:
+                        self.listObjects[key]=[[i,j]]
+            
     #object name from id
     def getName(self,objectId):
         return objectId
@@ -129,10 +413,10 @@ class Dataset(object):
         questionId=""
         try:
             #get camera Position x,y,z
-            camPosition=client.request('vget /camera/'+str(self.cameraId)+'/location').split(' ')
+            camPosition=self.request('vget /camera/'+str(self.cameraId)+'/location').split(' ')
             camPosition=[float(camPosition[0]),float(camPosition[1]),float(camPosition[2])]
             #get camera orientation teta,beta,phi
-            camOrientation=client.request('vget /camera/'+str(self.cameraId)+'/rotation').split(' ')
+            camOrientation=self.request('vget /camera/'+str(self.cameraId)+'/rotation').split(' ')
             camOrientation=[float(camOrientation[2]),float(camOrientation[0]),float(camOrientation[1])]
         except Exception,e:
             print('Error occured when requesting camera properties. '+str(e))
@@ -159,20 +443,22 @@ class Dataset(object):
             objLocalPosition=[]
             #get object tags,global Position and orientation
             try:
-                objTags=client.request('vget /object/'+objId+'/tags')
+                objTags=self.request('vget /object/'+objId+'/tags')
                 #split tags
                 objTags=objTags.split(';')
                 for elt in objTags:
                     try:
                         elt=elt.split(':')
+                        elt[0]=elt[0].rstrip().lstrip()#remove border spaces
+                        elt[1]=elt[1].rstrip().lstrip()
                         objTagTemp[elt[0]]=elt[1]
                     except Exception,e:
                          print('Error occured when parsing object tags. '+str(e))
                 #get object Position x,y,z
-                objPosition=client.request('vget /object/'+objId+'/location').split(' ')
+                objPosition=self.request('vget /object/'+objId+'/location').split(' ')
                 objPosition=[float(objPosition[0]),float(objPosition[1]),float(objPosition[2])]
                 #get object orientation teta,beta,phi
-                objOrientation=client.request('vget /object/'+objId+'/rotation').split(' ')
+                objOrientation=self.request('vget /object/'+objId+'/rotation').split(' ')
                 objOrientation=[float(objOrientation[2]),float(objOrientation[0]),float(objOrientation[1])]
                 #compute object pose in camera coordinate system
                 [objLocalPosition,objLocalOrientation]=self.getCameraObjectPose(np.array(camPosition),self.dToR(np.array(camOrientation)),np.array(objPosition),self.dToR(np.array(objOrientation)))
@@ -217,9 +503,20 @@ class Dataset(object):
         try:
             #convert from plain to json
             jsonImage=json.loads(jsonImage)
+            #Add relationship map
+            """uncomment the statement below if you want to ignore any existing relational map
+            """
+            #del annot['objectRelationship'][:]
+            for elt in self.relationship_map:
+                rel=elt[1][:1].lower()+elt[1][1:]
+                jsonImage['objectRelationship'].append(
+                json.loads(
+                            '{"object1":"'+self.actor_ids[elt[0]]+'","relation":"'+rel+'","object2":"'+self.actor_ids[elt[2]]+'"}'
+                          )
+                )
             #write json annotation to file
             with open(os.path.join(self.folder,self.annotation+str(self.index)+'.'+self.annotExtension),'w') as outfile:
-                json.dump(jsonImage,outfile,indent=5)
+                json.dump(jsonImage,outfile)
             print('Annotation saved successfully.')
             del jsonArray[:]
             return True
@@ -228,7 +525,7 @@ class Dataset(object):
             return False
     
     def cleanup(self):
-        client.disconnect()
+        self.disconnect()
         
     #get object pixels
     def getObjectColor(self, jsonFile,objName,imageName):
@@ -316,6 +613,8 @@ class Dataset(object):
             with open(jsonFile,'r') as infile:
                 jsonImage=json.load(infile)
             listObjectId=[]
+            #objects centers
+            obj_centers={}
             #load image to be overwritten with objects ids
             img=cv2.imread(imageName)
             #explore all objects
@@ -332,8 +631,13 @@ class Dataset(object):
                 #object's central point
                 Xc=int(np.average(lign))
                 Yc=int(np.average(col))
+                #save object  center
+                obj_centers[obj["objectId"]]=(Yc,Xc)
                 #overwrite image with this object id at point (Xc,Yc)
                 cv2.putText(img, str(len(listObjectId)-1), (Yc,Xc),cv2.FONT_HERSHEY_SCRIPT_SIMPLEX, size, (0, 255, 0), 1, cv2.LINE_AA)
+            #draw relationships among objects
+            for rel in jsonImage['objectRelationship']:
+                cv2.arrowedLine(img,tuple(map(sum,zip(obj_centers[rel['object1']],(5,5)))),obj_centers[rel['object2']],DatasetClasses.RELATION_COLOR_DICO[rel['relation']],2,cv2.LINE_AA)
             if mode=="indirect":
                 cv2.imwrite(outImageName,img)
             else:
@@ -348,8 +652,50 @@ class Dataset(object):
             return [],''
     
     
-    
-    
+    #secure data request client
+    def connect(self):
+        try:
+            res=None
+            res=client.connect()
+            assert res!=None
+            assert str(res).upper().find('ERROR:')<0
+            return res
+        except Exception,e:
+            print('Error when connecting. Wait for a new try: '+str(e))
+            time.sleep(1.0)
+            return self.connect()
+    def request(self,req):
+        try:
+            res=None
+            res=client.request(req)
+            assert res!=None
+            return res
+        except Exception,e:
+            print('Error when requesting. Wait for a new try: '+str(e))
+            time.sleep(1.0)
+            return self.request(req)
+            
+    def disconnect(self):
+        try:
+            res=None
+            res=client.disconnect()
+            assert res!=None
+            return res
+        except Exception,e:
+            print('Error when disconnecting. Wait for a new try: '+str(e))
+            time.sleep(1.0)
+            return self.disconnect()
+            
+    def isconnected(self):
+        try:
+            res=client.isconnected()
+            assert res!=None
+            return res
+        except Exception,e:
+            print('Error when checking connection. Wait for a new try: '+str(e))
+            time.sleep(1.0)
+            return self.isconnected()
+            
     #compute  RGB-color of an image
     def computeRGBColor(self, imageName):
         #weighted sum of pixels' RGB color
@@ -383,12 +729,12 @@ class Dataset(object):
         
     #save nberOfImages images
     def scan(self):
-        X=np.arange(-267,-208,23)
-        Y=np.arange(182,308,21)
-        Z=np.arange(140,216,11)
-        TETAX=np.arange(-90,91,45)
-        TETAY=np.arange(-60,-33,13)
-        TETAZ=np.arange(-35,48,17)
+        X=np.arange(-181,-180,10)
+        Y=np.arange(50,72,7.2)
+        Z=np.arange(147,181,11.2)
+        TETAX=np.arange(-69,70,23)
+        TETAY=np.arange(-51,-42,1.15)
+        TETAZ=np.arange(-125,-54,14)
         i=self.index
         for x in X:
             for y in Y:
@@ -397,24 +743,44 @@ class Dataset(object):
                         for tetay in TETAY:
                             for tetaz in TETAZ:
                                 try:
-                                    if (x,y,z,tetax,tetay,tetaz)>(-221,224,140,45,-47,-18): 
+                                    if (x,y,z,tetax,tetay,tetaz)>(-181.0, 50.0, 147.0,-46.0, -51.0, -111.0): 
                                         i=i+1
                                         self.index=i
                                         #set camera position
-                                        client.request('vset /camera/'+str(self.cameraId)+'/location '+str(x)+' '+str(y)+' '+str(z))                              
+                                        self.request('vset /camera/'+str(self.cameraId)+'/location '+str(x)+' '+str(y)+' '+str(z))                              
                                         #set camera orientation
-                                        client.request('vset /camera/'+str(self.cameraId)+'/rotation '+str(tetay)+' '+str(tetaz)+' '+str(tetax))
+                                        self.request('vset /camera/'+str(self.cameraId)+'/rotation '+str(tetay)+' '+str(tetaz)+' '+str(tetax))
                                         #take lit image
-                                        client.request('vset /viewmode lit')
-                                        img=client.request('vget /camera/'+str(self.cameraId)+'/lit png')
-                                        #convert image properly . remove unused A channel  
-                                        img=cv2.cvtColor(self.read_png(img),cv2.COLOR_RGBA2BGR)
+                                        self.request('vset /viewmode lit')
+                                        
+                                        #free screenshot folder
+                                        for the_file in os.listdir(self.screenshot):
+                                            file_path = os.path.join(self.screenshot, the_file)
+                                            if os.path.isfile(file_path):
+                                                os.unlink(file_path)
+                                            
+                                        #take a screenshot: This option provides a better resolution than the 'vget/camera/id/lit png' option        
+                                        self.request('vget /vrun shot')
+            
+                                        #get the screenshot path
+                                        while os.listdir(self.screenshot)==[]:
+                                            pass
+                                        the_file=os.listdir(self.screenshot)[0]
+                                        file_path = os.path.join(self.screenshot, the_file)
+                                        print self.screenshot,the_file,file_path
+                                        #get the image
+                                        img=None
+                                        while img==None:
+                                            img=cv2.imread(file_path)
+                                        #convert image properly . remove unused A channel 
+                                        if img.shape[2]>3:
+                                            img=cv2.cvtColor(img,cv2.COLOR_RGBA2BGR)
                                         #save image
                                         if not(cv2.imwrite(os.path.join(self.folder,self.litImage)+str(i)+'.'+self.extension,img)):
                                             raise Exception('Failed to save lit image!!!')
                                         
                                         #take depth Float32
-                                        img=client.request('vget /camera/'+str(self.cameraId)+'/depth npy')
+                                        img=self.request('vget /camera/'+str(self.cameraId)+'/depth npy')
                                         #convert image properly .  
                                         img=self.read_npy(img)
                                         #save image
@@ -429,8 +795,8 @@ class Dataset(object):
                                         imgc[:,:,2]=img
                                         imgc=np.array(imgc,dtype='uint8')
                                         #take depth image
-                                        #client.request('vset /viewmode depth') 
-                                        #img=client.request('vget /camera/'+str(self.cameraId)+'/depth png')
+                                        #self.request('vset /viewmode depth') 
+                                        #img=self.request('vget /camera/'+str(self.cameraId)+'/depth png')
                                         #img=self.read_png(img)
                                         #convert image properly . remove unused A channel  
                                         #print img
@@ -441,8 +807,8 @@ class Dataset(object):
                                         
                                     
                                         #take normal image 
-                                        client.request('vset /viewmode normal')
-                                        img=client.request('vget /camera/'+str(self.cameraId)+'/normal png')
+                                        self.request('vset /viewmode normal')
+                                        img=self.request('vget /camera/'+str(self.cameraId)+'/normal png')
                                         #convert image properly . remove unused A channel  
                                         img=cv2.cvtColor(self.read_png(img),cv2.COLOR_RGBA2BGR)
                                         #save image
@@ -451,8 +817,8 @@ class Dataset(object):
                                             
                                             
                                         #take mask image 
-                                        client.request('vset /viewmode object_mask')
-                                        img=client.request('vget /camera/'+str(self.cameraId)+'/object_mask png')
+                                        self.request('vset /viewmode object_mask')
+                                        img=self.request('vget /camera/'+str(self.cameraId)+'/object_mask png')
                                         img=self.read_png(img)
                                         imgc=img.copy()
                                         #convert image properly . remove unused A channel  
@@ -468,6 +834,10 @@ class Dataset(object):
                                         #not
                                         if not self.annotate():
                                             raise Exception('Annotation failed!!!')
+                                       
+                                        #update scene
+                                        self.alternateScene()
+                                        
                                         print('Image saved with success.')
                                 except Exception,e:
                                         if  os.path.exists(os.path.join(self.folder,self.litImage)+str(i)+'.'+self.extension):
@@ -674,9 +1044,56 @@ class Dataset(object):
             print('Object mask saved successfully.')
         except Exception,e:
             print('Failed to save object mask. '+str(e))
+    
+    def copyIndexedTo(self,indices,destination):
+        try:
+            if not os.path.exists(destination):
+                os.makedirs(destination)
+            for i in range(len(indices)):
+                try:
+                    #copy annotation
+                    copyfile(self.folder+'/'+self.annotation+str(indices[i])+'.'+self.annotExtension,destination+'/'+self.annotation+str(indices[i])+'.'+self.annotExtension)
+                    #copy depth
+                    copyfile(self.folder+'/'+self.depthImage+str(indices[i])+'.'+self.depthExtension,destination+'/'+self.depthImage+str(indices[i])+'.'+self.depthExtension)
+                    #copy litImage
+                    copyfile(self.folder+'/'+self.litImage+str(indices[i])+'.'+self.extension,destination+'/'+self.litImage+str(indices[i])+'.'+self.extension)
+                    #copy mask image
+                    copyfile(self.folder+'/'+self.maskImage+str(indices[i])+'.'+self.extension,destination+'/'+self.maskImage+str(indices[i])+'.'+self.extension)
+
+
+
+                except Exception as e:
+                    print('A failure occured: '+str(e)+' at index '+str(indices[i]))
+            print('Copying successfully terminated!')
+        except Exception as e:
+               print('A failure occured: '+str(e)+' by creating '+str(destination))      
+    
+    def getAllAnnotWithRelation(self):
+        """return all indices of annotations from dataset in self.folder
+           which contain object relations.Since relation annotation is very sparse, this allow
+           a special training of the portion of the dataset containing annotations of relations
+        """
+        listIndex=[]
+        try:
+            annotations=glob.glob(self.folder+'/*.json')
+            total=len(annotations)
+            completed=0
+            for jsonFile in annotations:
+                print(completed,'/',total,' completed')
+                try:
+                    with open(jsonFile,'r') as infile:
+                        jsonImage=json.load(infile)
+                    if len(jsonImage['objectRelationship'])>0:
+                        listIndex.append(int(jsonFile.split(self.folder)[1].split(self.annotation)[1].split('.')[0]))
+                except Exception as e:
+                   print('A failure occured: '+str(e)+' in '+jsonFile)
+                completed+=1
+            return np.array(listIndex,dtype='int32')
+        except Exception as e:
+            print('A failure occured: '+str(e))
+            return np.array(listIndex,dtype='int32')
             
-            
-    def cleanRelation(self):
+    def cleanRelation2(self):
         """make the relations consistent """
         try:
             #load annotation files
@@ -689,8 +1106,7 @@ class Dataset(object):
             self.rel_count={'left':0,'right':0,'front':0,'behind':0,'over':0,'under':0,'valign':0,'in':0,'on':0}
             
             #Initialize set of valid categories
-            self.valid_cat=['CookTop','Tea','Juice','Plate','Mug','Bowl','Tray','Tomato','Ketchup','Salz','Milch','Spoon','Spatula','Milk',
-            'Coffee','Cookie','Knife','Cornflakes','Cornflake','Eggholder','EggHolder', 'Cube','Mayonnaise','Cereal','Reis']
+            self.valid_cat==DatasetClasses.OBJECT_NAME_DICO
             
             #process each file
             
@@ -703,6 +1119,7 @@ class Dataset(object):
                     
                     #Modify json file
                     if jsonImage['objectRelationship']!=[]:
+                        
                         #Complete the id-cat dictionary
                         print('Updating id-cat dictionary ...')
                         for obj in jsonImage['objects']:
@@ -798,6 +1215,94 @@ class Dataset(object):
             print('Relation clean-up successfully terminated!')
         except Exception,e:
             print('\n\n Failed to clean up relations among objects: '+str(e))
+    
+    
+    
+    def cleanRelation(self):
+        """make the relations consistent """
+        try:
+            #load annotation files
+            annotation_files=glob.glob(self.folder+'/*.json')
+            print annotation_files
+           
+            #Initialize counter for number of relations group by relation types
+            self.rel_count={'left':0,'right':0,'front':0,'behind':0,'over':0,'under':0,'valign':0,'in':0,'on':0}
+                        
+            #process each file
+            for jsonFile in annotation_files:
+                try:
+                    
+                    #open json file
+                    with open(jsonFile,'r') as infile:
+                        jsonImage=json.load(infile)
+                    infile.close()
+                    
+                    #Modify json file
+                    if jsonImage['objectRelationship']!=[]:
+                        #invalid indices
+                        invalid_rel_indices=[]
+                        #List of valid objects
+                        list_of_valid_objects=[]
+                        for obj in jsonImage['objects']:
+                            try:
+                                list_of_valid_objects.append(obj['objectId'])
+                            except Exception,e:
+                                print('An object processing failed: '+str(e))
+                                
+                        #Remove all the relations involving invalid objects
+                        relId=0
+                        while relId<len(jsonImage['objectRelationship']):
+                            try:
+                                #get the next relation
+                                rel=jsonImage['objectRelationship'][relId]
+                                #check whether the involved objects are valid
+                                if (rel['object1'] not in list_of_valid_objects)  or (rel['object2'] not in list_of_valid_objects):
+                                    #check whether the involved object 1 is valid
+                                    if (rel['object1'] not in list_of_valid_objects):
+                                        objId=0
+                                        while(objId<len(jsonImage['objectRelationship'])):
+                                            rel1=jsonImage['objectRelationship'][objId]
+                                            if rel1['object2']==rel['object1'] and rel1['relation'] in DatasetClasses.CONTENANCE_RELATIONSHIPS and rel1['object1'] in list_of_valid_objects:
+                                                jsonImage['objectRelationship'].append({"object1": rel1['object1'], "object2": rel['object2'], "relation": rel['relation']})
+                                            objId+=1
+                                    #check whether the involved object 2 is valid
+                                    if (rel['object2'] not in list_of_valid_objects):
+                                        #Avoid self-contenance relation
+                                        if(rel['relation'] not in DatasetClasses.CONTENANCE_RELATIONSHIPS):
+                                            objId=0
+                                            while(objId<len(jsonImage['objectRelationship'])):
+                                                rel1=jsonImage['objectRelationship'][objId]
+                                                if rel1['object2']==rel['object2'] and rel1['relation'] in DatasetClasses.CONTENANCE_RELATIONSHIPS and rel1['object1'] in list_of_valid_objects:
+                                                    jsonImage['objectRelationship'].append({"object1": rel['object1'], "object2": rel1['object1'], "relation": rel['relation']})
+                                                objId+=1   
+                                    #Save the invalid relations
+                                    invalid_rel_indices.append(relId)
+                                else:
+                                    #Actualise the relation counter
+                                    self.rel_count[rel['relation']]+=1
+                                #Move forward in the list with normalization(consistency)
+                                relId+=1
+                            except Exception,e:
+                                print('Failed to process relation ',rel,': '+str(e))
+                        
+                        #Remove the invalid relations
+                        step=0
+                        for invalid_rel_indice in range(len(invalid_rel_indices)):
+                            jsonImage['objectRelationship'].pop(invalid_rel_indices[invalid_rel_indice]-step)
+                            step+=1
+                        #Free memory space
+                        del invalid_rel_indices[:]
+                        #Save changes committed in the json file
+                        print('Saving changes ...')
+                        with open(jsonFile,'w') as infile:
+                            json.dump(jsonImage,infile)
+                        infile.close()   
+                except Exception,e:
+                    print('Failed to clean up '+jsonFile+': '+str(e))
+            print('Relation clean-up successfully terminated!')
+        except Exception,e:
+            print('\n\n Failed to clean up relations among objects: '+str(e))
+    
     
     def BigNum(self,x):
         return (x)
