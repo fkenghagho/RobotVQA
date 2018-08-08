@@ -140,7 +140,7 @@ class ExtendedDatasetLoader(utils.Dataset):
     
     def reduce_relation(self,relation):
         x=np.count_nonzero(relation,axis=2)
-        x=np.count_nonzero(x,axis=0)
+        x=np.count_nonzero(x,axis=0)+np.count_nonzero(x,axis=1)
         return x.nonzero()
            
     def make_transition(self,relation):
@@ -216,7 +216,7 @@ class ExtendedDatasetLoader(utils.Dataset):
             print('\nShape:\n',shape)
             masks=np.zeros(shape,dtype='uint8')
             poses=np.zeros([nbInstances,6],dtype='float32')
-            relations=np.zeros([nbInstances,nbInstances,4],dtype='int32')
+            relations=np.zeros([nbInstances,nbInstances,DatasetClasses.NUM_CLASSES[6]-1],dtype='int32')
             for i in range(nbInstances):
                 masks[:,:,i]=mask[i].copy()
                 poses[i,:]=pose[i].copy()
@@ -237,8 +237,8 @@ class ExtendedDatasetLoader(utils.Dataset):
             #Further processing if there are relations
             if relations.sum()!=0.:
                 #augment dataset through transitivity property of relations
-                relations=self.make_transition(relations)
-                #only select objects participating in a relationship
+                #relations=self.make_transition(relations)
+                #only select objects participating in a relationship                
                 valid_obj=self.reduce_relation(relations)
                 #take away all non valid objects masks,poses,...
                 relations=relations.take(valid_obj[0],axis=1).take(valid_obj[0],axis=0)
@@ -247,8 +247,6 @@ class ExtendedDatasetLoader(utils.Dataset):
                 for i in range(len(classes)):
                     classes[i]=classes[i].take(valid_obj[0],axis=0)
                 #merge all relation categories into a single one
-                z=np.where(relations[:,:,3]>0)
-                relations[:,:,2][z]=(relations[:,:,3][z])
                 z=np.where(relations[:,:,2]>0)
                 relations[:,:,1][z]=(relations[:,:,2][z])
                 z=np.where(relations[:,:,1]>0)
@@ -305,11 +303,11 @@ class ExtendedRobotVQAConfig(RobotVQAConfig):
     # The Mask RCNN paper uses lr=0.02, but on TensorFlow it causes
     # weights to explode. Likely due to differences in optimzer
     # implementation.
-    LEARNING_RATE = 0.0005
+    LEARNING_RATE = 0.001
     LEARNING_MOMENTUM = 0.9
 
     # Weight decay regularization
-    WEIGHT_DECAY = 0.0001
+    WEIGHT_DECAY = 0.00008
     
     # Use small images for faster training. Set the limits of the small side
     # the large side, and that determines the image shape.
@@ -332,17 +330,17 @@ class ExtendedRobotVQAConfig(RobotVQAConfig):
 
     # ROIs kept after non-maximum supression (training and inference)
     POST_NMS_ROIS_TRAINING = 2000
-    POST_NMS_ROIS_INFERENCE = 2000
+    POST_NMS_ROIS_INFERENCE = 1000
 
     # Use a small epoch since the data is simple
-    STEPS_PER_EPOCH = 2050
+    STEPS_PER_EPOCH = 200
     
     #Number of epochs
-    NUM_EPOCHS=5
+    NUM_EPOCHS=500
     
 
     # use small validation steps since the epoch is small
-    VALIDATION_STEPS = 10
+    VALIDATION_STEPS = 20
     
     # Use RPN ROIs or externally generated ROIs for training
     # Keep this True for most situations. Set to False if you want to train
@@ -357,12 +355,15 @@ class ExtendedRobotVQAConfig(RobotVQAConfig):
     # Image mean (RGB)
     MEAN_PIXEL = DatasetClasses.MEAN_PIXEL
     
+    # With depth information?
+    WITH_DEPTH_INFORMATION=False 
+    
     #                           
-    EXCLUDE=["mrcnn_class_logits0", "mrcnn_class_logits1","mrcnn_class_logits2","mrcnn_class_logits3","mrcnn_class_logits4","mrcnn_class_logits5",
-                                        "mrcnn_class_logits5_1",'mrcnn_class_bn2','mrcnn_class_conv2',
-                                        "mrcnn_bbox_fc","mrcnn_bbox","mrcnn_poses_fc", "mrcnn_poses",
-                                        "mrcnn_poses_fc0","mrcnn_poses_fc1","mrcnn_poses_fc2",
-                                        "mrcnn_mask","mrcnn_class0","mrcnn_class1","mrcnn_class2","mrcnn_class3","mrcnn_class4","mrcnn_class5"]
+    EXCLUDE=["robotvqa_class_logits0", "robotvqa_class_logits1","robotvqa_class_logits2","robotvqa_class_logits3","robotvqa_class_logits4",
+                                        "robotvqa_class_logits5_1",'robotvqa_class_logits5_2','robotvqa_class_bn2','robotvqa_class_conv2',
+                                        "mrcnn_bbox_fc","mrcnn_bbox","robotvqa_poses_fc", "robotvqa_poses",
+                                        "robotvqa_poses_fc0","robotvqa_poses_fc1","robotvqa_poses_fc2",
+                                        "mrcnn_mask","robotvqa_class0","robotvqa_class1","robotvqa_class2","robotvqa_class3","robotvqa_class4","robotvqa_class5"]
 
 ################ Task Manager Class(TMC)##############
 class TaskManager(object):
@@ -398,7 +399,7 @@ class TaskManager(object):
     
     
     
-    def getDataset(self,folder, imgNameRoot, annotNameRoot,depthNameRoot,binary_dataset='D:/robotVQA/dataset.file'):
+    def getDataset(self,folder=DatasetClasses.DATASET_FOLDER, imgNameRoot=DatasetClasses.LIT_IMAGE_NAME_ROOT, annotNameRoot=DatasetClasses.ANNOTATION_IMAGE_NAME_ROOT,depthNameRoot=DatasetClasses.DEPTH_IMAGE_NAME_ROOT,binary_dataset=os.path.join(DatasetClasses.DATASET_FOLDER,DatasetClasses.DATASET_BINARY_FILE)):
         try:
             with open(binary_dataset,'rb') as f:
                 return pickle.load(f)
@@ -438,9 +439,7 @@ class TaskManager(object):
             # See README for instructions to download the COCO weights
             model_path=self.ROBOTVQA_WEIGHTS_PATH
             model.load_weights(model_path, by_name=True,
-                            exclude=["mrcnn_class_logits0", "mrcnn_class_logits1",
-                                        "mrcnn_bbox_fc","mrcnn_bbox","mrcnn_poses_fc", "mrcnn_poses",
-                                        "mrcnn_mask","mrcnn_class0","mrcnn_class1"])
+                            exclude=ExtendedRobotVQAConfig.EXCLUDE)
         elif init_with == "last":
             # Load the last model you trained and continue training
             model_path=model.find_last()[1]
@@ -466,15 +465,14 @@ class TaskManager(object):
         #Weights initialization imagenet, coco, or last
         if init_with == "imagenet":
             model_path=model.get_imagenet_weights()
-            model.load_weights(model_path, by_name=True)
+            model.load_weights(model_path, by_name=True,exclude=ExtendedRobotVQAConfig.EXCLUDE)
         elif init_with == "coco":
             # Load weights trained on MS COCO, but skip layers that
             # are different due to the different number of classes
             # See README for instructions to download the COCO weights
             model_path=self.ROBOTVQA_WEIGHTS_PATH
             model.load_weights(model_path, by_name=True,
-                            exclude=["mrcnn_class_logits", "mrcnn_bbox_fc", 
-                                        "mrcnn_bbox", "mrcnn_mask"])
+                            exclude=ExtendedRobotVQAConfig.EXCLUDE)
         elif init_with == "last":
             # Load the last model you trained and continue training
             model_path=model.find_last()[1]
@@ -485,7 +483,7 @@ class TaskManager(object):
         #predict
         results = model.detect([image], verbose=1)
         r = results[0]
-        dst=self.getDataset('c:/Dataset/raw/dataset2','litImage','annotation','depthImage')
+        dst=self.getDataset()
         class_ids=[r['class_cat_ids'],r['class_col_ids'],r['class_sha_ids'],r['class_mat_ids'],r['class_opn_ids'],r['class_rel_ids']]
         scores=[r['scores_cat'],r['scores_col'],r['scores_sha'],r['scores_mat'],r['scores_opn'],r['scores_rel']]
         visualize.display_instances(image[:,:,:3], r['rois'], r['masks'], class_ids, dst.class_names,r['poses'], scores=scores, axs=get_ax(cols=2),\

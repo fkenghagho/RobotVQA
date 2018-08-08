@@ -637,7 +637,7 @@ class Dataset(object):
                 cv2.putText(img, str(len(listObjectId)-1), (Yc,Xc),cv2.FONT_HERSHEY_SCRIPT_SIMPLEX, size, (0, 255, 0), 1, cv2.LINE_AA)
             #draw relationships among objects
             for rel in jsonImage['objectRelationship']:
-                cv2.arrowedLine(img,obj_centers[rel['object1']],obj_centers[rel['object2']],DatasetClasses.RELATION_COLOR_DICO[rel['relation']],2,cv2.LINE_AA)
+                cv2.arrowedLine(img,tuple(map(sum,zip(obj_centers[rel['object1']],(5,5)))),obj_centers[rel['object2']],DatasetClasses.RELATION_COLOR_DICO[rel['relation']],2,cv2.LINE_AA)
             if mode=="indirect":
                 cv2.imwrite(outImageName,img)
             else:

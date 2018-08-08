@@ -29,13 +29,13 @@ class DatasetClasses(object):
     OBJECT_OPENABILITY_DICO={'True':'Openable','False':'Non-Openable'}
     
     #object relationships
-    OBJECT_RELATION_DICO={'Left':'LeftRight','Right':'LeftRight','Front':'FrontBehind','Behind':'FrontBehind','Over':'OverUnder','Under':'OverUnder','Valign':'OverUnder','In':'OnIn','On':'OnIn'}
+    OBJECT_RELATION_DICO={'Left':'LeftRight','Front':'FrontBehind','In':'OnIn','On':'OnIn'}
     
     #relationship categories
-    RELATION_CATEGORY_DICO={0+1:'LeftRight',1+1:'FrontBehind',2+1:'OverUnder',3+1:'OnIn'}
+    RELATION_CATEGORY_DICO={0+1:'LeftRight',1+1:'FrontBehind',2+1:'OnIn'}
     
     #relation to color mapping
-    RELATION_COLOR_DICO={'in':(0,0,0),'on':(255,0,0),'left':(0,255,0),'front':(0,0,255)}
+    RELATION_COLOR_DICO={'in':(125,0,255),'on':(255,0,0),'left':(0,255,0),'front':(0,0,255)}
 
     # Number of classes per features(object's category/name, color, shape, material, openability) (including background)
     NUM_CLASSES =[1+len(OBJECT_NAME_DICO),
@@ -58,10 +58,10 @@ class DatasetClasses(object):
     IMAGE_MAX_CHANNEL=6
     
     # Image mean (RGB)
-    MEAN_PIXEL = np.array([123.7, 116.8, 103.9,173., 122., 127.])
+    MEAN_PIXEL = np.array([127.5, 127.5, 127.5,127.5, 127.5, 127.5])
     
     #Properties of image files 
-    
+    DATASET_BINARY_FILE='dataset.data'
     DATASET_FOLDER='D:/dataset35'
     SCREENSHOT_FOLDER='C:\\Users\\Franklin\\Desktop\\masterthesis\\P12-VisionScanning-UR16\\VisionScanning\\Saved\\Screenshots\\Windows'
     LIT_IMAGE_NAME_ROOT='litImage'
@@ -96,8 +96,6 @@ class DatasetClasses(object):
     ACTOR_COMMON_TEMP_LOCATION='-651 -701 30'
     ACTOR_COMMON_TEMP_ROTATION='0 0 0'
     
-    
-   
     
     def __init__(self):
         pass

@@ -100,7 +100,7 @@ def display_instances(image, boxes, masks, class_ids, class_names,poses,
     scores: [NUM_FEATURES,num_instances],(optional) confidence scores for each box/feature
     figsize: (optional) the size of the image.
     """
-    KEY_RELATIONS=['In']
+    
     # Number of instances
     N = boxes.shape[0]
     if not N:
@@ -132,7 +132,7 @@ def display_instances(image, boxes, masks, class_ids, class_names,poses,
     y3=10
     #class_ids[len(class_ids)-1]=class_ids[len(class_ids)-1]+1
     #best_relations=np.argmax(scores[len(class_ids)-1],axis=1)
-    best_relations=utils.relation_graph(boxes)
+    #best_relations=utils.relation_graph(boxes)
     for i in range(N):
         color = colors[i]
         # Bounding box
@@ -160,14 +160,14 @@ def display_instances(image, boxes, masks, class_ids, class_names,poses,
                 color='black', size=7, backgroundcolor="none")
                 
         #object relationship
-  
-        k=best_relations[i]
-        if(class_ids[len(class_ids)-1][i][k]!=0 and i!=k):
-            caption=str(i)+'.'+class_names[0][class_ids[0][i]]+' is '+class_names[5][class_ids[len(class_ids)-1][i][k]]+' '+str(k)+\
-            '.'+class_names[0][class_ids[0][k]]+': '+str((scores[len(class_ids)-1][i][k]))+'.'
-            print('RELATION:'+caption)
-            ax1.text(x3, y3, caption,color='black', size=8, backgroundcolor="none")
-            y3+=30
+        for k in range(N):
+            #k=best_relations[i]
+            if(class_ids[len(class_ids)-1][i][k]!=0 and i!=k):
+                caption=str(i)+'.'+class_names[0][class_ids[0][i]]+' is '+class_names[5][class_ids[len(class_ids)-1][i][k]]+' '+str(k)+\
+                '.'+class_names[0][class_ids[0][k]]+': '+str((scores[len(class_ids)-1][i][k]))+'.'
+                print('RELATION:'+caption)
+                ax1.text(x3, y3, caption,color='black', size=8, backgroundcolor="none")
+                y3+=30
      
         # Mask
         mask = masks[:, :, i]

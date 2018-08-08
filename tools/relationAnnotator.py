@@ -12,7 +12,7 @@ class ObjectRelationAnnotator(object):
 		
 		#globale Variablen##########################################
 		self.listRelation=[]
-		self.index=27309
+		self.index=13
 		self.step=1
 		self.annotFile=""
 		self.imageFile=""
