@@ -243,6 +243,26 @@ def clip_boxes_graph(boxes, window):
     clipped.set_shape((clipped.shape[0], 4))
     return clipped
 
+def clip_poses_graph(poses, window):
+    """
+    poxes: [N, 6] each row is rx,ry, ry, x, y, z
+    window: [8] in the form x1, x2, y1, y2, z1, z2, r1, r2
+    """
+    # Split corners
+    wr1, wr2, wy1, wx1, wy2, wx2, wz1, wz2 = tf.split(window, 8)
+    rx,ry, ry, x, y, z = tf.split(poses, 6, axis=1)
+    # Clip
+
+    x = tf.maximum(tf.minimum(x, wx2), wx1)
+    y = tf.maximum(tf.minimum(y, wy2), wy1)
+    z = tf.maximum(tf.minimum(z, wz2), wz1)
+    rx = tf.maximum(tf.minimum(rx, wr2), wr1)
+    ry = tf.maximum(tf.minimum(ry, wr2), wr1)
+    rz = tf.maximum(tf.minimum(rz, wr2), wr1)
+    
+    clipped = tf.concat([rx,ry, ry, x, y, z], axis=1, name="clipped_poses")
+    clipped.set_shape((clipped.shape[0], 6))
+    return clipped
 
 class ProposalLayer(KE.Layer):
     """Receives anchor scores and selects a subset to pass as proposals
@@ -778,6 +798,14 @@ def refine_detections_graph(Inputs, config):
     refined_rois *= tf.constant([height, width, height, width], dtype=tf.float32)
     # Clip boxes to image window
     refined_rois = clip_boxes_graph(refined_rois, window)
+    
+    #convert poses to image domain
+    poses_specific*=tf.constant(config.MAX_OBJECT_POSES, dtype=tf.float32)
+    # Clip poses to image window
+    orientation_normalizer=tf.constant([0.0,config.ANGLE_NORMALIZED_FACTOR],dtype='float32',shape=[2])
+    depth_normalizer=tf.constant([0.0,config.MAX_OBJECT_POSES[len(config.MAX_OBJECT_POSES)-1]],dtype='float32',shape=[2])
+    poses_specific=clip_poses_graph(poses_specific,tf.concat([orientation_normalizer,window,depth_normalizer],axis=0))
+    
     # Round and cast to int since we're deadling with pixels now
     refined_rois = tf.to_int32(tf.rint(refined_rois))
 
@@ -974,12 +1002,48 @@ def build_rpn_model(anchor_stride, anchors_per_location, depth):
 
 
 ############################################################
-#  Relational Network
+#  Background Extraction
 ############################################################
     
-   
-
-    
+def Background_Extraction(robotvqa_feature_maps,config):
+        """this function is intended to extract the global features from the image.
+            Very interesting for the relational network is the facial orientation of the camera or observer
+            
+            Input:
+            robotvqa_feature_maps: feature maps from the basenet [P2,P3,P4,P5]
+            
+            Output:
+            x: the background as a vector-like tensor of size batch*1024
+        """
+        
+        #1.global average pooling along the depth of the feature maps
+        P2,P3,P4,P5=robotvqa_feature_maps
+        print(' maps" shapes:',P4.shape,P5.shape,P2.shape,P3.shape)
+        
+        F5=KL.pooling.GlobalMaxPooling2D()(P5)#batch,h,w,256
+        F2=KL.pooling.GlobalMaxPooling2D()(P2)#batch,h,w,256
+        F3=KL.pooling.GlobalMaxPooling2D()(P3)#batch,h,w,256
+        F4=KL.pooling.GlobalMaxPooling2D()(P4)#batch,h,w,256
+        
+        print('globally pooled maps" shapes:',F4.shape,F5.shape,F2.shape,F3.shape)
+        
+        x=KL.Concatenate(axis=1)([F2,F3,F4,F5])#batch 1024
+        
+        print('global average pooling shape:',x.shape)
+        
+        x=KL.Lambda(lambda x:tf.expand_dims(x,axis=1))(x)
+        print('expanded global average pooling shape:',x.shape)
+        
+        #2. apply a sngle semi-non-linear-fully-connected layer
+        x=KL.TimeDistributed(KL.Dense(1024),name='robotvqa_background_extraction')(x)
+        x = KL.LeakyReLU(alpha=0.3)(x)
+        
+        print('expanded background shape:',x.shape)
+        
+        x=KL.Lambda(lambda x:tf.squeeze(x,axis=1))(x)
+        print(' background shape:',x.shape)
+        
+        return x
 
 ############################################################
 #  Feature Pyramid Network Heads
@@ -1023,8 +1087,8 @@ def fpn_classifier_graph(rois, feature_maps,image_shape, pool_size, num_classes,
     shared = KL.Lambda(lambda x: K.squeeze(K.squeeze(x, 3), 2),
                        name="pool_squeeze")(x)
                        
-    
-            
+    #add rois' location (global features) to rois' features(local features)
+    shared=KL.Concatenate(axis=2)([shared,rois])        
 
     # Classifier head
     robotvqa_class_logits=[]
@@ -1065,13 +1129,13 @@ def fpn_classifier_graph(rois, feature_maps,image_shape, pool_size, num_classes,
     # Poses head
     
     # [batch, boxes, num_classes * (tx,ty,tz,x,y,z)]
-    x = KL.TimeDistributed(KL.Dense(1024, activation='relu'),
-                           name='robotvqa_poses_fc2')(shared)
     x = KL.TimeDistributed(KL.Dense(1024, activation='linear'),
-                           name='robotvqa_poses_fc1')(x)
+                           name='robotvqa_poses_fc2')(shared)
     x = KL.TimeDistributed(KL.Dense(1024, activation='relu'),
+                           name='robotvqa_poses_fc1')(x)
+    x = KL.TimeDistributed(KL.Dense(1024, activation='linear'),
                            name='robotvqa_poses_fc0')(x)
-    x = KL.TimeDistributed(KL.Dense(num_classes[0] * 6, activation='linear'),
+    x = KL.TimeDistributed(KL.Dense(num_classes[0] * 6, activation='relu'),
                            name='robotvqa_poses_fc')(x)
     # Reshape to [batch, boxes, num_classes, (tx,ty,tz,x,y,z)]
     s = K.int_shape(x)
@@ -1258,8 +1322,8 @@ def robotvqa_class_rel_loss_graph(target_class_ids, pred_class_logits,
     #Avoiding lazy learning due to normal distributed data with very small variance
     t=tf.random_uniform(shape=[1],minval=0,maxval=1000,dtype='int32')
     f=tf.mod(t,10)
-    loss2_i=tf.cast(tf.greater(f[0],2),'float32')
-    loss1_i=tf.cast(tf.less_equal(f[0],2),'float32')
+    loss2_i=tf.cast(tf.greater(f[0],3),'float32')
+    loss1_i=tf.cast(tf.less_equal(f[0],3),'float32')
     
     print('loss2_i:',loss2_i)
     print('loss1_i:',loss1_i)
@@ -1461,19 +1525,22 @@ def load_image_gt(dataset, config, image_id, augment=False,
     image = dataset.load_image(image_id,config.MAX_CAMERA_CENTER_TO_PIXEL_DISTANCE)
     mask, class_ids,poses,class_rel_ids = dataset.load_mask(image_id,config)
     shape = image.shape
+    #resize image,mask and poses
     image, window, scale, padding = utils.resize_image(
         image,
         min_dim=config.IMAGE_MIN_DIM,
         max_dim=config.IMAGE_MAX_DIM,
         padding=config.IMAGE_PADDING)
     mask = utils.resize_mask(mask, scale, padding)
+    poses= utils.resize_poses(poses, scale, padding)
+    
 
     # Random horizontal flips.
     if augment:
         if random.randint(0, 1):
             image = np.fliplr(image)
             mask = np.fliplr(mask)
-
+            poses=np.fliplr(poses)
     # Note that some boxes might be all zeros if the corresponding mask got cropped out.
     # and here is to filter them out
     _idx = np.sum(mask, axis=(0, 1)) > 0
@@ -1989,6 +2056,9 @@ def data_generator(dataset, config, shuffle=False, augment=True, random_rois=0,
             # RPN Targets
             rpn_match, rpn_bbox = build_rpn_targets(image.shape, anchors,
                                                     gt_class_cat_ids, gt_boxes, config)
+                                                    
+            # Normalize Objects'Poses in [0,1[
+            gt_poses/=config.MAX_OBJECT_POSES
 
             # Mask R-CNN Targets
             if random_rois:
@@ -2151,12 +2221,13 @@ class RelationalGraph(object):
     
     #step 0
     def get_relational_graph_valid_nodes(inputs):
-        """input: Set of N objects/nodes for relational network
+        """input: Set of N objects/nodes for relational network+background
            output: Set of DETECTION_MAX_INSTANCES best valid objects/nodes
         """
         
         shared = inputs[0]
         best_valid_indices = inputs[1]
+        
         
         #get the config.DETECTION_MAX_INSTANCES best scores based on the first batch elements
         print('padding shape:',K.int_shape(best_valid_indices))
@@ -2168,7 +2239,7 @@ class RelationalGraph(object):
         return shared_n
 
     #step 1
-    def get_relational_graph_edges(objects,nber_boxes,num_classes):
+    def get_relational_graph_edges(objects,nber_boxes,num_classes,background):
         """input: Set of N objects/nodes for relational network
            output: NxN pairs/edges of flattened objects
         """
@@ -2176,7 +2247,7 @@ class RelationalGraph(object):
         for i in range(nber_boxes):
             for j in range(nber_boxes):
                 obj_feature_pairs.append(KL.Concatenate(axis=1)\
-                ([KL.Lambda(lambda x:x[:,i,:])(objects),KL.Lambda(lambda x:x[:,j,:])(objects)]))
+                ([KL.Lambda(lambda x:x[:,i,:])(objects),KL.Lambda(lambda x:x[:,j,:])(objects),background]))
             
                 
         relational_graph_edges=KL.Lambda(lambda x: K.stack(x,axis=1))(obj_feature_pairs)  
@@ -2264,7 +2335,8 @@ class RelationalGraph(object):
         
         
         #step 1. get edges for relational network
-        relational_graph_edges=RelationalGraph.get_relational_graph_edges(shared_n,nber_boxes,num_classes)
+        background=inputs[2]
+        relational_graph_edges=RelationalGraph.get_relational_graph_edges(shared_n,nber_boxes,num_classes,background)
         
         
         
@@ -2383,6 +2455,7 @@ class RobotVQA():
             h, w = K.shape(input_image)[1], K.shape(input_image)[2]
             image_scale = K.cast(K.stack([h, w, h, w], axis=0), tf.float32)
             gt_boxes = KL.Lambda(lambda x: x / image_scale)(input_gt_boxes)
+        
             # 3. GT Masks (zero padded)
             # [batch, height, width, MAX_GT_INSTANCES]
             if config.USE_MINI_MASK:
@@ -2399,7 +2472,7 @@ class RobotVQA():
         # Bottom-up Layers
         # Returns a list of the last layers of each stage, 5 in total.
         # Don't create the thead (stage 5), so we pick the 4th item in the list.
-        with tf.device('/cpu:0'):
+        with tf.device(self.config.CGPU1):
             _, C2, C3, C4, C5 = resnet_graph(input_image, "resnet101",self.config, stage5=True)
         # Top-down Layers
         # TODO: add assert to varify feature map sizes match what's in config
@@ -2460,7 +2533,7 @@ class RobotVQA():
         # and zero padded.
         proposal_count = config.POST_NMS_ROIS_TRAINING if mode == "training"\
             else config.POST_NMS_ROIS_INFERENCE
-        with tf.device('/cpu:0'):
+        with tf.device(self.config.CGPU1):
             rpn_rois = ProposalLayer(proposal_count=proposal_count,
                                     nms_threshold=config.RPN_NMS_THRESHOLD,
                                     name="ROI",
@@ -2525,8 +2598,10 @@ class RobotVQA():
             #select indices        
             best_valid_indices=KL.Lambda(lambda x:tf.range(self.config.DETECTION_MAX_INSTANCES))(shared)
             #relational graph
-            with tf.device('/cpu:0'):
-                rel_logits,rel_probs=RelationalGraph.Get_Relational_Graph(self.config,[shared,best_valid_indices])
+            with tf.device(self.config.CGPU1):
+                #background extraction
+                background=Background_Extraction(robotvqa_feature_maps,self.config)
+                rel_logits,rel_probs=RelationalGraph.Get_Relational_Graph(self.config,[shared,best_valid_indices,background])
             #register results
             robotvqa_class_logits.append(rel_logits)
             robotvqa_class.append(rel_probs)
@@ -2630,8 +2705,10 @@ class RobotVQA():
             best_valid_indices=KL.Lambda(lambda x:x[0])(best_valid_indices)
             print('Best indices shape:',K.int_shape(best_valid_indices))
             #Relational Graph
-            with tf.device('/cpu:0'):
-                rel_logits,rel_probs=RelationalGraph.Get_Relational_Graph(self.config,[shared,best_valid_indices])
+            with tf.device(self.config.CGPU1):
+                #background extraction
+                background=Background_Extraction(robotvqa_feature_maps,self.config)
+                rel_logits,rel_probs=RelationalGraph.Get_Relational_Graph(self.config,[shared,best_valid_indices,background])
             print('Relational graph output shape:',K.int_shape(rel_logits),K.int_shape(rel_probs))
            
             
@@ -3041,7 +3118,7 @@ class RobotVQA():
 
         Returns:
         boxes: [N, (y1, x1, y2, x2)] Bounding boxes in pixels
-        poses: [N, (tetay,tetaz,x,y,z)] Bounding boxes in pixels
+        poses: [N, (tetay,tetaz,x,y,z)] orientations in radians and positions in pixels
         class_ids: [N]*NUM_FEATURES Integer class IDs for each bounding box
         scores: [N]*NUM_FEATURES Float probability scores of the class_id
         masks: [height, width, num_instances] Instance masks
@@ -3074,7 +3151,11 @@ class RobotVQA():
 
         # Translate bounding boxes to image domain
         boxes = np.multiply(boxes - shifts, scales).astype(np.int32)
-
+        
+        #Shift and scale the pose back in image coordinates
+        poses[:,3]=(poses[:,3]-shift[1])*scale
+        poses[:,4]=(poses[:,4]-shift[0])*scale
+    
         # Filter out detections with zero area. Often only happens in early
         # stages of training when the network weights are still a bit random.
         exclude_ix = np.where(

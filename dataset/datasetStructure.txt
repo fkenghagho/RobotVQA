@@ -59,7 +59,7 @@ Each Image has a Json-file holding its annotation with the format:
 
 Some complementary informations:
 
-COORDINATE SYSTEM
+CAMERA COORDINATE SYSTEM:
 
 Orientations(angles) in degrees. 
 Z axis is upward and positive rotation around it is clockwise,
@@ -68,9 +68,17 @@ Y axis is leftward and positive rotation around it is  counterclockwise.
 Positions(X,Y,Z) are in cm
 
 
+IMAGE COORDINATE SYSTEM:
+
+Origin: upper most left corner
+X axis: Horizontal rightward
+Y axis: Vertical downward
+Z axis: X cross Y -ward
+
+
 CAMERA INFO:
 
-Quarre pixels
+Squarre pixels
 WidthxHeight: 640*480px ->99.52cm x 74.64cm
 Horizontal Field of View: 70 degree
 Aspect Ratio: 4/3

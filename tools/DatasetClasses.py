@@ -57,8 +57,26 @@ class DatasetClasses(object):
     IMAGE_MAX_DIM = 640
     IMAGE_MAX_CHANNEL=6
     
+    
     # Image mean (RGB)
     MEAN_PIXEL = np.array([127.5, 127.5, 127.5,127.5, 127.5, 127.5])
+    
+    #Camera Intrinsic Matrix
+    CAMERA_INTRINSIC_MATRIX=np.array([[457,   0,     320],[0,     457,   240],[0 ,      0  ,   1]],dtype='float')
+    
+    #PIXELS SIZE in cm
+    PIXEL_SIZE=0.1555
+    
+    
+    #Object Orientation Normalization Factor. Angles belong to [0,2pi[
+    #Amgles are normalized to [0,1[
+    ANGLE_NORMALIZED_FACTOR=2*np.pi
+    
+    #Object Poses' Boundaries  for normalizing objects'poses
+    #poses are normalized to [0,1[
+    MAX_OBJECT_POSES=np.array([ANGLE_NORMALIZED_FACTOR,ANGLE_NORMALIZED_FACTOR,ANGLE_NORMALIZED_FACTOR,IMAGE_MAX_DIM,IMAGE_MAX_DIM,MAX_OBJECT_COORDINATE/PIXEL_SIZE])
+    
+    
     
     #Properties of image files 
     DATASET_BINARY_FILE='dataset.data'

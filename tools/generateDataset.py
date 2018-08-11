@@ -733,7 +733,7 @@ class Dataset(object):
         Y=np.arange(50,72,7.2)
         Z=np.arange(147,181,11.2)
         TETAX=np.arange(-69,70,23)
-        TETAY=np.arange(-51,-42,1.15)
+        TETAY=np.arange(-51,-42,1.16)
         TETAZ=np.arange(-125,-54,14)
         i=self.index
         for x in X:
@@ -1306,3 +1306,13 @@ class Dataset(object):
     
     def BigNum(self,x):
         return (x)
+        
+    def getPositionFromCamToImg(self,objPosition):
+        """Convert objPosition from camera system(cm) to image system(pixels)
+        """
+        
+        objPosition=np.array([objPosition[1],objPosition[2],objPosition[0]],dtype='float32')/DatasetClasses.PIXEL_SIZE
+        objPosition=np.dot(DatasetClasses.CAMERA_INTRINSIC_MATRIX,objPosition)
+        objPosition[:2]/=objPosition[2]
+        objPosition[1]=2*DatasetClasses.CAMERA_INTRINSIC_MATRIX[1,2]-objPosition[1]
+        return objPosition
