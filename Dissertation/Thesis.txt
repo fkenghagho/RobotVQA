@@ -11,7 +11,7 @@ The problem is two-fold:
 
 * 3D-scene understanding for robotic manipulation tasks 
 	+ Contributions
-	       - Full Fix-Format-Graph-based Scene Description within a single Deep-Learning Model generalizes VQA
+	       - Full Fix-Format-Graph-based Scene Description within a single Deep-Learning Model, which generalizes VQA
                  It is an extension of Mask-RCNN(Category, Mask, Bounding Box):
 			* Integration of Additional submodules for:
 				- Material
