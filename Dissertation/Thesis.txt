@@ -27,7 +27,7 @@ The problem is two-fold:
 * Demonstration of high applicability of photorealistic virtual worlds in training Robot vision systems
 	+ Contributions:
                - Virtual world
-	       - Synthetic dataset 
+	       - High-Entropy Synthetic dataset 
 
 5- Chap2: Dataset
 6- Chap3: RobotVQA
