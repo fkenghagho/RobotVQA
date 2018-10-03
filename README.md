@@ -47,7 +47,9 @@ As output, the system returns a scene graph. A scene graph is a directed graph, 
    The structure of the visual dataset can be found at [dataset's structure](https://github.com/fkenghagho/RobotVQA/blob/master/dataset/datasetStructure.txt). This file deeply specifies the structure of objects in the scene and the image and information types needed to learn the structure of objects. For building a huge dataset, we model the environment of the target robot in Unreal Engine4.16, which is a photorealistic game engine allowing therefore efficient transfer learning. Then,  we write a software for an end-to-end construction of the dataset starting from the automatic camera navigation in the virtual environment till the saving of scene images and annotations. To augment the annotation of the collected images with relationships, we built a flexibel software. The use of this software is definitively compulsory when dealing with some external images. Our annotation softwares can be found at [automatic dataset generator](https://github.com/fkenghagho/RobotVQA/blob/feature-background-in-object-integration/tools/generateDataset.py) and [manual dataset generator](https://github.com/fkenghagho/RobotVQA/blob/feature-background-in-object-integration/tools/relationAnnotator.py) . An example of annotation can be downloaded from [example of annotation](https://github.com/fkenghagho/RobotVQA/blob/feature-background-in-object-integration/dataset/datasetExample1.zip)(**zip file**).
    
    The following images depict the annotation of a typical scene from objects to relationships description:
-   
+
+![Scene Realisticness](images/sceneRealisticness.png "Scene Realisticness")   
+
 ![Typical scene](images/dataset1.png "Typical scene")   
 
 ![Objects in the scene](images/objects.png "Objects in the scene")   
