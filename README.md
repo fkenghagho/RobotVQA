@@ -19,9 +19,9 @@ As output, the system returns a scene graph. A scene graph is a directed graph, 
 # 2. Typical Scene 
 
   
-   The following figure briefly illustrates the concept of scene graph:
+   The following figure briefly illustrates the concept of scene graph.The system operates in two modes: either with depth information or without.
 
-![Objects and Relationships description](images/scenegraphFinal.png "Objects and Relationships description")
+![Objects and Relationships description](images/scenegraphFinal1.png "Objects and Relationships description")
 
 
 # 3. Multi-Task Deep Convo-Neural Network
