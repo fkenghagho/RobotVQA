@@ -29,7 +29,7 @@ As output, the system returns a scene graph. A scene graph is a directed graph, 
 
    Our model works as follows:
 
-![Objects and Relationships description](images/architecture2.png "Model description")
+![Objects and Relationships description](images/architecture6.png "Model description")
 
 
 
