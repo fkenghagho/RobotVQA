@@ -131,6 +131,15 @@ size or material.
 In our virtual environment, we try to categorize objects as abstractly as possible to capture generality. That is, instead of categorizing an object as **FridgeDrawer**, it would be much better to  simply categorize it as **Drawer**, because there are only few instances of the category **FridgeDrawer** in the environment but so many instances of particular drawers. As far as the complementarity of **Fridge** is concerned, this is ensured by the relationship **has(Fridge, Drawer)**. This is also frequently observed with packaged food items: since the overall visual configuration of packages of a category(Coffee) can drastically vary, what would be the most common sufficient features to most packages? Observations show that the most common sufficient features to most packages are neither the package's shape, nor its color, nor the words written on it but rather the image depicting the content of the package. This discovery merely reinforces the idea, that objects should be carefully categorized to enable an efficient machine learning.
 
 
-# 12. Relationships among Objects
+# 12. Relationships Among Objects
 
-Some information, that we would like to get from the scene such as the semantic location *(in the pot , on the table, ...)* of objects or the possible compositional  relationships *( has(Fridge,Door), has(Door, Handle) ...)* between them could also be computed by our deep convo-neural network, however a very big set of manually annotated images would be required. A manual annotation because those properties in contrast to the ones mentioned earlier cannot be dynamically estimated during the sampling of data from the simulated virtual world of the robot. In this thesis, we address the problem of relationships determination with a relation-specific network. As described in the introduction, this seperation of modules(networks) allows us to capture dynamic properties of the scene such as objects relationships with a loosely annotated set of images.
+Complex manipulation of objects in an environment does not merely require an understanding of separated objects in the scene, but also a good understanding of how those objects are related and interact to and with each other. In this thesis, we focus essentially on spatial relationships, which provide the manipulator with sufficiently great insights into the objects' space occupancy and how to navigate in the scene.  
+
+We distinguish almost 8 types of relations namely {left, rigth, over, under, on, front, behind,in} between any pair of distinct objects in the scene. For N objects, the number of pairs being approximatedly O(NxN) leads directly to O(8xNxN) relations which become quickly intractable at every stage(annotation, training, evaluation) of the system's pipeline. Based on many tricks such as the transivity rule,  We address this problem by defining an efficient format for spatial relationships description which significantly reduce the complexity to O(N) in average. The following picture demonstrates the completeness of the group of relation types {on, in, left, front}.
+
+![Relation Annotation](images/relationAnnotation.png "Relation Annotation")
+
+
+# 12. Some Provisional Results
+
+![Results](images/results.png "Results")
