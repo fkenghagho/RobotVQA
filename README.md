@@ -15,7 +15,8 @@ For achieving a good reasoning about scenes, both tasks including object descrip
 As output, the system returns a scene graph. A scene graph is a directed graph, whose nodes and edges respectively encode objects description and relationships among objects in the scene.  
 
 The contribution of this thesis is twofold:
-- **A single novel Model that massively describes visual scenes to be able to address general visual question answering tasks for robots during manipulation tasks**
+- **A single novel Model that massively describes visual scenes to be able to address general visual question answering tasks for robots during manipulation tasks**: given a scene, the model outputs each object's category, color, shape, material, pose, bounding box, mask, openability and spatial relationships to other objects.
+
 - **Demonstration of full machine learning transferability from virtual worlds to real worlds:**  the real world is virtualized, a big rich dataset is collected from the virtual world, the above model is trained on and tested in the real world.
 
 
