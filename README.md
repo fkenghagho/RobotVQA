@@ -7,12 +7,16 @@
    Robohow is the European Research Project that aims at enabling robots to competently perform human-scale daily manipulation activities such as cooking in an ordinary kitchen. However, to complete such tasks, robots should not only exhibit standard visual perception capabilities such as captioning, detection, localization or recognition, but also demonstrate some cognitive vision, in which all these capabilities including considerable reasoning are integrated together, so that semantically deep understanding of the unstructured and dynamic scene can be reached.
    
    In this thesis, we formulate the underlying perception problem of scene understanding as two subproblems:
-- **Objects description:** we design and train a deep convo-neural network to provide an end-to-end dense description of objects in the scene. Since context-independent annotation of objects in the scene can be done almost automatically, we can easily generate a big dataset and take advantage of deep learning.
-- **Relationships description:** we design and train a relational neural network for computing relationships among objects in the scene. Relationships essentially encode scale-invariant relative positioning (on-the, in-the, left-of, under-the, ...) as well as composition (has-a). The network takes as inputs the input image code(Referential) and the codes(Mask(local infos)+Pose) of two objects in the image, then outputs the most likely relationship between both objects. Note that this can be regarded as a soft or more semantic variant of the hard object pose estimation performed by the object descriptor mentioned above. The annotation of images with relationships is done hybridly ie. automatically along with the description of objects and fine-tuned manually with a specialized software.
+- **Objects description:** we design and train a deep convo-neural network to provide an end-to-end dense description of objects in the scene. 
+- **Relationships description:** we design and train a relational neural network for computing relationships among objects in the scene. Relationships essentially encode scale-invariant relative positioning (on-the, in-the, left-of, under-the, ...) as well as composition (has-a). The network takes as inputs the input image code(Referential) and the codes(Mask(local infos)+Pose) of two objects in the image, then outputs the most likely relationship between both objects. Note that this can be regarded as a soft or more semantic variant of the hard object pose estimation performed by the object descriptor mentioned above. 
 
 For achieving a good reasoning about scenes, both tasks including object description task's subtasks are integrated together into a single multi-task deep convo-neural network where training and inference take place end-to-end. 
 
 As output, the system returns a scene graph. A scene graph is a directed graph, whose nodes and edges respectively encode objects description and relationships among objects in the scene.  
+
+The contribution of this thesis is twofold:
+- **A single novel Model that massively describes visual scenes to be able to address general visual question answering tasks for robots during manipulation tasks**
+- **Demonstration of full machine learning transferability from virtual worlds to real worlds:**  the real world is virtualized, a big rich dataset is collected from the virtual world, the above model is trained on and tested in the real world.
 
 
 
@@ -135,7 +139,7 @@ In our virtual environment, we try to categorize objects as abstractly as possib
 
 Complex manipulation of objects in an environment does not merely require an understanding of separated objects in the scene, but also a good understanding of how those objects are related and interact to and with each other. In this thesis, we focus essentially on spatial relationships, which provide the manipulator with sufficiently great insights into the objects' space occupancy and how to navigate in the scene.  
 
-We distinguish almost 8 types of relations namely {left, rigth, over, under, on, front, behind,in} between any pair of distinct objects in the scene. For N objects, the number of pairs being approximatedly O(NxN) leads directly to O(8xNxN) relations which become quickly intractable at every stage(annotation, training, evaluation) of the system's pipeline. Based on many tricks such as the transivity rule,  We address this problem by defining an efficient format for spatial relationships description which significantly reduce the complexity to O(N) in average. The following picture demonstrates the completeness of the group of relation types {on, in, left, front}.
+We distinguish almost 8 types of relations namely {left, rigth, over, under, on, front, behind,in} between any pair of distinct objects in the scene. For N objects, the number of pairs being approximatedly O(NxN) leads directly to O(8xNxN) relations which become quickly intractable at every stage(annotation, training, evaluation) of the system's pipeline. Based on many tricks such as the transitivity rule,  We address this problem by defining an efficient format for spatial relationships description which significantly reduce the complexity to O(N) in average. The following picture demonstrates the completeness of the group of relation types {on, in, left, front}.
 
 ![Relation Annotation](images/relationAnnotation.png "Relation Annotation")
 
