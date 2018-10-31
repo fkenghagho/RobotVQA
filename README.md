@@ -150,7 +150,8 @@ We distinguish almost 8 types of relations namely {left, rigth, over, under, on,
 
 
 # 12. Some Provisional Results
-<video src="images/test1.mp4" width="1301" height="744" controls preload></video>
+
+![Results video](images/test1.mp4 "Results video")
 ![Results](images/results.png "Results")
 ![Results1](images/results1.png "Results1")
 ![Results2](images/results2.png "Results2")
