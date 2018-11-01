@@ -151,6 +151,8 @@ We distinguish almost 8 types of relations namely {left, rigth, over, under, on,
 
 # 12. Some Provisional Results
 
+To watch the results video, please click on ***the above image link and then on Raw View***.
+
 [![Results video](images/tests.png)](images/test1.mp4 "Results video")
 ![Results](images/results.png "Results")
 ![Results1](images/results1.png "Results1")
