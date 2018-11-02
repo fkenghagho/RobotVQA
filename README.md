@@ -1,6 +1,9 @@
 <p align="center">
+   
 # RobotVQA: Scene-graph-oriented Visual Scene Understanding for Complex Robot Manipulation Tasks based on Deep Learning Architectures and Virtual Reality
+
 <p>
+   
 # 0. Introduction 
 
 
