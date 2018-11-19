@@ -4,9 +4,9 @@
 </center>
    
 # 0. Introduction 
+ 
 
-
-   OpenEASE is the IAI-Bremen Research Project that aims at enabling robots to competently perform human-scale daily manipulation activities such as cooking in an ordinary kitchen. However, to complete such tasks, robots should not only exhibit standard visual perception capabilities such as captioning, detection, localization or recognition, but also demonstrate some cognitive vision, in which all these capabilities including considerable reasoning are integrated together, so that semantically deep understanding of the unstructured and dynamic scene can be reached.
+   OpenEASE is an initiative of the interdisciplinary research center at the University of Bremen that aims at enabling robots to competently perform human-scale daily manipulation activities such as cooking in an ordinary kitchen. However, to complete such tasks, robots should not only exhibit standard visual perception capabilities such as captioning, detection, localization or recognition, but also demonstrate some cognitive vision, in which all these capabilities including considerable reasoning are integrated together, so that semantically deep understanding of the unstructured and dynamic scene can be reached.
    
    In this thesis, we formulate the underlying perception problem of scene understanding as two subproblems:
 - **Objects description:** we design and train a deep convo-neural network to provide an end-to-end dense description of objects in the scene. 
