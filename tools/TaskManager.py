@@ -183,12 +183,12 @@ class ExtendedDatasetLoader(utils.Dataset):
                         sha=self.normalize(obj['objectShape'])
                         mat=self.normalize(obj['objectExternMaterial'])
                         opn=self.normalize(obj['objectOpenability'])
-                        ori=obj['objectLocalOrientation']
+                        ori=np.array(obj['objectLocalOrientation'],dtype='float32')
                         #normalize angles to principal ones
                         ori[0]=utils.principal_angle(ori[0])
                         ori[1]=utils.principal_angle(ori[1])
                         ori[2]=utils.principal_angle(ori[2])
-                        pos=obj['objectLocalPosition']
+                        pos=np.array(obj['objectLocalPosition'],dtype='float32')
                         opn=self.normalize(config.OBJECT_OPENABILITY_DICO[opn])
                         #check that objects are defined in the right bound
                         assert abs(pos[0])<=config.MAX_OBJECT_COORDINATE and \
@@ -206,7 +206,8 @@ class ExtendedDatasetLoader(utils.Dataset):
                                     for cord in obj['objectSegmentationPixels']:
                                             img[cord[0]][cord[1]]=1
                                     mask.append(img.copy())
-                                    pose.append(np.array(ori+pos,dtype='float32'))
+                                    #register poses with normalization
+                                    pose.append(np.array(list(ori)+list(utils.getPositionFromCamToImg(pos)),dtype='float32'))
                                     nbsuccess+=1
                 except Exception as e:
                                     nbfail+=1
@@ -296,7 +297,7 @@ class ExtendedRobotVQAConfig(RobotVQAConfig):
     #Max Object Coordinate in cm
     MAX_OBJECT_COORDINATE=DatasetClasses.MAX_OBJECT_COORDINATE
     
-    #Max CAMERA_CENTER_TO_PIXEL_DISTANCE in m
+    #Max CAMERA_CENTER_TO_PIXEL_DISTANCE in m for attaching useless(not in the system's focus: reduce scope of view) objects
     MAX_CAMERA_CENTER_TO_PIXEL_DISTANCE=DatasetClasses.MAX_CAMERA_CENTER_TO_PIXEL_DISTANCE
     
     # Learning rate and momentum
@@ -307,7 +308,7 @@ class ExtendedRobotVQAConfig(RobotVQAConfig):
     LEARNING_MOMENTUM = 0.9
 
     # Weight decay regularization
-    WEIGHT_DECAY = 0.00008
+    WEIGHT_DECAY = 0.0001
     
     # Use small images for faster training. Set the limits of the small side
     # the large side, and that determines the image shape.
@@ -350,7 +351,15 @@ class ExtendedRobotVQAConfig(RobotVQAConfig):
     USE_RPN_ROIS = True
     
     # Input image size:RGBD-Images
-    IMAGE_SHAPE = [IMAGE_MAX_DIM, IMAGE_MAX_DIM, DatasetClasses.IMAGE_MAX_CHANNEL]
+    IMAGE_SHAPE = [DatasetClasses.IMAGE_MAX_DIM, DatasetClasses.IMAGE_MAX_DIM, DatasetClasses.IMAGE_MAX_CHANNEL]
+    
+    #Object Poses' Boundaries  for normalizing objects'poses
+    #poses are normalized to [0,1[
+    MAX_OBJECT_POSES=DatasetClasses.MAX_OBJECT_POSES
+
+    #Object Orientation Normalization Factor. Angles belong to [0,2pi[
+    #Amgles are normalized to [0,1[
+    ANGLE_NORMALIZED_FACTOR=DatasetClasses.ANGLE_NORMALIZED_FACTOR
     
     # Image mean (RGB)
     MEAN_PIXEL = DatasetClasses.MEAN_PIXEL
@@ -358,7 +367,11 @@ class ExtendedRobotVQAConfig(RobotVQAConfig):
     # With depth information?
     WITH_DEPTH_INFORMATION=False 
     
-    #                           
+    #processor's names
+    CGPU1='/cpu:0'
+    CGPU0='/gpu:0'
+    
+    #Layers to exclude on very first training with a new weights file                          
     EXCLUDE=["robotvqa_class_logits0", "robotvqa_class_logits1","robotvqa_class_logits2","robotvqa_class_logits3","robotvqa_class_logits4",
                                         "robotvqa_class_logits5_1",'robotvqa_class_logits5_2','robotvqa_class_bn2','robotvqa_class_conv2',
                                         "mrcnn_bbox_fc","mrcnn_bbox","robotvqa_poses_fc", "robotvqa_poses",
@@ -424,7 +437,7 @@ class TaskManager(object):
         except Exception as e:
             print('Error-Could not visualize dataset: '+str(e))
     
-    def train(self,dataset,init_with='last'):
+    def train(self,dataset,init_with='coco'):
         #config= should be adequately set for training
         model = modellib.RobotVQA(mode="training", config=self.config,
                           model_dir=self.MODEL_DIR)
@@ -448,7 +461,7 @@ class TaskManager(object):
                           
         #first training phase: only dataset specific layers(error) are trained
         #the second dataset is dedicated to evaluation and consequenty needs to be set differently than the first one
-        model.train(dataset, dataset,learning_rate=self.config.LEARNING_RATE, epochs=self.config.NUM_EPOCHS,layers='5+')
+        model.train(dataset, dataset,learning_rate=self.config.LEARNING_RATE, epochs=self.config.NUM_EPOCHS,layers='heads')
         #second training phase:all layers are revisited for fine-tuning
         #the second dataset is dedicated to evaluation and consequenty needs to be set differently than the first one
         #model.train(dataset, dataset,learning_rate=self.config.LEARNING_RATE/10, epochs=1,layers='all')

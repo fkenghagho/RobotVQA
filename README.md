@@ -1,34 +1,46 @@
+<center>
+   
+# RobotVQA: Scene-graph-oriented Visual Scene Understanding for Complex Robot Manipulation Tasks based on Deep Learning Architectures and Virtual Reality
+</center>
+   
+# 0. Introduction 
+ 
 
-# RobotVQA
-
-# 1. Introduction 
-
-
-   Robohow is the European Research Project that aims at enabling robots to competently perform human-scale daily manipulation activities such as cooking in an ordinary kitchen. However, to complete such tasks, robots should not only exhibit standard visual perception capabilities such as captioning, detection, localization or recognition, but also demonstrate some cognitive vision, in which all these capabilities including considerable reasoning are integrated together, so that semantically deep understanding of the unstructured and dynamic scene can be reached.
+   EASE is the initiative of the interdisciplinary research center EASE at the University of Bremen that aims at enabling robots to competently perform human-scale daily manipulation activities such as cooking in an ordinary kitchen. However, to complete such tasks, robots should not only exhibit standard visual perception capabilities such as captioning, detection, localization or recognition, but also demonstrate some cognitive vision, in which all these capabilities including considerable reasoning are integrated together, so that semantically deep understanding of the unstructured and dynamic scene can be reached.
    
    In this thesis, we formulate the underlying perception problem of scene understanding as two subproblems:
-- **Objects description:** we design and train a deep convo-neural network to provide an end-to-end dense description of objects in the scene. Since context-independent annotation of objects in the scene can be done almost automatically, we can easily generate a big dataset and take advantage of deep learning.
-- **Relationships description:** we design and train a relational network for computing relationships among objects in the scene. Relationships essentially encode scale-invariant relative positioning (on-the, in-the, left-of, under-the, ...) as well as composition (has-a). The network takes as inputs the input image code(Referential) and the codes(Mask+Pose) of two objects in the image, then outputs the most likely relationship between both objects. Note that this can be regarded as a soft or more semantic variant of the hard object pose estimation performed by the object descriptor mentioned above. The separation of this module from the object description module enables modularity(changes in the one module does not affect the other module).
+- **Objects description:** we design and train a deep convo-neural network to provide an end-to-end dense description of objects in the scene. 
+- **Relationships description:** we design and train a relational neural network for computing relationships among objects in the scene. Relationships essentially encode scale-invariant relative positioning (on-the, in-the, left-of, under-the, ...) as well as composition (has-a). The network takes as inputs the input image code(Referential) and the codes(Mask(local infos)+Pose) of two objects in the image, then outputs the most likely relationship between both objects. Note that this can be regarded as a soft or more semantical variant of the hard object pose estimation performed by the object describer mentioned above. 
 
-As far as the system training and inference are concerned, both networks are separately however dependendly trained and inferences take place in pipeline. That is, the outputs of the object descriptor are partially duplicated and redirected to the inputs of the relational network.
+For achieving a good reasoning about scenes, both tasks including object description task's subtasks are integrated together into a single multi-task deep convo-neural network where training and inference take place end-to-end. 
+
 As output, the system returns a scene graph. A scene graph is a directed graph, whose nodes and edges respectively encode objects description and relationships among objects in the scene.  
+
+
+
+# 1. Contribution
+
+The contribution of this thesis is twofold:
+- **A single novel Model that massively describes visual scenes to be able to address general visual question answering tasks for robots during manipulation tasks**: given a scene, the model outputs each object's category, color, shape, material, pose, bounding box, mask, openability and spatial relationships to other objects.
+
+- **Demonstration of full machine learning transferability from virtual worlds to real worlds:**  the real world is virtualized, a big rich dataset is collected from the virtual world, the above model is trained on and tested in the real world.
 
 
 
 # 2. Typical Scene 
 
   
-   The following figure briefly illustrates the concept of scene graph:
+   The following figure briefly illustrates the concept of scene graph.The system operates in two modes: either with depth information or without.
 
-![Objects and Relationships description](images/scenegraphFinal.png "Objects and Relationships description")
+![Objects and Relationships description](images/scenegraphFinal2.png "Objects and Relationships description")
 
 
-# 3. Deep Convo-Neural and Relational Networks
+# 3. Multi-Task Deep Convo-Neural Network
 
 
    Our model works as follows:
 
-![Objects and Relationships description](images/architecture2.png "Model description")
+![Objects and Relationships description](images/architecture6.png "Model description")
 
 
 
@@ -43,10 +55,15 @@ As output, the system returns a scene graph. A scene graph is a directed graph, 
 
 # 6. Dataset 
 
-   The structure of the visual dataset can be found at [dataset's structure](https://github.com/fkenghagho/RobotVQA/blob/master/dataset/datasetStructure.txt). This file deeply specifies the structure of objects in the scene and the image and information types needed to learn the structure of objects. For building a huge dataset, we model the environment of the target robot in Unreal Engine4.16, which is a photorealistic game engine allowing therefore efficient transfer learning. Then,  we write a software for an end-to-end construction of the dataset starting from the automatic camera navigation in the virtual environment till the saving of scene images and annotations. To enable a training of the relational network, we augment the annotation of the collected images by loosely specifying relationships among objects. Our annotation software can be found at [dataset generator](https://github.com/fkenghagho/RobotVQA/blob/master/tools/generateDataset.py). An example of annotation can be downloaded from [example of annotation](https://github.com/fkenghagho/RobotVQA/blob/master/dataset/datasetExample.zip)(**zip file**).
+   The structure of the visual dataset can be found at [dataset's structure](https://github.com/fkenghagho/RobotVQA/blob/master/dataset/datasetStructure.txt). This file deeply specifies the structure of objects in the scene and the image and information types needed to learn the structure of objects. For building a huge dataset, we model the environment of the target robot in Unreal Engine4.16, which is a photorealistic game engine allowing therefore efficient transfer learning. Then,  we write a software for an end-to-end construction of the dataset starting from the automatic camera navigation in the virtual environment till the saving of scene images and annotations. To augment the annotation of the collected images with relationships, we built a flexibel software. The use of this software is definitively compulsory when dealing with some external images. Our annotation softwares can be found at [automatic dataset generator](https://github.com/fkenghagho/RobotVQA/blob/feature-background-in-object-integration/tools/generateDataset.py) and [manual dataset generator](https://github.com/fkenghagho/RobotVQA/blob/feature-background-in-object-integration/tools/relationAnnotator.py) . An example of annotation can be downloaded from [example of annotation](https://github.com/fkenghagho/RobotVQA/blob/feature-background-in-object-integration/dataset/datasetExample1.zip)(**zip file**).
+
+   The above picture shows how realistic the unreal scene can be:
    
+![Scene Realisticness](images/sceneRealisticness1.png "Scene Realisticness")   
+  
+  
    The following images depict the annotation of a typical scene from objects to relationships description:
-   
+
 ![Typical scene](images/dataset1.png "Typical scene")   
 
 ![Objects in the scene](images/objects.png "Objects in the scene")   
@@ -125,6 +142,21 @@ size or material.
 In our virtual environment, we try to categorize objects as abstractly as possible to capture generality. That is, instead of categorizing an object as **FridgeDrawer**, it would be much better to  simply categorize it as **Drawer**, because there are only few instances of the category **FridgeDrawer** in the environment but so many instances of particular drawers. As far as the complementarity of **Fridge** is concerned, this is ensured by the relationship **has(Fridge, Drawer)**. This is also frequently observed with packaged food items: since the overall visual configuration of packages of a category(Coffee) can drastically vary, what would be the most common sufficient features to most packages? Observations show that the most common sufficient features to most packages are neither the package's shape, nor its color, nor the words written on it but rather the image depicting the content of the package. This discovery merely reinforces the idea, that objects should be carefully categorized to enable an efficient machine learning.
 
 
-# 12. Relationships among Objects
+# 12. Relationships Among Objects
 
-Some information, that we would like to get from the scene such as the semantic location *(in the pot , on the table, ...)* of objects or the possible compositional  relationships *( has(Fridge,Door), has(Door, Handle) ...)* between them could also be computed by our deep convo-neural network, however a very big set of manually annotated images would be required. A manual annotation because those properties in contrast to the ones mentioned earlier cannot be dynamically estimated during the sampling of data from the simulated virtual world of the robot. In this thesis, we address the problem of relationships determination with a relation-specific network. As described in the introduction, this seperation of modules(networks) allows us to capture dynamic properties of the scene such as objects relationships with a loosely annotated set of images.
+Complex manipulation of objects in an environment does not merely require an understanding of separated objects in the scene, but also a good understanding of how those objects are related and interact to and with each other. In this thesis, we focus essentially on spatial relationships, which provide the manipulator with sufficiently great insights into the objects' space occupancy and how to navigate in the scene.  
+
+We distinguish almost 8 types of relations namely {left, rigth, over, under, on, front, behind,in} between any pair of distinct objects in the scene. For N objects, the number of pairs being approximatedly O(NxN) leads directly to O(8xNxN) relations which become quickly intractable at every stage(annotation, training, evaluation) of the system's pipeline. Based on many tricks such as the transitivity rule,  We address this problem by defining an efficient format for spatial relationships description which significantly reduce the complexity to O(N) in average. The following picture demonstrates the completeness of the group of relation types {on, in, left, front}.
+
+![Relation Annotation](images/relationAnnotation.png "Relation Annotation")
+
+
+# 12. Some Provisional Results
+
+To watch the results video, please click on ***the following image link and then on View Raw***.
+
+[![Results video](images/tests.png)](images/test1.mp4 "Results video")
+![Results](images/results.png "Results")
+![Results1](images/results1.png "Results1")
+![Results2](images/results2.png "Results2")
+![Results3](images/results3.png "Results3")

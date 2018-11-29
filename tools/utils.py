@@ -6,7 +6,7 @@ Copyright (c) 2017 Matterport, Inc.
 Licensed under the MIT License (see LICENSE for details)
 Written by Waleed Abdulla
 """
-
+from DatasetClasses import DatasetClasses
 import sys
 import os
 import math
@@ -570,6 +570,23 @@ def resize_mask(mask, scale, padding):
     mask = scipy.ndimage.zoom(mask, zoom=[scale, scale, 1], order=0)
     mask = np.pad(mask, padding, mode='constant', constant_values=0)
     return mask
+    
+def resize_poses(poses, scale, padding):
+    """Resizes a poses using the given scale and padding.
+    Typically, you get the scale and padding from resize_image() to
+    ensure both, the image and the poses(in image coordinates) are resized consistently.
+
+    scale: mask scaling factor
+    padding: Padding to add to the postions in the form
+            [(top, bottom), (left, right), (0, 0)]
+    """
+    
+    poses[:,3:5]=poses[:,3:5]*scale
+    poses[:,3] = poses[:,3]+padding[1][0]#the x coordinate is only affected by the left padding
+    poses[:,4] = poses[:,4]+padding[0][0]#the y coordinate is only affected by the top padding
+    #the z coordinate is kept unchanged
+    return poses
+
 
 
 def minimize_mask(bbox, mask, mini_shape):
@@ -843,14 +860,25 @@ def batch_slice(inputs, graph_fn, batch_size, names=None,parallel_processing=Fal
 
     return result
 
-#principal measure in radians of  an  angle:
+
+def getPositionFromCamToImg(objPosition):
+    """Convert objPosition from camera system(cm) to image system(pixels)
+    """
+    
+    objPosition=np.array([objPosition[1],objPosition[2],objPosition[0]],dtype='float32')/DatasetClasses.PIXEL_SIZE
+    objPosition=np.dot(DatasetClasses.CAMERA_INTRINSIC_MATRIX,objPosition)
+    objPosition[:2]/=objPosition[2]
+    objPosition[1]=2*DatasetClasses.CAMERA_INTRINSIC_MATRIX[1,2]-objPosition[1]
+    return objPosition
+
+#principal measure in radians of  an  angle[0,2pi[:
 def principal_angle(angle):
     angle=np.pi*angle/180.
     if angle<0.:
         inc=np.pi*2
     else:
         inc=-np.pi*2
-    while(not(angle<=np.pi and angle>-np.pi)):
+    while(not(angle<2*np.pi and angle>=0)):
         angle+=inc
     return angle
 
