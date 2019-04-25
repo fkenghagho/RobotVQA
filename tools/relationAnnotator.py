@@ -1,3 +1,10 @@
+"""
+#@Author:   Frankln Kenghagho
+#@Date:     04.04.2019
+#@Project:  RobotVA
+"""
+
+
 import numpy as np
 import Tkinter as t
 from Tkinter import *
@@ -9,6 +16,9 @@ import json
 
 class ObjectRelationAnnotator(object):
 	def __init__(self,datasetGenerator):
+
+		"""Spatial Relation Annotator
+		"""
 		
 		#globale Variablen##########################################
 		self.listRelation=[]

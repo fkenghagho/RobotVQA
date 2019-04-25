@@ -1,0 +1,37 @@
+Master thesis: RobotVQA-Mask-RCNN
+
+1-Cover Page
+2-Thanks to Uni and Family
+3-Abstract
+4-Chap1: introduction
+
+Definition of the problem:
+
+The problem is two-fold:
+
+* Scene understanding for robotic manipulation tasks 
+	+ Contributions
+	       - Full Fix-Format-Graph-based Scene Description within a single Deep-Learning Model, which generalizes VQA
+                 It is an extension of Mask-RCNN(Category, Mask, Bounding Box):
+			* Integration of Additional submodules for:
+				- Material
+				- Color
+				- Shape
+				- Openability
+				- 6-D pose
+				- Spatial Relationship
+				- 7-Channel Input(Color, Normal and Depth Maps)	
+				
+				
+
+* Demonstration of high applicability of photorealistic virtual worlds in training Robot vision systems
+	+ Contributions:
+               - Virtual world
+	       - High-Entropy Synthetic dataset 
+
+5- Chap2: Dataset
+6- Chap3: RobotVQA
+7- Chap4: Experimentation
+8- Chap5: Conclusion & Recommendations
+9- Annexes
+10- Litterature.

@@ -1,4 +1,11 @@
 """
+#@Author:   Frankln Kenghagho
+#@Date:     04.04.2019
+#@Project:  RobotVA
+#Extends the work below Mask R-CNN
+"""
+
+"""
 Mask R-CNN
 Common utility functions and classes.
 
@@ -6,6 +13,7 @@ Copyright (c) 2017 Matterport, Inc.
 Licensed under the MIT License (see LICENSE for details)
 Written by Waleed Abdulla
 """
+
 from DatasetClasses import DatasetClasses
 import sys
 import os
@@ -18,19 +26,82 @@ import skimage.color
 import skimage.io
 import urllib
 import shutil
+import pickle
 import cv2
 # URL from which to download the latest COCO trained weights
 COCO_MODEL_URL = "https://github.com/matterport/Mask_RCNN/releases/download/v2.0/mask_rcnn_coco.h5"
+
+#############################################################
+#Data augmentation function
+
+
+def data_augmentation(image,aug_img_probs=0.93,aug_pix_probs=0.5,pixel_shift=2, image_shift=2):
+    try:
+	    final_image=None
+	    final_image=image.copy()
+	    rows,cols,depth=image.shape
+	    #decide whether to augment the image
+	    if((int(os.urandom(5).encode('hex'),16)%100)/100.>=aug_img_probs):
+		    for i in range(rows):
+			for j in range(cols):
+			    for k in range(depth):
+				    #choose whether to shift the pixel and how if
+				    if((int(os.urandom(5).encode('hex'),16)%100)/100.>=aug_pix_probs):
+					#choose whether to shift down or up the pixel and how if
+					if(int(os.urandom(5).encode('hex'),16)%2==0):
+					   val=np.minimum(255,image[i][j][k]+(int(os.urandom(5).encode('hex'),16)%pixel_shift))
+					else:
+					   val=np.maximum(0,image[i][j][k]-(int(os.urandom(5).encode('hex'),16)%pixel_shift))
+					image[i][j][k]+=val
+                    for i in range(rows):
+			    #choose whether to shift the rows and how if
+			    if((int(os.urandom(5).encode('hex'),16)%100)/100.>=aug_pix_probs):
+				#choose whether to shift left or right the row and how if
+				if(int(os.urandom(5).encode('hex'),16)%2==0):
+				   image[i]=np.roll(image[i],int(os.urandom(5).encode('hex'),16)%image_shift,axis=0)
+				else:
+				   image[i]=np.roll(image[i],-int(os.urandom(5).encode('hex'),16)%image_shift,axis=0)
+
+                    for j in range(cols):
+			    #choose whether to shift the cols and how if
+			    if((int(os.urandom(5).encode('hex'),16)%100)/100.>=aug_pix_probs):
+				#choose whether to shift left or right the cols and how if
+				if(int(os.urandom(5).encode('hex'),16)%2==0):
+				   image[:,j,:]=np.roll(image[:,j,:],int(os.urandom(5).encode('hex'),16)%image_shift,axis=0)
+				else:
+				   image[:,j,:]=np.roll(image[:,j,:],-int(os.urandom(5).encode('hex'),16)%image_shift,axis=0)
+	    print('Augmentation of the image/inputs successful!!!')
+	    return image
+    except Exception,e:
+	   print('Failed to augment the image/inputs: '+str(e))
+	   if final_image==None:
+		return image
+	   else:
+                return final_image
+
+
+
+#############################################################
+#Pickle load function
+#############################################################
+
+def loadFile(filename='../validation.data'):
+	with open(filename,'rb') as f:
+		res=pickle.load(f)
+		f.close()
+	print(res)
+	return res
 
 #############################################################
 #Random functions
 #############################################################
 def randomIndex(N):
     assert N>0
-    sum=0
+    summ=0
     for i in range(N):
-        sum+=int(os.urandom(5).encode('hex'),16)
-    return sum%N
+        summ+=int(os.urandom(5).encode('hex'),16)
+        summ=summ%N
+    return summ%N
 ############################################################
 #  Bounding Boxes
 ############################################################
@@ -294,7 +365,8 @@ def normalSurface(depthImg,max_distance,depth="float32"):
             depthImg=depthImg/max_distance
     else:
         depthImg=np.array(cv2.imread(depthImg)[:,:,0],dtype="float32")
-        depthImg=depthImg/depthImg.max()
+        depthImg=depthImg/255.0
+    depthImage=depthImg*255.0
     depthImg=depthImg-1.0
     #sobel x
     sobelx=cv2.Sobel(depthImg,cv2.CV_32F,1,0,ksize=15)
@@ -310,8 +382,7 @@ def normalSurface(depthImg,max_distance,depth="float32"):
             normalImg[y][x]=normalImg[y][x]/np.linalg.norm(normalImg[y][x])
             normalImg[y][x]=(0.5*normalImg[y][x]+0.5)*255.0
     normalImg=np.array(normalImg,dtype='uint8')    
-    return cv2.cvtColor(normalImg,cv2.COLOR_BGR2RGB)
-
+    return cv2.cvtColor(normalImg,cv2.COLOR_BGR2RGB),depthImage
 
 def load_image(litImg,depthImg,max_distance,depth="float32"):
         # Load image
@@ -320,13 +391,23 @@ def load_image(litImg,depthImg,max_distance,depth="float32"):
         if image.ndim != 3:
             image =np.array(skimage.color.gray2rgb(image),dtype='float32')
         try:
-            depthImage=normalSurface(depthImg,max_distance,depth=depth)
+            depthImage1,depthImage2=normalSurface(depthImg,max_distance,depth=depth)
+	    shapes=list(image.shape)[:2]
+	    shapes.append(4)
+            depthImage=np.zeros(shapes,dtype='float32')
+	    depthImage[:,:,:3]=depthImage1
+	    depthImage[:,:,3]=depthImage2
+	    print('Load depth successfully!')
         except Exception as e:
-            depthImage=np.zeros(image.shape,dtype='float32')
+	    shapes=list(image.shape)[:2]
+	    shapes.append(4)
+	    print('Failed to load depth:'+str(e))
+            depthImage=np.zeros(shapes,dtype='float32')
         shape=list(image.shape)
-        shape[len(shape)-1]=shape[len(shape)-1]+3
+        shape[len(shape)-1]=shape[len(shape)-1]+4
         finalImage=np.zeros(shape,dtype='float32')
-        finalImage[:,:,:3]=image
+        #finalImage[:,:,:3]=data_augmentation(image)
+	finalImage[:,:,:3]=image
         finalImage[:,:,3:]=depthImage
         return finalImage
 
@@ -541,8 +622,8 @@ def resize_image(image, min_dim=None, max_dim=None, padding=False):
             scale = max_dim / image_max
     # Resize image and mask
     if scale != 1:
-        image = scipy.misc.imresize(
-            image, (round(h * scale), round(w * scale)))
+        image = cv2.resize(
+            image, (int(round(w * scale)), int(round(h * scale))))
     # Need padding?
     if padding:
         # Get new height and width
@@ -878,8 +959,12 @@ def principal_angle(angle):
         inc=np.pi*2
     else:
         inc=-np.pi*2
-    while(not(angle<2*np.pi and angle>=0)):
+    if(abs(angle)<DatasetClasses.OBJECT_ORIENTATION_PRECISION):
+	angle=0.0
+    while(not(angle<2*np.pi and angle>=0.)):
         angle+=inc
+	if(abs(angle)<DatasetClasses.OBJECT_ORIENTATION_PRECISION):
+		angle=0.0
     return angle
 
 def download_trained_weights(coco_model_path, verbose=1):
