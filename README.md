@@ -25,6 +25,8 @@ The contribution of this thesis is twofold:
 
 - **Demonstration of full machine learning transferability from virtual worlds to real worlds:**  the real world is virtualized, a big rich dataset is collected from the virtual world, the above model is trained on and tested in the real world.
 
+The pdf-version of the thesis can be found at [thesis.pdf](https://github.com/fkenghagho/RobotVQA/blob/feature-background-in-object-integration/Literature/thesis.pdf)
+
 
 
 # 2. Typical Scene 
@@ -234,15 +236,15 @@ To train RobotVQA: optimize parameters on a dataset.
 
 Note: 
 
-* make sure that in the function call train(...) within launcher.py, that the op_type variable is set to training.*
+- *make sure that in the function call train(...) within launcher.py, that the op_type variable is set to training.*
 
-* However, Since the proper data (images) are so big and lie on the IAI Bremen's server, a real training would require to download them.*
+- *However, Since the proper data (images) are so big and lie on the IAI Bremen's server, a real training would require to download them.*
 
-* While saving the downloaded datasets on your machine, the path should be preserved: if /mnt/prog/dataset is the path on the server, then it should also be the case on your machine.
+- *While saving the downloaded datasets on your machine, the path should be preserved: if /mnt/prog/dataset is the path on the server, then it should also be the case on your machine.*
 
-* The first two parameter of train(...) are respectively the training dataset (train_set) and the validation dataset (val_set)*
+- *The first two parameter of train(...) are respectively the training dataset (train_set) and the validation dataset (val_set)*
 	  
-  * RobotVQA's parameter files (.h5) are stored in the subfolders logs (RGBD mode) and logs1 (RGB mode). They are not uploaded yet *
+- *RobotVQA's parameter files (.h5) are stored in the subfolders logs (RGBD mode) and logs1 (RGB mode). They are not uploaded yet*
 
 
 
@@ -258,15 +260,15 @@ To validate RobotVQA: test the system on a dataset and return the performance me
 
 Note: 
 
-- * make sure that in the function call train(...) within launcher.py, that the op_type variable is set to 'training'.
+- *make sure that in the function call train(...) within launcher.py, that the op_type variable is set to 'training'.*
 
-- * However, Since the proper data (images) are so big and lie on the IAI Bremen's server, a real training would require to download them.
+- *However, Since the proper data (images) are so big and lie on the IAI Bremen's server, a real training would require to download them.*
 
-- * While saving the downloaded datasets on your machine, the path should be preserved: if /mnt/prog/dataset is the path on the server, then it should also be the case on your machine.
+- *While saving the downloaded datasets on your machine, the path should be preserved: if /mnt/prog/dataset is the path on the server, then it should also be the case on your machine.*
 
-- * The first two parameter of train(...) are identical (val_set), (val_set).
+- *The first two parameter of train(...) are identical (val_set), (val_set).*
 	  
-- * RobotVQA's parameter files (.h5) are stored in the subfolders logs (RGBD mode) and logs1 (RGB mode). They are not uploaded yet 
+- *RobotVQA's parameter files (.h5) are stored in the subfolders logs (RGBD mode) and logs1 (RGB mode). They are not uploaded yet* 
 
 3. At the end of the evaluation, the results are appended to a binary file named validation.data and located in the folder RobotVQA
 
