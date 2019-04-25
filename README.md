@@ -48,7 +48,7 @@ The contribution of this thesis is twofold:
 
    We make use of the following Frameworks:
 
-- **PythonLibs, Unreal Engine and UnrealCV:** to build the dataset 
+- **PythonLibs, LabelMe, Unreal Engine and UnrealCV:** to build the dataset 
 - **PythonLibs, TensorFlow and Caffe:** to build the deep convo-neural and relational networks, train them and make inferences
 
 
@@ -180,27 +180,27 @@ To watch the results video, please click on ***the following image link and then
 
 	3.2. Install cuDNN 7.0.4: found at https://developer.nvidia.com/rdp/cudnn-archive
 
-3. Install tensorflow 1.12.0 or 1.13.1: found at https://www.tensorflow.org/install/source
+4. Install tensorflow 1.12.0 or 1.13.1: found at https://www.tensorflow.org/install/source
 
-4. Using the pip utilitty, install the following python package from the command-line terminal:
+5. Using the pip utilitty, install the following python package from the command-line terminal:
 
-	4.1. pip install numpy==1.14.3
+	5.1. pip install numpy==1.14.3
 
-	4.2. pip install scipy==1.1.0
+	5.2. pip install scipy==1.1.0
 
-	4.3. pip install keras==2.1.6
+	5.3. pip install keras==2.1.6
 
-	4.4. pip install h5py==2.7.1
+	5.4. pip install h5py==2.7.1
 
-	4.5. pip install pillow==3.1.2
+	5.5. pip install pillow==3.1.2
 
-	4.6. pip install unrealcv==0.3.10
+	5.6. pip install unrealcv==0.3.10
 
-	4.7. pip install opencv-python==4.0.0.21
+	5.7. pip install opencv-python==4.0.0.21
 
-	4.8. pip install matplotlib==1.5.1
+	5.8. pip install matplotlib==1.5.1
 
-	4.9. pip install scikit-image==0.13.1
+	5.9. pip install scikit-image==0.13.1
 
 
 
@@ -218,7 +218,7 @@ To test RobotVQA: inference on images in folder  testsamples.
 
 4. The results will be graphically displayed and subsequently saved into the subfolder result of the folder RobotVQA
 
-Note:  * RobotVQA's parameter files (.h5) are stored in the subfolders logs (RGBD mode) and logs1 (RGB mode). They are not uploaded yet 
+Note:  * RobotVQA's parameter files (.h5) are stored in the subfolders logs (RGBD mode) and logs1 (RGB mode). They are not uploaded yet *
 
 
 
@@ -232,15 +232,17 @@ To train RobotVQA: optimize parameters on a dataset.
 
 2. Run the file launcher.py. 
 
-Note: * make sure that in the function call train(...) within launcher.py, that the op_type variable is set to 'training'.
+Note: 
 
-      * However, Since the proper data (images) are so big and lie on the IAI Bremen's server, a real training would require to download them.
+* make sure that in the function call train(...) within launcher.py, that the op_type variable is set to training.*
 
-      * While saving the downloaded datasets on your machine, the path should be preserved: if /mnt/prog/dataset is the path on the server, 		then it should also be the case on your machine.
+* However, Since the proper data (images) are so big and lie on the IAI Bremen's server, a real training would require to download them.*
 
-      * The first two parameter of train(...) are respectively the training dataset (train_set) and the validation dataset (val_set)
+* While saving the downloaded datasets on your machine, the path should be preserved: if /mnt/prog/dataset is the path on the server, then it should also be the case on your machine.
+
+* The first two parameter of train(...) are respectively the training dataset (train_set) and the validation dataset (val_set)*
 	  
-	  * RobotVQA's parameter files (.h5) are stored in the subfolders logs (RGBD mode) and logs1 (RGB mode). They are not uploaded yet 
+  * RobotVQA's parameter files (.h5) are stored in the subfolders logs (RGBD mode) and logs1 (RGB mode). They are not uploaded yet *
 
 
 
@@ -254,15 +256,17 @@ To validate RobotVQA: test the system on a dataset and return the performance me
 
 2. Run the file launcher.
 
-Note: * make sure that in the function call train(...) within launcher.py, that the op_type variable is set to 'training'.
+Note: 
 
-      * However, Since the proper data (images) are so big and lie on the IAI Bremen's server, a real training would require to download them.
+- * make sure that in the function call train(...) within launcher.py, that the op_type variable is set to 'training'.
 
-      * While saving the downloaded datasets on your machine, the path should be preserved: if /mnt/prog/dataset is the path on the server, 		then it should also be the case on your machine.
+- * However, Since the proper data (images) are so big and lie on the IAI Bremen's server, a real training would require to download them.
 
-      * The first two parameter of train(...) are identical (val_set), (val_set).
+- * While saving the downloaded datasets on your machine, the path should be preserved: if /mnt/prog/dataset is the path on the server, then it should also be the case on your machine.
+
+- * The first two parameter of train(...) are identical (val_set), (val_set).
 	  
-	  * RobotVQA's parameter files (.h5) are stored in the subfolders logs (RGBD mode) and logs1 (RGB mode). They are not uploaded yet 
+- * RobotVQA's parameter files (.h5) are stored in the subfolders logs (RGBD mode) and logs1 (RGB mode). They are not uploaded yet 
 
 3. At the end of the evaluation, the results are appended to a binary file named validation.data and located in the folder RobotVQA
 
