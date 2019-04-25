@@ -3,7 +3,7 @@
 # RobotVQA: Scene-graph-oriented Visual Scene Understanding for Complex Robot Manipulation Tasks based on Deep Learning Architectures and Virtual Reality
 </center>
    
-# 0. Introduction 
+# Introduction 
  
 
    EASE is the initiative of the interdisciplinary research center EASE at the University of Bremen that aims at enabling robots to competently perform human-scale daily manipulation activities such as cooking in an ordinary kitchen. However, to complete such tasks, robots should not only exhibit standard visual perception capabilities such as captioning, detection, localization or recognition, but also demonstrate some cognitive vision, in which all these capabilities including considerable reasoning are integrated together, so that semantically deep understanding of the unstructured and dynamic scene can be reached.
@@ -25,6 +25,8 @@ The contribution of this thesis is twofold:
 
 - **Demonstration of full machine learning transferability from virtual worlds to real worlds:**  the real world is virtualized, a big rich dataset is collected from the virtual world, the above model is trained on and tested in the real world.
 
+The pdf-version of the thesis can be found at [thesis.pdf](Literature/thesis.pdf)
+
 
 
 # 2. Typical Scene 
@@ -38,7 +40,7 @@ The contribution of this thesis is twofold:
 # 3. Multi-Task Deep Convo-Neural Network
 
 
-   Our model works as follows:
+   Our model, from a broader view,  works as follows:
 
 ![Objects and Relationships description](images/architecture6.png "Model description")
 
@@ -48,14 +50,14 @@ The contribution of this thesis is twofold:
 
    We make use of the following Frameworks:
 
-- **PythonLibs, Unreal Engine and UnrealCV:** to build the dataset 
+- **PythonLibs, LabelMe, Unreal Engine and UnrealCV:** to build the dataset 
 - **PythonLibs, TensorFlow and Caffe:** to build the deep convo-neural and relational networks, train them and make inferences
 
 
 
 # 6. Dataset 
 
-   The structure of the visual dataset can be found at [dataset's structure](https://github.com/fkenghagho/RobotVQA/blob/master/dataset/datasetStructure.txt). This file deeply specifies the structure of objects in the scene and the image and information types needed to learn the structure of objects. For building a huge dataset, we model the environment of the target robot in Unreal Engine4.16, which is a photorealistic game engine allowing therefore efficient transfer learning. Then,  we write a software for an end-to-end construction of the dataset starting from the automatic camera navigation in the virtual environment till the saving of scene images and annotations. To augment the annotation of the collected images with relationships, we built a flexibel software. The use of this software is definitively compulsory when dealing with some external images. Our annotation softwares can be found at [automatic dataset generator](https://github.com/fkenghagho/RobotVQA/blob/feature-background-in-object-integration/tools/generateDataset.py) and [manual dataset generator](https://github.com/fkenghagho/RobotVQA/blob/feature-background-in-object-integration/tools/relationAnnotator.py) . An example of annotation can be downloaded from [example of annotation](https://github.com/fkenghagho/RobotVQA/blob/feature-background-in-object-integration/dataset/datasetExample1.zip)(**zip file**).
+   The structure of the visual dataset can be found at [dataset's structure](dataset/datasetStructure.txt). This file deeply specifies the structure of objects in the scene and the image and information types needed to learn the structure of objects. For building a huge dataset, we model the environment of the target robot in Unreal Engine4.16, which is a photorealistic game engine allowing therefore efficient transfer learning. Then,  we write a software for an end-to-end construction of the dataset starting from the automatic camera navigation in the virtual environment till the saving of scene images and annotations. To augment the annotation of the collected images with relationships, we built a flexible software. The use of this software is definitively compulsory when dealing with some external images. Our annotation softwares can be found at [automatic dataset generator](tools/generateDataset.py) and [manual dataset generator](tools/relationAnnotator.py) . An example of annotation can be downloaded from [example of annotation](dataset/datasetExample1.zip)(**zip file**).
 
    The above picture shows how realistic the unreal scene can be:
    
@@ -180,27 +182,27 @@ To watch the results video, please click on ***the following image link and then
 
 	3.2. Install cuDNN 7.0.4: found at https://developer.nvidia.com/rdp/cudnn-archive
 
-3. Install tensorflow 1.12.0 or 1.13.1: found at https://www.tensorflow.org/install/source
+4. Install tensorflow 1.12.0 or 1.13.1: found at https://www.tensorflow.org/install/source
 
-4. Using the pip utilitty, install the following python package from the command-line terminal:
+5. Using the pip utilitty, install the following python package from the command-line terminal:
 
-	4.1. pip install numpy==1.14.3
+	5.1. pip install numpy==1.14.3
 
-	4.2. pip install scipy==1.1.0
+	5.2. pip install scipy==1.1.0
 
-	4.3. pip install keras==2.1.6
+	5.3. pip install keras==2.1.6
 
-	4.4. pip install h5py==2.7.1
+	5.4. pip install h5py==2.7.1
 
-	4.5. pip install pillow==3.1.2
+	5.5. pip install pillow==3.1.2
 
-	4.6. pip install unrealcv==0.3.10
+	5.6. pip install unrealcv==0.3.10
 
-	4.7. pip install opencv-python==4.0.0.21
+	5.7. pip install opencv-python==4.0.0.21
 
-	4.8. pip install matplotlib==1.5.1
+	5.8. pip install matplotlib==1.5.1
 
-	4.9. pip install scikit-image==0.13.1
+	5.9. pip install scikit-image==0.13.1
 
 
 
@@ -218,7 +220,7 @@ To test RobotVQA: inference on images in folder  testsamples.
 
 4. The results will be graphically displayed and subsequently saved into the subfolder result of the folder RobotVQA
 
-Note:  * RobotVQA's parameter files (.h5) are stored in the subfolders logs (RGBD mode) and logs1 (RGB mode). They are not uploaded yet 
+Note:  * RobotVQA's parameter files (.h5) are stored in the subfolders logs (RGBD mode) and logs1 (RGB mode). They are not uploaded yet *
 
 
 
@@ -232,15 +234,17 @@ To train RobotVQA: optimize parameters on a dataset.
 
 2. Run the file launcher.py. 
 
-Note: * make sure that in the function call train(...) within launcher.py, that the op_type variable is set to 'training'.
+Note: 
 
-      * However, Since the proper data (images) are so big and lie on the IAI Bremen's server, a real training would require to download them.
+- *make sure that in the function call train(...) within launcher.py, that the op_type variable is set to training.*
 
-      * While saving the downloaded datasets on your machine, the path should be preserved: if /mnt/prog/dataset is the path on the server, 		then it should also be the case on your machine.
+- *However, Since the proper data (images) are so big and lie on the IAI Bremen's server, a real training would require to download them.*
 
-      * The first two parameter of train(...) are respectively the training dataset (train_set) and the validation dataset (val_set)
+- *While saving the downloaded datasets on your machine, the path should be preserved: if /mnt/prog/dataset is the path on the server, then it should also be the case on your machine.*
+
+- *The first two parameter of train(...) are respectively the training dataset (train_set) and the validation dataset (val_set)*
 	  
-	  * RobotVQA's parameter files (.h5) are stored in the subfolders logs (RGBD mode) and logs1 (RGB mode). They are not uploaded yet 
+- *RobotVQA's parameter files (.h5) are stored in the subfolders logs (RGBD mode) and logs1 (RGB mode). They are not uploaded yet*
 
 
 
@@ -254,15 +258,17 @@ To validate RobotVQA: test the system on a dataset and return the performance me
 
 2. Run the file launcher.
 
-Note: * make sure that in the function call train(...) within launcher.py, that the op_type variable is set to 'training'.
+Note: 
 
-      * However, Since the proper data (images) are so big and lie on the IAI Bremen's server, a real training would require to download them.
+- *make sure that in the function call train(...) within launcher.py, that the op_type variable is set to 'training'.*
 
-      * While saving the downloaded datasets on your machine, the path should be preserved: if /mnt/prog/dataset is the path on the server, 		then it should also be the case on your machine.
+- *However, Since the proper data (images) are so big and lie on the IAI Bremen's server, a real training would require to download them.*
 
-      * The first two parameter of train(...) are identical (val_set), (val_set).
+- *While saving the downloaded datasets on your machine, the path should be preserved: if /mnt/prog/dataset is the path on the server, then it should also be the case on your machine.*
+
+- *The first two parameter of train(...) are identical (val_set), (val_set).*
 	  
-	  * RobotVQA's parameter files (.h5) are stored in the subfolders logs (RGBD mode) and logs1 (RGB mode). They are not uploaded yet 
+- *RobotVQA's parameter files (.h5) are stored in the subfolders logs (RGBD mode) and logs1 (RGB mode). They are not uploaded yet* 
 
 3. At the end of the evaluation, the results are appended to a binary file named validation.data and located in the folder RobotVQA
 
