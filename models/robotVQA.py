@@ -1,12 +1,21 @@
 """
-ROBOT VQA
-The main ROBOT VQA model implemenetation.
+#@Author:   Frankln Kenghagho
+#@Date:     04.04.2019
+#@Project:  RobotVA
+#Extends the above work Mask R-CNN
+"""
+
+"""
+Mask R-CNN
+Common utility functions and classes.
 
 Copyright (c) 2017 Matterport, Inc.
 Licensed under the MIT License (see LICENSE for details)
 Written by Waleed Abdulla
 """
 
+import time
+import pickle
 import os
 import sys
 import glob
@@ -17,6 +26,7 @@ import itertools
 import json
 import re
 import logging
+import threading
 from collections import OrderedDict
 import numpy as np
 import scipy.misc
@@ -27,16 +37,28 @@ import keras.layers as KL
 import keras.initializers as KI
 import keras.engine as KE
 import keras.models as KM
+import keras.utils as KU
 from keras.utils.generic_utils import get_custom_objects
 
 sys.path.append('../tools')
 import utils
 import TaskManager as tkm
 
+
+
 # Requires TensorFlow 1.3+ and Keras 2.0.8+.
 from distutils.version import LooseVersion
 assert LooseVersion(tf.__version__) >= LooseVersion("1.3")
 assert LooseVersion(keras.__version__) >= LooseVersion('2.0.8')
+
+
+
+
+		
+			
+		
+		
+	
 
 
 ############################################################
@@ -98,17 +120,17 @@ def identity_block(input_tensor, kernel_size, filters, stage, block,
 
     x = KL.Conv2D(nb_filter1, (1, 1), name=conv_name_base + '2a',
                   use_bias=use_bias)(input_tensor)
-    x = BatchNorm(axis=3, name=bn_name_base + '2a')(x)
+    #x = BatchNorm(axis=3, name=bn_name_base + '2a')(x)
     x = KL.Activation('relu')(x)
 
     x = KL.Conv2D(nb_filter2, (kernel_size, kernel_size), padding='same',
                   name=conv_name_base + '2b', use_bias=use_bias)(x)
-    x = BatchNorm(axis=3, name=bn_name_base + '2b')(x)
+    #x = BatchNorm(axis=3, name=bn_name_base + '2b')(x)
     x = KL.Activation('relu')(x)
 
     x = KL.Conv2D(nb_filter3, (1, 1), name=conv_name_base + '2c',
                   use_bias=use_bias)(x)
-    x = BatchNorm(axis=3, name=bn_name_base + '2c')(x)
+    #x = BatchNorm(axis=3, name=bn_name_base + '2c')(x)
 
     x = KL.Add()([x, input_tensor])
     x = KL.Activation('relu', name='res' + str(stage) + block + '_out')(x)
@@ -133,21 +155,21 @@ def conv_block(input_tensor, kernel_size, filters, stage, block,
 
     x = KL.Conv2D(nb_filter1, (1, 1), strides=strides,
                   name=conv_name_base + '2a', use_bias=use_bias)(input_tensor)
-    x = BatchNorm(axis=3, name=bn_name_base + '2a')(x)
+    #x = BatchNorm(axis=3, name=bn_name_base + '2a')(x)
     x = KL.Activation('relu')(x)
 
     x = KL.Conv2D(nb_filter2, (kernel_size, kernel_size), padding='same',
                   name=conv_name_base + '2b', use_bias=use_bias)(x)
-    x = BatchNorm(axis=3, name=bn_name_base + '2b')(x)
+    #x = BatchNorm(axis=3, name=bn_name_base + '2b')(x)
     x = KL.Activation('relu')(x)
 
     x = KL.Conv2D(nb_filter3, (1, 1), name=conv_name_base +
                   '2c', use_bias=use_bias)(x)
-    x = BatchNorm(axis=3, name=bn_name_base + '2c')(x)
+    #x = BatchNorm(axis=3, name=bn_name_base + '2c')(x)
 
     shortcut = KL.Conv2D(nb_filter3, (1, 1), strides=strides,
                          name=conv_name_base + '1', use_bias=use_bias)(input_tensor)
-    shortcut = BatchNorm(axis=3, name=bn_name_base + '1')(shortcut)
+    #shortcut = BatchNorm(axis=3, name=bn_name_base + '1')(shortcut)
 
     x = KL.Add()([x, shortcut])
     x = KL.Activation('relu', name='res' + str(stage) + block + '_out')(x)
@@ -166,7 +188,7 @@ def resnet_graph(input_image, architecture,config, stage5=False):
         x=KL.Lambda(lambda x:x[:,:,:,:3])(x)
     print('Input: ',K.int_shape(x))
     x = KL.Conv2D(64, (7, 7), strides=(2, 2), name='conv1', use_bias=True)(x)
-    x = BatchNorm(axis=3, name='bn_conv1')(x)
+    #x = BatchNorm(axis=3, name='bn_conv1')(x)
     x = KL.Activation('relu')(x)
     C1 = x = KL.MaxPooling2D((3, 3), strides=(2, 2), padding="same")(x)
     
@@ -250,7 +272,7 @@ def clip_poses_graph(poses, window):
     """
     # Split corners
     wr1, wr2, wy1, wx1, wy2, wx2, wz1, wz2 = tf.split(window, 8)
-    rx,ry, ry, x, y, z = tf.split(poses, 6, axis=1)
+    rx,ry, rz, x, y, z = tf.split(poses, 6, axis=1)
     # Clip
 
     x = tf.maximum(tf.minimum(x, wx2), wx1)
@@ -260,7 +282,7 @@ def clip_poses_graph(poses, window):
     ry = tf.maximum(tf.minimum(ry, wr2), wr1)
     rz = tf.maximum(tf.minimum(rz, wr2), wr1)
     
-    clipped = tf.concat([rx,ry, ry, x, y, z], axis=1, name="clipped_poses")
+    clipped = tf.concat([rx,ry, rz, x, y, z], axis=1, name="clipped_poses")
     clipped.set_shape((clipped.shape[0], 6))
     return clipped
 
@@ -1036,7 +1058,7 @@ def Background_Extraction(robotvqa_feature_maps,config):
         
         #2. apply a sngle semi-non-linear-fully-connected layer
         x=KL.TimeDistributed(KL.Dense(1024),name='robotvqa_background_extraction')(x)
-        x = KL.LeakyReLU(alpha=0.3)(x)
+        x = KL.LeakyReLU(alpha=0.5)(x)
         
         print('expanded background shape:',x.shape)
         
@@ -1075,12 +1097,11 @@ def fpn_classifier_graph(rois, feature_maps,image_shape, pool_size, num_classes,
     # Two 1024 FC layers (implemented with Conv2D for consistency)
     x = KL.TimeDistributed(KL.Conv2D(1024, (pool_size, pool_size), padding="valid"),
                            name="robotvqa_class_conv1")(x)
-    x = KL.TimeDistributed(BatchNorm(axis=3), name='robotvqa_class_bn1')(x)
+    #x = KL.TimeDistributed(BatchNorm(axis=3), name='robotvqa_class_bn1')(x)
     x = KL.Activation('relu')(x)
     x = KL.TimeDistributed(KL.Conv2D(1024, (1, 1)),
                            name="robotvqa_class_conv2")(x)
-    x = KL.TimeDistributed(BatchNorm(axis=3),
-                           name='robotvqa_class_bn2')(x)
+    #x = KL.TimeDistributed(BatchNorm(axis=3),name='robotvqa_class_bn2')(x)
     x = KL.Activation('relu')(x)
     
 
@@ -1092,15 +1113,15 @@ def fpn_classifier_graph(rois, feature_maps,image_shape, pool_size, num_classes,
 
     # Classifier head
     robotvqa_class_logits=[]
-    robotvqa_class_logits.append(KL.TimeDistributed(KL.Dense(num_classes[0]),
+    robotvqa_class_logits.append(KL.TimeDistributed(KL.Dense(num_classes[0],activation='relu'),
                                             name='robotvqa_class_logits0')(shared))
-    robotvqa_class_logits.append(KL.TimeDistributed(KL.Dense(num_classes[1]),
+    robotvqa_class_logits.append(KL.TimeDistributed(KL.Dense(num_classes[1],activation='relu'),
                                             name='robotvqa_class_logits1')(shared))
-    robotvqa_class_logits.append(KL.TimeDistributed(KL.Dense(num_classes[2]),
+    robotvqa_class_logits.append(KL.TimeDistributed(KL.Dense(num_classes[2],activation='relu'),
                                             name='robotvqa_class_logits2')(shared))
-    robotvqa_class_logits.append(KL.TimeDistributed(KL.Dense(num_classes[3]),
+    robotvqa_class_logits.append(KL.TimeDistributed(KL.Dense(num_classes[3],activation='relu'),
                                             name='robotvqa_class_logits3')(shared))
-    robotvqa_class_logits.append(KL.TimeDistributed(KL.Dense(num_classes[4]),
+    robotvqa_class_logits.append(KL.TimeDistributed(KL.Dense(num_classes[4],activation='relu'),
                                             name='robotvqa_class_logits4')(shared))
     
     
@@ -1126,17 +1147,24 @@ def fpn_classifier_graph(rois, feature_maps,image_shape, pool_size, num_classes,
     mrcnn_bbox = KL.Reshape((s[1], num_classes[0], 4), name="mrcnn_bbox")(x)
     
     
-    # Poses head
-    
+    # Poses head with residual connections
     # [batch, boxes, num_classes * (tx,ty,tz,x,y,z)]
-    x = KL.TimeDistributed(KL.Dense(1024, activation='linear'),
+
+    x1 = KL.TimeDistributed(KL.Dense(1028, activation='relu'),
                            name='robotvqa_poses_fc2')(shared)
-    x = KL.TimeDistributed(KL.Dense(1024, activation='relu'),
-                           name='robotvqa_poses_fc1')(x)
-    x = KL.TimeDistributed(KL.Dense(1024, activation='linear'),
-                           name='robotvqa_poses_fc0')(x)
+    
+    x2 = KL.TimeDistributed(KL.Dense(1028, activation='linear'),
+                           name='robotvqa_poses_fc03')(KL.Average()([shared,x1]))
+
+    x3 = KL.TimeDistributed(KL.Dense(1028, activation='relu'),
+                           name='robotvqa_poses_fc00')(KL.Average()([x1, x2]))
+    
+    x4 = KL.TimeDistributed(KL.Dense(1028, activation='linear'),
+                           name='robotvqa_poses_fc01')(KL.Average()([x2, x3]))
+   
+
     x = KL.TimeDistributed(KL.Dense(num_classes[0] * 6, activation='relu'),
-                           name='robotvqa_poses_fc')(x)
+                           name='robotvqa_poses_fc04')(KL.Average()([x3, x4]))
     # Reshape to [batch, boxes, num_classes, (tx,ty,tz,x,y,z)]
     s = K.int_shape(x)
     robotvqa_poses = KL.Reshape((s[1], num_classes[0], 6), name="robotvqa_poses")(x)
@@ -1167,26 +1195,22 @@ def build_fpn_mask_graph(rois, feature_maps,
     # Conv layers
     x = KL.TimeDistributed(KL.Conv2D(256, (3, 3), padding="same"),
                            name="mrcnn_mask_conv1")(x)
-    x = KL.TimeDistributed(BatchNorm(axis=3),
-                           name='mrcnn_mask_bn1')(x)
+    #x = KL.TimeDistributed(BatchNorm(axis=3),name='mrcnn_mask_bn1')(x)
     x = KL.Activation('relu')(x)
 
     x = KL.TimeDistributed(KL.Conv2D(256, (3, 3), padding="same"),
                            name="mrcnn_mask_conv2")(x)
-    x = KL.TimeDistributed(BatchNorm(axis=3),
-                           name='mrcnn_mask_bn2')(x)
+    #x = KL.TimeDistributed(BatchNorm(axis=3),name='mrcnn_mask_bn2')(x)
     x = KL.Activation('relu')(x)
 
     x = KL.TimeDistributed(KL.Conv2D(256, (3, 3), padding="same"),
                            name="mrcnn_mask_conv3")(x)
-    x = KL.TimeDistributed(BatchNorm(axis=3),
-                           name='mrcnn_mask_bn3')(x)
+    #x = KL.TimeDistributed(BatchNorm(axis=3),name='mrcnn_mask_bn3')(x)
     x = KL.Activation('relu')(x)
 
     x = KL.TimeDistributed(KL.Conv2D(256, (3, 3), padding="same"),
                            name="mrcnn_mask_conv4")(x)
-    x = KL.TimeDistributed(BatchNorm(axis=3),
-                           name='mrcnn_mask_bn4')(x)
+    #x = KL.TimeDistributed(BatchNorm(axis=3),name='mrcnn_mask_bn4')(x)
     x = KL.Activation('relu')(x)
 
     x = KL.TimeDistributed(KL.Conv2DTranspose(256, (2, 2), strides=2, activation="relu"),
@@ -1302,6 +1326,42 @@ def robotvqa_class_loss_graph(target_class_ids, pred_class_logits,
 
 
 
+
+def robotvqa_class_accuracy_graph(target_class_ids, pred_class_logits,
+                           active_class_ids):
+    """Accuracy for the classifier head of Mask RCNN.
+
+    target_class_ids: [batch, num_rois]. Integer class IDs. Uses zero
+        padding to fill in the array.
+    pred_class_logits: [batch, num_rois, num_classes]
+    active_class_ids: [batch, num_classes]. Has a value of 1 for
+        classes that are in the dataset of the image, and 0
+        for classes that are not in the dataset.
+    """
+    target_class_ids = tf.cast(target_class_ids, 'int64')
+
+    # Find predictions of classes that are not in the dataset.
+    pred_class_ids = tf.argmax(pred_class_logits, axis=2)
+    # TODO: Update this line to work with batch > 1. Right now it assumes all
+    #       images in a batch have the same active_class_ids
+    pred_active = tf.gather(active_class_ids[0], pred_class_ids)
+
+    pred_active =tf.cast(pred_active, 'int64')
+    # select valid predictions
+    pred_class_ids=pred_class_ids*pred_active
+    target_class_ids=target_class_ids*pred_active
+
+    # accuracy
+    accuracy =tf.metrics.accuracy(target_class_ids,pred_class_ids)[1]
+
+    return accuracy
+
+
+
+
+
+
+
 def robotvqa_class_rel_loss_graph(target_class_ids, pred_class_logits,
                            active_class_ids):
     """Loss for the classifier head of Mask RCNN.
@@ -1320,13 +1380,20 @@ def robotvqa_class_rel_loss_graph(target_class_ids, pred_class_logits,
     print('What: ', batch_size,nber_boxes,nber_boxes,num_classes)
     
     #Avoiding lazy learning due to normal distributed data with very small variance
-    t=tf.random_uniform(shape=[1],minval=0,maxval=1000,dtype='int32')
-    f=tf.mod(t,10)
-    loss2_i=tf.cast(tf.greater(f[0],3),'float32')
-    loss1_i=tf.cast(tf.less_equal(f[0],3),'float32')
+    #t=tf.random_uniform(shape=[1],minval=0,maxval=1000,dtype='int32')
+    #f=tf.mod(t,100)
+	
+    #LEARNING RATE CONTROLLER
+    REL_ALPHA1=0.999
+    REL_ALPHA2=0.001
+
+    loss1_i=tf.constant(REL_ALPHA1,dtype='float32',shape=[1])
+    loss2_i=tf.constant(REL_ALPHA2,dtype='float32',shape=[1])
     
     print('loss2_i:',loss2_i)
     print('loss1_i:',loss1_i)
+
+   
     
     #1.remove adversary relationships
     obj_feature_pairs=[]
@@ -1359,7 +1426,7 @@ def robotvqa_class_rel_loss_graph(target_class_ids, pred_class_logits,
     #loss= tf.reduce_sum(pred_active)
     
     
-    
+
     
     #2. With useless relationships
     #only consider first Image in the batch
@@ -1384,7 +1451,109 @@ def robotvqa_class_rel_loss_graph(target_class_ids, pred_class_logits,
     loss2 = tf.reduce_sum(loss2)/ (tf.reduce_sum(pred_active2))
     #loss= tf.reduce_sum(pred_active)
     loss=loss2_i*loss2+loss1_i*loss1
-    return loss
+    return loss2
+
+
+
+
+
+
+
+
+def robotvqa_class_rel_accuracy_graph(target_class_ids, pred_class_logits,
+                           active_class_ids):
+    """Accuracy for the classifier head of Mask RCNN.
+
+    target_class_ids: [batch, num_rois, num_rois]. Integer class IDs. Uses zero
+        padding to fill in the array.
+    pred_class_logits: [batch, num_rois,num_rois,num_classes]
+    active_class_ids: [batch, num_classes]. Has a value of 1 for
+        classes that are in the dataset of the image, and 0
+        for classes that are not in the dataset.
+    """
+    
+  
+    #transform target_class_ids from [batch, num_rois, num_rois] to [batch, num_rois*num_rois]
+    batch_size,nber_boxes,nber_boxes,num_classes= K.int_shape(pred_class_logits)
+    print('What: ', batch_size,nber_boxes,nber_boxes,num_classes)
+    
+    #Avoiding lazy learning due to normal distributed data with very small variance
+    #t=tf.random_uniform(shape=[1],minval=0,maxval=1000,dtype='int32')
+    #f=tf.mod(t,100)
+	
+    #LEARNING RATE CONTROLLER
+    REL_ALPHA1=0.999
+    REL_ALPHA2=0.001
+
+    acc1_i=tf.constant(REL_ALPHA1,dtype='float32',shape=[1])
+    acc2_i=tf.constant(REL_ALPHA2,dtype='float32',shape=[1])
+    
+    print('acc2_i:',acc2_i)
+    print('acc1_i:',acc1_i)
+
+    
+    
+    #1.remove adversary relationships
+    obj_feature_pairs=[]
+    list_of_valid_obj=[]
+    #only consider first Image in the batch
+    target_class_ids1=tf.concat([tf.cast(tf.reshape(target_class_ids,[1,-1]),'int32'),tf.constant(1,shape=[1,1],dtype='int32')],axis=1) 
+    epsilon=tf.concat([tf.constant(-1000,shape=[1,1,1],dtype='float32'),tf.constant(1000,shape=[1,1,1],dtype='float32'),tf.constant(-1000,shape=[1,1,num_classes-2],dtype='float32')],axis=2)
+    pred_class_logits1=tf.concat([tf.reshape(pred_class_logits,[1,-1,num_classes]),epsilon],axis=1)
+    #remove invalid relation
+    list_of_valid_obj=tf.reshape(tf.where(target_class_ids1[0]),[-1])
+    target_class_ids1=tf.gather(target_class_ids1,list_of_valid_obj,axis=1)
+    pred_class_logits1=tf.gather(pred_class_logits1,list_of_valid_obj,axis=1)   
+    print('loss shape1:',K.int_shape(pred_class_logits1),K.int_shape(target_class_ids1))
+    target_class_ids1 = tf.cast(target_class_ids1, 'int64')
+    # Find predictions of classes that are not in the dataset.
+    pred_class_ids1 = tf.argmax(pred_class_logits1, axis=2)
+    # TODO: Update this line to work with batch > 1. Right now it assumes all
+    #       images in a batch have the same active_class_ids
+    pred_active1 = tf.gather(active_class_ids[0], pred_class_ids1)
+    pred_active1 = tf.cast(pred_active1 , 'int64')
+    # Accuracy 1
+    pred_class_ids1=pred_class_ids1*pred_active1
+    target_class_ids1=target_class_ids1*pred_active1
+    acc1 = tf.metrics.accuracy(target_class_ids1, pred_class_ids1)[1]
+     
+   
+    
+    
+    
+    
+    #2. With useless relationships
+    #only consider first Image in the batch
+    target_class_ids2=tf.reshape(target_class_ids,[1,-1])
+    pred_class_logits2=tf.reshape(pred_class_logits,[1,-1,num_classes])
+    print('loss shape2:',K.int_shape(pred_class_logits2),K.int_shape(target_class_ids2))
+    target_class_ids2 = tf.cast(target_class_ids2, 'int64')
+    # Find predictions of classes that are not in the dataset.
+    pred_class_ids2 = tf.argmax(pred_class_logits2, axis=2)
+    # TODO: Update this line to work with batch > 1. Right now it assumes all
+    #       images in a batch have the same active_class_ids
+    pred_active2 = tf.gather(active_class_ids[0], pred_class_ids2)
+    pred_active2 = tf.cast(pred_active2 , 'int64')
+    # Accuracy 2
+    pred_class_ids2=pred_class_ids2*pred_active2
+    target_class_ids2=target_class_ids2*pred_active2
+    acc2 =  tf.metrics.accuracy(target_class_ids2, pred_class_ids2)[1]
+
+
+
+    accuracy=acc2_i*acc2+acc1_i*acc1
+    return acc
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1443,10 +1612,36 @@ def robotvqa_poses_loss_graph(target_poses, target_class_ids, pred_poses):
     target_poses = tf.gather(target_poses, positive_roi_ix)
     pred_poses = tf.gather_nd(pred_poses, indices)
 
+    #remove x,y coordinates which are directly infered from bounding box
+
+    target_poses=KL.Lambda(lambda x:tf.reshape(x[:,5],shape=[-1,1]))(target_poses)
+
+    pred_poses=KL.Lambda(lambda x:tf.reshape(x[:,5],shape=[-1,1]))(pred_poses)
+
     # Smooth-L1 Loss
+
+    
+
     loss = K.switch(tf.size(target_poses) > 0,
-                    smooth_l1_loss(y_true=target_poses, y_pred=pred_poses),
+
+                    K.abs(target_poses-pred_poses),
+
                     tf.constant(0.0))
+    """
+    target_poses=KL.Lambda(lambda x:tf.concat([x[:,:3],tf.reshape(x[:,5],shape=[-1,1])],axis=1))(target_poses)
+    pred_poses=KL.Lambda(lambda x:tf.concat([x[:,:3],tf.reshape(x[:,5],shape=[-1,1])],axis=1))(pred_poses)
+    # Smooth-L1 Loss
+    
+    loss = K.switch(tf.size(target_poses) > 0,
+                    smooth_l1_loss(y_true=target_poses,y_pred=pred_poses),
+                    tf.constant(0.0))
+   
+    loss = K.switch(tf.size(target_poses) > 0,
+
+                    tf.constant(0.149),
+
+                    tf.constant(0.0))
+    """
     loss = K.mean(loss)
     loss = K.reshape(loss, [1, 1])
     return loss
@@ -1493,12 +1688,52 @@ def mrcnn_mask_loss_graph(target_masks, target_class_ids, pred_masks):
     return loss
 
 
+
+def mrcnn_mask_accuracy_graph(target_masks, target_class_ids, pred_masks):
+    """Mask categorical accuracy for the masks head.
+
+    target_masks: [batch, num_rois, height, width].
+        A float32 tensor of values 0 or 1. Uses zero padding to fill array.
+    target_class_ids: [batch, num_rois]. Integer class IDs. Zero padded.
+    pred_masks: [batch, proposals, height, width, num_classes] float32 tensor
+                with values from 0 to 1.
+    """
+    # Reshape for simplicity. Merge first two dimensions into one.
+    target_class_ids = K.reshape(target_class_ids, (-1,))
+    mask_shape = tf.shape(target_masks)
+    target_masks = K.reshape(target_masks, (-1, mask_shape[2], mask_shape[3]))
+    pred_shape = tf.shape(pred_masks)
+    pred_masks = K.reshape(pred_masks,
+                           (-1, pred_shape[2], pred_shape[3], pred_shape[4]))
+    # Permute predicted masks to [N, num_classes, height, width]
+    pred_masks = tf.transpose(pred_masks, [0, 3, 1, 2])
+
+    # Only positive ROIs contribute to the loss. And only
+    # the class specific mask of each ROI.
+    positive_ix = tf.where(target_class_ids > 0)[:, 0]
+    positive_class_ids = tf.cast(
+        tf.gather(target_class_ids, positive_ix), tf.int64)
+    indices = tf.stack([positive_ix, positive_class_ids], axis=1)
+
+    # Gather the masks (predicted and true) that contribute to loss
+    y_true = tf.gather(target_masks, positive_ix)
+    y_pred = tf.gather_nd(pred_masks, indices)
+
+    # Compute binary cross entropy. If no positive ROIs, then return 1.
+    # shape: [batch, roi, num_classes]
+    accuracy = K.switch(tf.size(y_true) > 0,
+                    tf.keras.metrics.binary_accuracy(y_true, y_pred),tf.constant(1.0))
+   
+    return accuracy
+
+
+
 ############################################################
 #  Data Generator
 ############################################################
 
 def load_image_gt(dataset, config, image_id, augment=False,
-                  use_mini_mask=False):
+                  use_mini_mask=False,depth='float32'):
     """Load and return ground truth data for an image (image, mask, bounding boxes).
 
     augment: If true, apply random image augmentation. Currently, only
@@ -1522,7 +1757,7 @@ def load_image_gt(dataset, config, image_id, augment=False,
     poses: [instance_count, (tetax,tetay,tetaz,x,y,z)]
     """
     # Load image and mask
-    image = dataset.load_image(image_id,config.MAX_CAMERA_CENTER_TO_PIXEL_DISTANCE)
+    image = dataset.load_image(image_id,config.MAX_CAMERA_CENTER_TO_PIXEL_DISTANCE,depth=depth)
     mask, class_ids,poses,class_rel_ids = dataset.load_mask(image_id,config)
     shape = image.shape
     #resize image,mask and poses
@@ -1976,11 +2211,287 @@ def generate_random_rois(image_shape, count, gt_class_ids, gt_boxes):
     return rois
 
 
+"""Sequential Data Generator
+"""
+class Data_Generator(KU.Sequence):
+
+	"""A generator that returns images and corresponding target class ids,
+	    bounding box deltas, and masks.
+	    model: keras/tensorflow model to train
+	    dataset: The Dataset object to pick data from
+	    config: The model config object
+	    shuffle: If True, shuffles the samples before every epoch
+	    augment: If True, applies image augmentation to images (currently only
+		     horizontal flips are supported)
+	    random_rois: If > 0 then generate proposals to be used to train the
+		         network classifier and mask heads. Useful if training
+		         the Mask RCNN part without the RPN.
+	    batch_size: How many images to return in each call
+	    detection_targets: If True, generate detection targets (class IDs, bbox
+		deltas, and masks). Typically for debugging or visualizations because
+		in trainig detection targets are generated by DetectionTargetLayer.
+
+
+
+	    stage: training or evaluation
+
+
+
+
+
+	    Returns a Python generator. Upon calling next() on it, the
+
+	    generator returns two lists, inputs and outputs. The containtes
+
+	    of the lists differs depending on the received arguments:
+
+	    inputs list:
+
+	    - images: [batch, H, W, C]
+	    - image_meta: [batch, size of image meta]
+	    - rpn_match: [batch, N] Integer (1=positive anchor, -1=negative, 0=neutral)
+	    - rpn_bbox: [batch, N, (dy, dx, log(dh), log(dw))] Anchor bbox deltas.
+	    - gt_class_cat_ids: [batch, MAX_GT_INSTANCES] Integer category class IDs,
+	    - gt_class_col_ids: [batch, MAX_GT_INSTANCES] Integer color class IDs,
+	    - gt_class_sha_ids: [batch, MAX_GT_INSTANCES] Integer shape class IDs,
+	    - gt_class_mat_ids: [batch, MAX_GT_INSTANCES] Integer material class IDs,
+	    - gt_class_opn_ids: [batch, MAX_GT_INSTANCES] Integer openability class IDs,
+	    - gt_class_rel_ids: [batch, MAX_GT_INSTANCES,MAX_GT_INSTANCES,4] Integer openability class IDs,
+	    - gt_boxes: [batch, MAX_GT_INSTANCES, (y1, x1, y2, x2)]
+	    - gt_poses: [batch, MAX_GT_INSTANCES, (tetax,tetay,tetaz, x, y, z)]
+	    - gt_masks: [batch, height, width, MAX_GT_INSTANCES]. The height and width
+		        are those of the image unless use_mini_mask is True, in which
+		        case they are defined in MINI_MASK_SHAPE.
+	    outputs list: Usually empty in regular training. But if detection_targets
+		is True then the outputs list contains target class_ids, bbox deltas,
+		and masks.
+	"""
+	
+
+		
+	def __init__(self,dataset, config, shuffle=False, augment=True, random_rois=0,
+                     batch_size=1, detection_targets=False,stage='training', generator_default_size=100,depth='float32'):
+
+		self.dataset=dataset
+		self.config=config
+		self.shuffle=shuffle
+		self.augment=augment
+		self.depth=depth
+		self.random_rois=random_rois
+		self.batch_size=batch_size
+		self.detection_targets=detection_targets
+		self.stage=stage
+		self.generator_default_size=generator_default_size
+		self.b = 0  # batch item index
+		self.image_index = -1
+		self.image_ids = np.copy(self.dataset.image_ids)
+		self.error_count = 0
+		self.batch_index=-1
+    		self.on_epoch_end()
+
+		# Anchors
+		# [anchor_count, (y1, x1, y2, x2)]
+		self.anchors = utils.generate_pyramid_anchors(self.config.RPN_ANCHOR_SCALES,
+				                     self.config.RPN_ANCHOR_RATIOS,
+				                     self.config.BACKBONE_SHAPES,
+				                     self.config.BACKBONE_STRIDES,
+				                     self.config.RPN_ANCHOR_STRIDE)
+	def on_epoch_end(self):
+		 if self.shuffle:
+			np.random.shuffle(self.image_ids)
+		 print('Batch index: '+str(self.batch_index)+', Stage: '+str(self.stage))
+
+	def __len__(self):
+		#length of the dataset
+		return int(np.floor(len(self.image_ids) / self.batch_size))
+
+	def __getitem__(self, index):
+		dataset=self.dataset
+		config=self.config
+		shuffle=self.shuffle
+		augment=self.augment
+		random_rois=self.random_rois
+		batch_size=self.batch_size
+		detection_targets=self.detection_targets
+		stage=self.stage
+		generator_default_size=self.generator_default_size
+		b=self.b  # batch item index
+		image_ids = self.image_ids
+		self.batch_index=index
+		anchors=self.anchors
+		error_count =self.error_count
+		for image_index in range(index*self.batch_size,(index+1)*self.batch_size):
+			try:
+	    
+			    # Increment index to pick next image. Shuffle if at the start of an epoch.
+			    image_index = (image_index + 1) % len(image_ids)
+
+			    print( 'data index: '+str(image_index)+', image id: '+str(image_ids[image_index]))
+			   
+			    # Get GT raw data, metadata, feature class id, bounding boxes and masks for image.
+			    image_id = image_ids[image_index]
+			    image, image_meta, gt_class_ids, gt_boxes, gt_masks,gt_poses = \
+				load_image_gt(dataset, config, image_id, augment=augment,
+				              use_mini_mask=config.USE_MINI_MASK,depth=self.depth)
+			    #features' classes
+			    [gt_class_cat_ids,gt_class_col_ids,gt_class_sha_ids,gt_class_mat_ids,gt_class_opn_ids,gt_class_rel_ids]=gt_class_ids
+
+			    # Skip images that have no instances. This can happen in cases
+			    # where we train on a subset of classes and the image doesn't
+			    # have any of the classes we care about.
+			    if not np.any(gt_class_cat_ids > 0):
+				continue
+
+			    # RPN Targets
+			    rpn_match, rpn_bbox = build_rpn_targets(image.shape, anchors,
+				                                    gt_class_cat_ids, gt_boxes, config)
+				                                    
+			    # Normalize Objects'Poses in [0,1[
+			    gt_poses/=config.MAX_OBJECT_POSES
+
+
+			    # Mask R-CNN Targets
+			    if random_rois:
+				rpn_rois = generate_random_rois(
+				    image.shape, random_rois, gt_class_cat_ids, gt_boxes)
+				if detection_targets:
+				    rois, robotvqa_class_ids, mrcnn_bbox, mrcnn_mask,robotvqa_poses =\
+				        build_detection_targets(
+				            rpn_rois, gt_class_ids, gt_boxes, gt_masks,gt_poses, config)
+				    [robotvqa_class_cat_ids,robotvqa_class_col_ids,robotvqa_class_sha_ids,robotvqa_class_mat_ids,robotvqa_class_opn_ids,robotvqa_class_rel_ids]=robotvqa_class_ids
+
+			    # Init batch arrays
+			    if b == 0:
+				batch_image_meta = np.zeros(
+				    (batch_size,) + image_meta.shape, dtype=image_meta.dtype)
+				batch_rpn_match = np.zeros(
+				    [batch_size, anchors.shape[0], 1], dtype=rpn_match.dtype)
+				batch_rpn_bbox = np.zeros(
+				    [batch_size, config.RPN_TRAIN_ANCHORS_PER_IMAGE, 4], dtype=rpn_bbox.dtype)
+				batch_images = np.zeros(
+				    (batch_size,) + image.shape, dtype=np.float32)
+				batch_gt_class_ids = np.zeros(
+				    (batch_size, config.NUM_FEATURES-2, config.MAX_GT_INSTANCES), dtype=np.int32)
+				
+				batch_gt_class_rel_ids = np.zeros(
+				    (batch_size,config.MAX_GT_INSTANCES,config.MAX_GT_INSTANCES), dtype=np.int32)
+				
+				batch_gt_boxes = np.zeros(
+				    (batch_size, config.MAX_GT_INSTANCES, 4), dtype=np.int32)
+				batch_gt_poses = np.zeros(
+				    (batch_size, config.MAX_GT_INSTANCES, 6), dtype=np.float32)
+				if config.USE_MINI_MASK:
+				    batch_gt_masks = np.zeros((batch_size, config.MINI_MASK_SHAPE[0], config.MINI_MASK_SHAPE[1],
+				                               config.MAX_GT_INSTANCES))
+				else:
+				    batch_gt_masks = np.zeros(
+				        (batch_size, image.shape[0], image.shape[1], config.MAX_GT_INSTANCES))
+				if random_rois:
+				    batch_rpn_rois = np.zeros(
+				        (batch_size, rpn_rois.shape[0], 4), dtype=rpn_rois.dtype)
+				    if detection_targets:
+				        batch_rois = np.zeros(
+				            (batch_size,) + rois.shape, dtype=rois.dtype)
+				        batch_robotvqa_class_ids = np.zeros(
+				            (batch_size, config.NUM_FEATURES-2,) +robotvqa_class_cat_ids.shape, dtype=robotvqa_class_cat_ids.dtype)
+				
+				        batch_robotvqa_class_rel_ids = np.zeros(
+				            (batch_size,)+robotvqa_class_cat_ids.shape+robotvqa_class_cat_ids.shape, dtype=robotvqa_class_rel_ids.dtype)
+		    
+				        batch_mrcnn_bbox = np.zeros(
+				            (batch_size,) + mrcnn_bbox.shape, dtype=mrcnn_bbox.dtype)
+				        batch_mrcnn_mask = np.zeros(
+				            (batch_size,) + mrcnn_mask.shape, dtype=mrcnn_mask.dtype)
+				        batch_robotvqa_poses = np.zeros(
+				            (batch_size,) + robotvqa_poses.shape, dtype=robotvqa_poses.dtype)
+
+			    # If more instances than fits in the array, sub-sample from them.
+			    if gt_boxes.shape[0] > config.MAX_GT_INSTANCES:
+				ids = np.random.choice(
+				    np.arange(gt_boxes.shape[0]), config.MAX_GT_INSTANCES, replace=False)
+				gt_class_cat_ids = gt_class_cat_ids[ids]
+				gt_class_col_ids = gt_class_col_ids[ids]
+				gt_class_sha_ids = gt_class_sha_ids[ids]
+				gt_class_mat_ids = gt_class_mat_ids[ids]
+				gt_class_opn_ids = gt_class_opn_ids[ids]
+				gt_class_rel_ids = gt_class_rel_ids[ids,:][:,ids]
+				gt_boxes = gt_boxes[ids]
+				gt_masks = gt_masks[:, :, ids]
+				gt_poses = gt_poses[ids]
+
+			    # Add to batch
+			    batch_image_meta[b] = image_meta
+			    batch_rpn_match[b] = rpn_match[:, np.newaxis]
+			    batch_rpn_bbox[b] = rpn_bbox
+			    batch_images[b] = mold_image(image.astype(np.float32), config)
+			    batch_gt_class_ids[b, 0,:gt_class_cat_ids.shape[0]] = gt_class_cat_ids
+			    batch_gt_class_ids[b, 1,:gt_class_col_ids.shape[0]] = gt_class_col_ids
+			    batch_gt_class_ids[b, 2,:gt_class_sha_ids.shape[0]] = gt_class_sha_ids
+			    batch_gt_class_ids[b, 3,:gt_class_mat_ids.shape[0]] = gt_class_mat_ids
+			    batch_gt_class_ids[b, 4,:gt_class_opn_ids.shape[0]] = gt_class_opn_ids
+			    batch_gt_class_rel_ids[b,:gt_class_rel_ids.shape[0],:gt_class_rel_ids.shape[1]] = gt_class_rel_ids
+			    batch_gt_boxes[b, :gt_boxes.shape[0]] = gt_boxes
+			    batch_gt_masks[b, :, :, :gt_masks.shape[-1]] = gt_masks
+			    batch_gt_poses[b, :gt_poses.shape[0]] = gt_poses
+			    if random_rois:
+				batch_rpn_rois[b] = rpn_rois
+				if detection_targets:
+				    batch_rois[b] = rois
+				    batch_robotvqa_class_ids[b, 0,:robotvqa_class_cat_ids.shape[0]] = robotvqa_class_cat_ids
+				    batch_robotvqa_class_ids[b, 1,:robotvqa_class_col_ids.shape[0]] = robotvqa_class_col_ids
+				    batch_robotvqa_class_ids[b, 2,:robotvqa_class_sha_ids.shape[0]] = robotvqa_class_sha_ids
+				    batch_robotvqa_class_ids[b, 3,:robotvqa_class_mat_ids.shape[0]] = robotvqa_class_mat_ids
+				    batch_robotvqa_class_ids[b, 4,:robotvqa_class_opn_ids.shape[0]] = robotvqa_class_opn_ids
+				    batch_robotvqa_class_rel_ids[b,:robotvqa_class_rel_ids.shape[0],:robotvqa_class_rel_ids.shape[1]] = robotvqa_class_rel_ids
+				    batch_mrcnn_bbox[b] = mrcnn_bbox
+				    batch_mrcnn_mask[b] = mrcnn_mask
+				    batch_robotvqa_poses[b] = robotvqa_poses
+			    b += 1
+
+			    # Batch full?
+			    if b >= batch_size:
+				inputs = [batch_images, batch_image_meta, batch_rpn_match, batch_rpn_bbox,
+				          batch_gt_class_ids[:,0,:],batch_gt_class_ids[:,1,:],batch_gt_class_ids[:,2,:],batch_gt_class_ids[:,3,:],batch_gt_class_ids[:,4,:],
+				          batch_gt_class_rel_ids,batch_gt_boxes, batch_gt_masks,batch_gt_poses]
+				outputs = []
+
+				if random_rois:
+				    inputs.extend([batch_rpn_rois])
+				    if detection_targets:
+				        inputs.extend([batch_rois])
+				        # Keras requires that output and targets have the same number of dimensions
+				        batch_robotvqa_class_cat_ids = np.expand_dims(batch_robotvqa_class_ids[:,0,:], -1)
+				        batch_robotvqa_class_col_ids = np.expand_dims(batch_robotvqa_class_ids[:,1,:], -1)
+				        batch_robotvqa_class_sha_ids = np.expand_dims(batch_robotvqa_class_ids[:,2,:], -1)
+				        batch_robotvqa_class_mat_ids = np.expand_dims(batch_robotvqa_class_ids[:,3,:], -1)
+				        batch_robotvqa_class_opn_ids = np.expand_dims(batch_robotvqa_class_ids[:,4,:], -1)
+				        batch_robotvqa_class_rel_ids = np.expand_dims(batch_robotvqa_class_rel_ids, -1)
+				        outputs.extend(
+				            [batch_robotvqa_class_cat_ids,batch_robotvqa_class_col_ids,batch_robotvqa_class_sha_ids,batch_robotvqa_class_mat_ids,batch_robotvqa_class_opn_ids,
+				            batch_robotvqa_class_rel_ids,batch_mrcnn_bbox, batch_mrcnn_mask,batch_robotvqa_poses])
+				return inputs, outputs
+			except (GeneratorExit, KeyboardInterrupt):
+			    raise
+			except:
+			    # Log it and skip the image
+			    logging.exception("Error processing image {}".format(
+				dataset.image_info[image_index]))
+			    error_count += 1
+			    if error_count > 0:
+				return None
+		#No sample found in this batch
+		return None
+
+	
+
+"""Functional Data Generator
+"""
+
 def data_generator(dataset, config, shuffle=False, augment=True, random_rois=0,
-                   batch_size=1, detection_targets=False):
+                   batch_size=1, detection_targets=False,stage='training', generator_default_size=100,depth='float'):
     """A generator that returns images and corresponding target class ids,
     bounding box deltas, and masks.
-
+    model: keras/tensorflow model to train
     dataset: The Dataset object to pick data from
     config: The model config object
     shuffle: If True, shuffles the samples before every epoch
@@ -1993,6 +2504,9 @@ def data_generator(dataset, config, shuffle=False, augment=True, random_rois=0,
     detection_targets: If True, generate detection targets (class IDs, bbox
         deltas, and masks). Typically for debugging or visualizations because
         in trainig detection targets are generated by DetectionTargetLayer.
+
+    stage: training or evaluation
+
 
     Returns a Python generator. Upon calling next() on it, the
     generator returns two lists, inputs and outputs. The containtes
@@ -2013,15 +2527,17 @@ def data_generator(dataset, config, shuffle=False, augment=True, random_rois=0,
     - gt_masks: [batch, height, width, MAX_GT_INSTANCES]. The height and width
                 are those of the image unless use_mini_mask is True, in which
                 case they are defined in MINI_MASK_SHAPE.
-
     outputs list: Usually empty in regular training. But if detection_targets
         is True then the outputs list contains target class_ids, bbox deltas,
         and masks.
     """
+    
+
     b = 0  # batch item index
     image_index = -1
     image_ids = np.copy(dataset.image_ids)
     error_count = 0
+    
 
     # Anchors
     # [anchor_count, (y1, x1, y2, x2)]
@@ -2032,18 +2548,30 @@ def data_generator(dataset, config, shuffle=False, augment=True, random_rois=0,
                                              config.RPN_ANCHOR_STRIDE)
 
     # Keras requires a generator to run indefinately.
-    while True:
+    batch_index=0
+    while True:#batch_index<generator_default_size
         try:
+	    
             # Increment index to pick next image. Shuffle if at the start of an epoch.
             image_index = (image_index + 1) % len(image_ids)
             if shuffle and image_index == 0:
-                np.random.shuffle(image_ids)
+                #np.random.shuffle(image_ids)
+		rIndex=utils.randomIndex(config.NUMBER_THREADS)
+		print('')
+		print('....................Random Index: '+str(rIndex)+'..................................................')
+		print('')
+		if stage=='training':
+			image_index=int(np.floor(rIndex*(config.STEPS_PER_EPOCH//config.NUMBER_THREADS)))
+		else:
+			image_index=int(np.floor(rIndex*(config.VALIDATION_STEPS//config.NUMBER_THREADS)))
 
-            # Get GT raw data, metadata, feature class id, bounding boxes and masks for image.
+	    print('batch index: '+str(batch_index)+', data index: '+str(image_index)+', image id: '+str(image_ids[image_index]))
+
+	    # Get GT raw data, metadata, feature class id, bounding boxes and masks for image.
             image_id = image_ids[image_index]
             image, image_meta, gt_class_ids, gt_boxes, gt_masks,gt_poses = \
                 load_image_gt(dataset, config, image_id, augment=augment,
-                              use_mini_mask=config.USE_MINI_MASK)
+                              use_mini_mask=config.USE_MINI_MASK,depth=depth)
             #features' classes
             [gt_class_cat_ids,gt_class_col_ids,gt_class_sha_ids,gt_class_mat_ids,gt_class_opn_ids,gt_class_rel_ids]=gt_class_ids
 
@@ -2179,7 +2707,7 @@ def data_generator(dataset, config, shuffle=False, augment=True, random_rois=0,
                         outputs.extend(
                             [batch_robotvqa_class_cat_ids,batch_robotvqa_class_col_ids,batch_robotvqa_class_sha_ids,batch_robotvqa_class_mat_ids,batch_robotvqa_class_opn_ids,
                             batch_robotvqa_class_rel_ids,batch_mrcnn_bbox, batch_mrcnn_mask,batch_robotvqa_poses])
-
+		batch_index+=1
                 yield inputs, outputs
 
                 # start a new batch
@@ -2189,10 +2717,14 @@ def data_generator(dataset, config, shuffle=False, augment=True, random_rois=0,
         except:
             # Log it and skip the image
             logging.exception("Error processing image {}".format(
-                dataset.image_info[image_id]))
+                dataset.image_info[image_index]))
             error_count += 1
             if error_count > 5:
                 raise
+
+
+
+
 
 ###################################################################################
 #RelationLayer
@@ -2220,6 +2752,7 @@ class RelationalGraph(object):
         pass
     
     #step 0
+    @staticmethod
     def get_relational_graph_valid_nodes(inputs):
         """input: Set of N objects/nodes for relational network+background
            output: Set of DETECTION_MAX_INSTANCES best valid objects/nodes
@@ -2239,6 +2772,7 @@ class RelationalGraph(object):
         return shared_n
 
     #step 1
+    @staticmethod	
     def get_relational_graph_edges(objects,nber_boxes,num_classes,background):
         """input: Set of N objects/nodes for relational network
            output: NxN pairs/edges of flattened objects
@@ -2257,6 +2791,7 @@ class RelationalGraph(object):
         return relational_graph_edges
     
     #step 2
+    @staticmethod
     def get_relational_graph_merged_edges(relational_graph_edges):
         """input: Set of NxN pairs(edges) of objects(nodes) for relational network, size=1024*2=2048/pair
            output: Set of NxN merged pairs(edges) of objects(nodes) for relational network, size=1024/pair
@@ -2264,15 +2799,13 @@ class RelationalGraph(object):
         # relational net's hidden layer
         relational_graph_merged_edges=KL.TimeDistributed(KL.Dense(1024),name='robotvqa_relational_graph_merged_edges1')(relational_graph_edges)
         relational_graph_merged_edges = KL.Activation('relu')(relational_graph_merged_edges)
-        relational_graph_merged_edges= KL.TimeDistributed(KL.Dense(1024),name='robotvqa_relational_graph_merged_edges2')(relational_graph_merged_edges)
-        relational_graph_merged_edges = KL.Activation('relu')(relational_graph_merged_edges)
-        
         print('relational graph merges edges:',relational_graph_merged_edges.shape)
         
         return relational_graph_merged_edges
         
         
     #step 3
+    @staticmethod
     def get_relational_graph_background(relational_graph_merged_edges):
         """input: Set of NxN pairs(edges) of objects(nodes) for relational network
            output: Single edge summarizing the NxN pairs/edges. It acts as background for the set of objects
@@ -2283,6 +2816,7 @@ class RelationalGraph(object):
         
         return relational_graph_background
     #step 4
+    @staticmethod
     def get_relational_graph_contextual_merged_edges(relational_graph_merged_edges,relational_graph_background,nber_boxes):
         """input: NxN pairs/edges, graph background, nber of nodes 
            output: NxN contextual pairs/edge
@@ -2302,6 +2836,7 @@ class RelationalGraph(object):
         
         
     #step 5
+    @staticmethod
     def get_relational_graph_contextual_merged_edges_value(relational_graph_contextual_merged_edges,nber_boxes,num_classes):
         """input: NxN contextual merged pairs/edges, 
            output: NxN contextual merged pairs/edges' values
@@ -2309,10 +2844,7 @@ class RelationalGraph(object):
         
         #output for relational network
         relational_graph_output={'probs':[],'logits':[]}
-        
-        relational_graph_contextual_merged_edges_value=KL.TimeDistributed(KL.Dense(1024),name='robotvqa_class_logits5_1')(relational_graph_contextual_merged_edges)
-        relational_graph_contextual_merged_edges_value = KL.Activation('relu')(relational_graph_contextual_merged_edges_value)
-        rel_logits= KL.TimeDistributed(KL.Dense(num_classes),name='robotvqa_class_logits5_2')(relational_graph_contextual_merged_edges_value)
+        rel_logits= KL.TimeDistributed(KL.Dense(num_classes),name='robotvqa_class_logits5_1')(relational_graph_contextual_merged_edges)
         print('rel_logits',rel_logits.shape)
         rel_probs=KL.TimeDistributed(KL.Activation("softmax"),name="robotvqa_class5") (rel_logits)
         
@@ -2324,6 +2856,7 @@ class RelationalGraph(object):
         
         return [rel_logits,rel_probs]
 
+    @staticmethod
     def Get_Relational_Graph(config, inputs):
 
         #step 0. get DETECTION_MAX_INSTANCES best nodes/objects
@@ -2373,15 +2906,12 @@ class RobotVQA():
         model_dir: Directory to save training logs and trained weights
         """
         assert mode in ['training', 'inference']
+	self.history=''
+	self.evaluation_results=[]
         self.mode = mode
         self.config = config
         self.model_dir = model_dir
         self.set_log_dir()
-        #initialize global session
-        sessionConfig = tf.ConfigProto()
-        sessionConfig.gpu_options.allow_growth = True
-        K.tensorflow_backend.set_session(tf.Session(config=sessionConfig))
-        print('Global Session created successfully!!!')
         print('Constants definition ...')
         self.NUM_FEATURES=self.config.NUM_FEATURES
         self.CATEGORY_INDEX=0
@@ -2393,7 +2923,18 @@ class RobotVQA():
         get_custom_objects().update({'projection_activation': KL.Activation(self.custom_activation)})
         #Model
         self.keras_model = self.build(mode=mode, config=config)
-        
+         #initialize global session
+        sessionConfig = tf.ConfigProto()
+        sessionConfig.gpu_options.allow_growth = True
+        K.tensorflow_backend.set_session(tf.Session(config=sessionConfig))
+        print('Global Session created successfully!!!')
+	#set local variable
+	init_l = tf.local_variables_initializer()
+	init_g = tf.global_variables_initializer()
+    	K.tensorflow_backend.get_session().run(init_l)
+	K.tensorflow_backend.get_session().run(init_g)
+	print('*****************************Initialize*******************************')
+
     #projection from R to [-scaler,scaler]
     def custom_activation(self,x):
         return (K.tanh(x) * self.config.GEOMETRIC_SCALER)    
@@ -2472,8 +3013,8 @@ class RobotVQA():
         # Bottom-up Layers
         # Returns a list of the last layers of each stage, 5 in total.
         # Don't create the thead (stage 5), so we pick the 4th item in the list.
-        with tf.device(self.config.CGPU1):
-            _, C2, C3, C4, C5 = resnet_graph(input_image, "resnet101",self.config, stage5=True)
+        #with tf.device(self.config.CPU0):
+	_, C2, C3, C4, C5 = resnet_graph(input_image, "resnet101",self.config, stage5=True)
         # Top-down Layers
         # TODO: add assert to varify feature map sizes match what's in config
         P5 = KL.Conv2D(256, (1, 1), name='fpn_c5p5')(C5)
@@ -2533,12 +3074,12 @@ class RobotVQA():
         # and zero padded.
         proposal_count = config.POST_NMS_ROIS_TRAINING if mode == "training"\
             else config.POST_NMS_ROIS_INFERENCE
-        with tf.device(self.config.CGPU1):
-            rpn_rois = ProposalLayer(proposal_count=proposal_count,
-                                    nms_threshold=config.RPN_NMS_THRESHOLD,
-                                    name="ROI",
-                                    anchors=self.anchors,
-                                    config=config)([rpn_class, rpn_bbox])
+        #with tf.device(self.config.CPU0):
+	rpn_rois = ProposalLayer(proposal_count=proposal_count,
+	                            nms_threshold=config.RPN_NMS_THRESHOLD,
+	                            name="ROI",
+	                            anchors=self.anchors,
+	                            config=config)([rpn_class, rpn_bbox])
 
         if mode == "training":
             # Class ID mask to mark class IDs supported by the dataset the image
@@ -2598,10 +3139,10 @@ class RobotVQA():
             #select indices        
             best_valid_indices=KL.Lambda(lambda x:tf.range(self.config.DETECTION_MAX_INSTANCES))(shared)
             #relational graph
-            with tf.device(self.config.CGPU1):
-                #background extraction
-                background=Background_Extraction(robotvqa_feature_maps,self.config)
-                rel_logits,rel_probs=RelationalGraph.Get_Relational_Graph(self.config,[shared,best_valid_indices,background])
+            #with tf.device(self.config.CPU0):
+	    #background extraction
+	    background=Background_Extraction(robotvqa_feature_maps,self.config)
+	    rel_logits,rel_probs=RelationalGraph.Get_Relational_Graph(self.config,[shared,best_valid_indices,background])
             #register results
             robotvqa_class_logits.append(rel_logits)
             robotvqa_class.append(rel_probs)
@@ -2633,23 +3174,40 @@ class RobotVQA():
             class_cat_loss = KL.Lambda(lambda x: robotvqa_class_loss_graph(*x), name="robotvqa_class_loss")(
                 [target_class_cat_ids, robotvqa_class_cat_logits, active_class_cat_ids])
                 
-                
+	    class_cat_acc = KL.Lambda(lambda x: robotvqa_class_accuracy_graph(*x), name="robotvqa_class_acc")(
+                [target_class_cat_ids, robotvqa_class_cat_logits, active_class_cat_ids])                
+
             class_col_loss = KL.Lambda(lambda x: robotvqa_class_loss_graph(*x), name="robotvqa_class_col_loss")(
                 [target_class_col_ids, robotvqa_class_col_logits, active_class_col_ids])
                 
+	    class_col_acc = KL.Lambda(lambda x: robotvqa_class_accuracy_graph(*x), name="robotvqa_class_col_acc")(
+                [target_class_col_ids, robotvqa_class_col_logits, active_class_col_ids])
+
                 
             class_sha_loss = KL.Lambda(lambda x: robotvqa_class_loss_graph(*x), name="robotvqa_class_sha_loss")(
+                [target_class_sha_ids, robotvqa_class_sha_logits, active_class_sha_ids])
+
+	    class_sha_acc = KL.Lambda(lambda x: robotvqa_class_accuracy_graph(*x), name="robotvqa_class_sha_acc")(
                 [target_class_sha_ids, robotvqa_class_sha_logits, active_class_sha_ids])
                 
                 
             class_mat_loss = KL.Lambda(lambda x: robotvqa_class_loss_graph(*x), name="robotvqa_class_mat_loss")(
                 [target_class_mat_ids, robotvqa_class_mat_logits, active_class_mat_ids])
-                
+	
+	    class_mat_acc = KL.Lambda(lambda x: robotvqa_class_accuracy_graph(*x), name="robotvqa_class_mat_acc")(
+                [target_class_mat_ids, robotvqa_class_mat_logits, active_class_mat_ids])                
+
             class_opn_loss = KL.Lambda(lambda x: robotvqa_class_loss_graph(*x), name="robotvqa_class_opn_loss")(
+                [target_class_opn_ids, robotvqa_class_opn_logits, active_class_opn_ids])
+
+	    class_opn_acc = KL.Lambda(lambda x: robotvqa_class_accuracy_graph(*x), name="robotvqa_class_opn_acc")(
                 [target_class_opn_ids, robotvqa_class_opn_logits, active_class_opn_ids])
             
                 
             class_rel_loss = KL.Lambda(lambda x: robotvqa_class_rel_loss_graph(*x), name="robotvqa_class_rel_loss")(
+                [target_class_rel_ids, robotvqa_class_rel_logits, active_class_rel_ids])
+
+	    class_rel_acc = KL.Lambda(lambda x: robotvqa_class_rel_accuracy_graph(*x), name="robotvqa_class_rel_acc")(
                 [target_class_rel_ids, robotvqa_class_rel_logits, active_class_rel_ids])
         
 
@@ -2663,6 +3221,9 @@ class RobotVQA():
             mask_loss = KL.Lambda(lambda x: mrcnn_mask_loss_graph(*x), name="mrcnn_mask_loss")(
                 [target_mask, target_class_cat_ids, robotvqa_mask])
 
+	    mask_acc = KL.Lambda(lambda x: mrcnn_mask_accuracy_graph(*x), name="mrcnn_mask_acc")(
+                [target_mask, target_class_cat_ids, robotvqa_mask])
+
             # Model
             inputs = [input_image, input_image_meta,
                       input_rpn_match, input_rpn_bbox,
@@ -2674,12 +3235,12 @@ class RobotVQA():
                 inputs.append(input_rois)
             outputs = [rpn_class_logits, rpn_class, rpn_bbox,
                        robotvqa_class_cat_logits,robotvqa_class_col_logits,robotvqa_class_sha_logits,robotvqa_class_mat_logits,robotvqa_class_opn_logits,robotvqa_class_rel_logits,
-                        class_cat_loss,class_col_loss,class_sha_loss,class_mat_loss,class_opn_loss,class_rel_loss,
+                        class_cat_loss,class_cat_acc,class_col_loss,class_col_acc,class_sha_loss,class_sha_acc,class_mat_loss,class_mat_acc,class_opn_loss,class_opn_acc,class_rel_loss,class_rel_acc,
                         robotvqa_class_cat,robotvqa_class_col,robotvqa_class_sha,robotvqa_class_mat,robotvqa_class_opn,robotvqa_class_rel,
                         robotvqa_bbox,
                         robotvqa_mask,
                        rpn_rois, output_rois,
-                       rpn_class_loss, rpn_bbox_loss, bbox_loss, mask_loss,robotvqa_poses,poses_loss]
+                       rpn_class_loss, rpn_bbox_loss, bbox_loss, mask_loss,mask_acc,robotvqa_poses,poses_loss]
             model = KM.Model(inputs, outputs, name='mask_rcnn')
         else:
 
@@ -2705,10 +3266,10 @@ class RobotVQA():
             best_valid_indices=KL.Lambda(lambda x:x[0])(best_valid_indices)
             print('Best indices shape:',K.int_shape(best_valid_indices))
             #Relational Graph
-            with tf.device(self.config.CGPU1):
-                #background extraction
-                background=Background_Extraction(robotvqa_feature_maps,self.config)
-                rel_logits,rel_probs=RelationalGraph.Get_Relational_Graph(self.config,[shared,best_valid_indices,background])
+            #with tf.device(self.config.CPU0):
+	    #background extraction
+	    background=Background_Extraction(robotvqa_feature_maps,self.config)
+	    rel_logits,rel_probs=RelationalGraph.Get_Relational_Graph(self.config,[shared,best_valid_indices,background])
             print('Relational graph output shape:',K.int_shape(rel_logits),K.int_shape(rel_probs))
            
             
@@ -2884,6 +3445,9 @@ class RobotVQA():
                       "robotvqa_class_loss","robotvqa_class_col_loss",
                       "robotvqa_class_sha_loss","robotvqa_class_mat_loss","robotvqa_class_opn_loss","robotvqa_class_rel_loss",
                        "mrcnn_bbox_loss", "mrcnn_mask_loss",'robotvqa_poses_loss']
+	accuracy_names = ["robotvqa_class_acc","robotvqa_class_col_acc",
+                      "robotvqa_class_sha_acc","robotvqa_class_mat_acc","robotvqa_class_opn_acc","robotvqa_class_rel_acc", "mrcnn_mask_acc"]
+
         for name in loss_names:
             layer = self.keras_model.get_layer(name)
             if layer.output in self.keras_model.losses:
@@ -2903,7 +3467,7 @@ class RobotVQA():
                                  None] * len(self.keras_model.outputs))
 
         # Add metrics for losses
-        for name in loss_names:
+        for name in (loss_names + accuracy_names):
             if name in self.keras_model.metrics_names:
                 continue
             layer = self.keras_model.get_layer(name)
@@ -2937,7 +3501,7 @@ class RobotVQA():
             if not layer.weights:
                 continue
             # Is it trainable?
-            trainable = bool(re.fullmatch(layer_regex, layer.name))
+            trainable = bool(re.match("(?:"+layer_regex+r")\Z", layer.name))
             # Update layer. If layer is a container, update inner layer.
             if layer.__class__.__name__ == 'TimeDistributed':
                 layer.layer.trainable = trainable
@@ -2982,7 +3546,7 @@ class RobotVQA():
         self.checkpoint_path = self.checkpoint_path.replace(
             "*epoch*", "{epoch:04d}")
 
-    def train(self, train_dataset, val_dataset, learning_rate, epochs, layers):
+    def train(self, train_dataset, val_dataset, learning_rate, epochs, layers,depth='float32',op_type='training'):
         """Train the model.
         train_dataset, val_dataset: Training and validation Dataset objects.
         learning_rate: The learning rate to train with
@@ -2998,11 +3562,16 @@ class RobotVQA():
               3+: Train Resnet stage 3 and up
               4+: Train Resnet stage 4 and up
               5+: Train Resnet stage 5 and up
+	op_type: training or validation
         """
+	
+	assert op_type in ['validation','training'], 'Value Error: Bad op_type - '+str(op_type)
         assert self.mode == "training", "Create model in training mode."
 
         # Pre-defined layer regular expressions
         layer_regex = {
+	     # all pose layers
+            "pheads": r"(robotvqa\_*pose*.*)",
             # all layers but the backbone
             "heads": r"(mrcnn\_.*)|(rpn\_.*)|(fpn\_.*)|(robotvqa\_.*)",
             # From a specific Resnet stage and up
@@ -3016,12 +3585,22 @@ class RobotVQA():
             layers = layer_regex[layers]
 
         # Data generators
-        train_generator = data_generator(train_dataset, self.config, shuffle=True,
+	
+	#shuffle dataset
+	shuffle_nber=utils.randomIndex(5)
+	for sn in range(shuffle_nber+1):
+		np.random.shuffle(train_dataset.image_ids)
+        train_generator = Data_Generator(train_dataset, self.config, shuffle=False,
                                          batch_size=self.config.BATCH_SIZE,random_rois=False,
-                                         detection_targets=False, augment=False)
-        val_generator = data_generator(train_dataset, self.config, shuffle=True,
+                                         detection_targets=False, augment=False,stage='training',generator_default_size=20)
+	
+	#shuffle dataset
+	shuffle_nber=utils.randomIndex(3)
+	for sn in range(shuffle_nber+1):
+		np.random.shuffle(val_dataset.image_ids)
+        val_generator = Data_Generator(val_dataset, self.config, shuffle=False,
                                          batch_size=self.config.BATCH_SIZE,random_rois=False,
-                                         detection_targets=False, augment=False)
+                                         detection_targets=False, augment=False,stage='validation',generator_default_size=10)
 
         # Callbacks
         callbacks = [
@@ -3043,22 +3622,47 @@ class RobotVQA():
         if os.name is 'nt':
             workers = 0
         else:
-            workers = max(self.config.BATCH_SIZE // 2, 2)
-
-        self.keras_model.fit_generator(
-            train_generator,
-            initial_epoch=self.epoch,
-            epochs=epochs,
-            steps_per_epoch=self.config.STEPS_PER_EPOCH,
-            callbacks=callbacks,
-            validation_data=next(val_generator),
-            validation_steps=self.config.VALIDATION_STEPS,
-            max_queue_size=100,
-            workers=workers,
-            use_multiprocessing=True,
-        )
-        self.epoch = max(self.epoch, epochs)
-
+            workers = max(self.config.BATCH_SIZE // 2, self.config.NUMBER_THREADS)
+        
+	if(op_type=='training'):
+		self.history=self.keras_model.fit_generator(
+		    train_generator,
+		    steps_per_epoch=None,
+		    initial_epoch=self.epoch,
+		    epochs=epochs,
+		    callbacks=callbacks,
+		    validation_data=val_generator,
+		    validation_steps=None,
+		    max_queue_size=1000,
+		    workers=workers,
+		    use_multiprocessing=True,
+		    shuffle=False
+		   
+		)
+		self.epoch = max(self.epoch, epochs)
+	if(op_type=='validation'):
+		start_time=time.time()
+		evaluation_results=self.keras_model.evaluate_generator(val_generator, steps=None, max_queue_size=1000, workers=workers, use_multiprocessing=True)
+		end_time=time.time()
+		self.evaluation_results={'elapsed time in s': end_time-start_time,'datalength':len(val_generator)}
+		for i in range(len(evaluation_results)):
+			self.evaluation_results[self.keras_model.metrics_names[i]]=evaluation_results[i]
+	
+	
+		print('Validation: ',self.evaluation_results,'time elapsed in s: ', end_time-start_time )
+		try:
+			with open('../validation.data','rb') as f:
+				res=pickle.load(f)
+				f.close()
+		except Exception,e:
+			res=[]
+		res.append(self.evaluation_results)
+		with open('../validation.data','wb') as f:
+				pickle.dump(res,f)
+				f.close()
+	
+	
+	
     def mold_inputs(self, images):
         """Takes a list of images and modifies them to the format expected
         as an input to the neural network.
@@ -3253,7 +3857,7 @@ class RobotVQA():
         for p in parents:
             if p in checked:
                 continue
-            if bool(re.fullmatch(name, p.name)):
+            if bool(re.match("(?:"+name+r")\Z", p.name)):
                 return p
             checked.append(p)
             a = self.ancestor(p, name, checked)

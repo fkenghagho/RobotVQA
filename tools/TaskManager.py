@@ -1,3 +1,11 @@
+"""
+#@Author:   Frankln Kenghagho
+#@Date:     04.04.2019
+#@Project:  RobotVA
+"""
+
+
+
 #This program is frontend and multi-task, namely
 #   1- Setting of model paths 
 #   2- Setting of model hyperparameters
@@ -8,8 +16,8 @@
 #   7- Testing
 #   8- Result visualization
 
-#@Author:   Frankln Kenghagho
-#@Date:     19.03.2018
+
+
 from DatasetClasses import DatasetClasses
 import pickle
 import glob
@@ -56,54 +64,53 @@ class ExtendedDatasetLoader(utils.Dataset):
         return s[0].upper()+s[1:]
         
             
-    def register_images(self,folder,imgNameRoot,annotNameRoot,depthNameRoot,config):
+    def register_images(self,folders,imgNameRoot,annotNameRoot,depthNameRoot,config,with_depth=True,high_depth=True):
         """get all image files that pass the filter
             
            inputs:
                   mode: how to build the dataset: from a dataset file(file) or from a raw dataset(data) made up of images and annotations
                         For a quick access to large dataset, the latter is preloaded into a binary file
         """
-        image_filter=folder+'/'+imgNameRoot+'*.*'
-        annotation_filter=folder+'/'+annotNameRoot+'*.json'
-        images=glob.glob(image_filter)
-        annotations=glob.glob(annotation_filter)
-        classes=[[],[],[],[],[]]#for 5 output_features
+	classes=[[],[],[],[],[]]#for 5 output_features
         nbfails=0
         nbsuccess=0
-        #Add classes
-        print('\nLoading classes from dataset ...\n')
-        for anot in annotations:
-            try:
-                with open(anot,'r') as infile:
-                    jsonImage=json.load(infile)
-                infile.close()
-                for obj in jsonImage['objects']:
-                    try:
-                            cat=self.normalize(obj['objectName'])
-                            col=self.normalize(obj['objectColor'])
-                            sha=self.normalize(obj['objectShape'])
-                            mat=self.normalize(obj['objectExternMaterial'])
-                            opn=self.normalize(obj['objectOpenability'])
-                            opn=self.normalize(config.OBJECT_OPENABILITY_DICO[opn])
-                            if((cat in config.OBJECT_NAME_DICO) and (col in config.OBJECT_COLOR_DICO) and (sha in config.OBJECT_SHAPE_DICO) and \
-                                (mat in config.OBJECT_MATERIAL_DICO) and (opn in list(config.OBJECT_OPENABILITY_DICO.values()))):
-                                    if cat not in classes[0]:
-                                        classes[0].append(cat)
-                                    if col not in classes[1]:
-                                        classes[1].append(col)
-                                    if sha not in classes[2]:
-                                        classes[2].append(sha)
-                                    if mat not in classes[3]:
-                                        classes[3].append(mat)
-                                    if opn not in classes[4]:
-                                        classes[4].append(opn)
-                                    nbsuccess+=1
-                    except Exception as e:
-                        print('Data '+str(anot)+': An object could not be processed:'+str(e))
-                        nbfails+=1    
-            except Exception as e:
-                print('Data '+str(anot)+' could not be processed:'+str(e))
-                nbfails+=1
+	for folder in folders:
+		annotation_filter=folder+'/'+annotNameRoot+'*.json'
+		annotations=glob.glob(annotation_filter)
+		#Add classes
+		print('\nLoading classes from dataset ...\n')
+		for anot in annotations:
+		    try:
+		        with open(anot,'r') as infile:
+		            jsonImage=json.load(infile)
+		        infile.close()
+		        for obj in jsonImage['objects']:
+		            try:
+		                    cat=self.normalize(obj['objectName'])
+		                    col=self.normalize(obj['objectColor'])
+		                    sha=self.normalize(obj['objectShape'])
+		                    mat=self.normalize(obj['objectExternMaterial'])
+		                    opn=self.normalize(obj['objectOpenability'])
+		                    opn=self.normalize(config.OBJECT_OPENABILITY_DICO[opn])
+		                    if((cat in config.OBJECT_NAME_DICO) and (col in config.OBJECT_COLOR_DICO) and (sha in config.OBJECT_SHAPE_DICO) and \
+		                        (mat in config.OBJECT_MATERIAL_DICO) and (opn in list(config.OBJECT_OPENABILITY_DICO.values()))):
+		                            if cat not in classes[0]:
+		                                classes[0].append(cat)
+		                            if col not in classes[1]:
+		                                classes[1].append(col)
+		                            if sha not in classes[2]:
+		                                classes[2].append(sha)
+		                            if mat not in classes[3]:
+		                                classes[3].append(mat)
+		                            if opn not in classes[4]:
+		                                classes[4].append(opn)
+		                            nbsuccess+=1
+		            except Exception as e:
+		                print('Data '+str(anot)+': An object could not be processed:'+str(e))
+		                nbfails+=1    
+		    except Exception as e:
+		        print('Data '+str(anot)+' could not be processed:'+str(e))
+		        nbfails+=1
         print('\n',nbsuccess,' Objects successfully found and ',nbfails,' Objects failed!', '\n')
         print('\nClasses found:',classes, '\n')
         print('\nRegistering classes ...\n')
@@ -124,19 +131,28 @@ class ExtendedDatasetLoader(utils.Dataset):
                  self.add_class(feature_id,"robotVQA",i+1,self.normalize(list(config.RELATION_CATEGORY_DICO.values())[i]))
         
         print('\nAdding images ...\n')
-        #Add images      
-        for i in range(len(images)):
-            index=images[i].split(imgNameRoot)[1].split('.')[0]
-            annotationPath=folder+'/'+annotNameRoot+index+'.json'
-            depthPath=folder+'/'+depthNameRoot+index+'.exr'
-            try:
-                image = skimage.io.imread(images[i])
-                if os.path.exists(depthPath) and os.path.exists(annotationPath):
-                    self.add_image("robotVQA",i,images[i],depthPath=depthPath,annotPath=annotationPath,dataFolder=folder,shape=image.shape)
-            except Exception as e:
-                print('Image '+str(images[i])+' could not be registered:'+str(e))
+	k=-1
+	for folder in folders:
+		image_filter=folder+'/'+imgNameRoot+'*.*'
+		images=glob.glob(image_filter)
+		#Add images      
+		for i in range(len(images)):
+		    k+=1
+		    index=images[i].split(imgNameRoot)[1].split('.')[0]
+		    annotationPath=folder+'/'+annotNameRoot+index+'.json'
+		    if high_depth:
+		    	depthPath=folder+'/'+depthNameRoot+index+'.exr'
+		    else:
+			depthPath=folder+'/'+depthNameRoot+index+'.jpg'
+		    try:
+		        image = skimage.io.imread(images[i])
+		        if (os.path.exists(depthPath) or (not with_depth) ) and os.path.exists(annotationPath):
+		            self.add_image("robotVQA",k,images[i],depthPath=depthPath,annotPath=annotationPath,dataFolder=folder,shape=image.shape)
+		    except Exception as e:
+		        print('Image '+str(images[i])+' could not be registered:'+str(e))
+		print('\nImages found in'+folder+':',len(images), '\n')
         del classes[:]
-        print('\nImages found:',len(images), '\n')
+        
     
     def reduce_relation(self,relation):
         x=np.count_nonzero(relation,axis=2)
@@ -308,8 +324,8 @@ class ExtendedRobotVQAConfig(RobotVQAConfig):
     LEARNING_MOMENTUM = 0.9
 
     # Weight decay regularization
-    WEIGHT_DECAY = 0.0001
-    
+    WEIGHT_DECAY = 0.000001
+  
     # Use small images for faster training. Set the limits of the small side
     # the large side, and that determines the image shape.
     IMAGE_MIN_DIM = DatasetClasses.IMAGE_MIN_DIM
@@ -334,14 +350,18 @@ class ExtendedRobotVQAConfig(RobotVQAConfig):
     POST_NMS_ROIS_INFERENCE = 1000
 
     # Use a small epoch since the data is simple
-    STEPS_PER_EPOCH = 200
+    STEPS_PER_EPOCH = 10
     
     #Number of epochs
-    NUM_EPOCHS=500
+    NUM_EPOCHS=1000
     
 
     # use small validation steps since the epoch is small
-    VALIDATION_STEPS = 20
+    VALIDATION_STEPS = 500
+
+    #LEARNING RATE CONTROLLER
+    REL_ALPHA1=0.9999
+    REL_ALPHA2=0.0001
     
     # Use RPN ROIs or externally generated ROIs for training
     # Keep this True for most situations. Set to False if you want to train
@@ -349,6 +369,15 @@ class ExtendedRobotVQAConfig(RobotVQAConfig):
     # the RPN. For example, to debug the classifier head without having to
     # train the RPN.
     USE_RPN_ROIS = True
+
+
+    # Non-max suppression threshold to filter RPN proposals.
+    # You can reduce this during training to generate more propsals.
+    RPN_NMS_THRESHOLD = 0.6
+
+    # Non-maximum suppression threshold for detection
+    DETECTION_NMS_THRESHOLD = 0.1
+
     
     # Input image size:RGBD-Images
     IMAGE_SHAPE = [DatasetClasses.IMAGE_MAX_DIM, DatasetClasses.IMAGE_MAX_DIM, DatasetClasses.IMAGE_MAX_CHANNEL]
@@ -365,18 +394,26 @@ class ExtendedRobotVQAConfig(RobotVQAConfig):
     MEAN_PIXEL = DatasetClasses.MEAN_PIXEL
     
     # With depth information?
-    WITH_DEPTH_INFORMATION=False 
+    WITH_DEPTH_INFORMATION=False
     
     #processor's names
-    CGPU1='/cpu:0'
-    CGPU0='/gpu:0'
+    GPU0='/gpu:0'
+    GPU1='/gpu:1'
+    GPU2='/gpu:2'
+    GPU3='/gpu:3'
+    CPU0='/cpu:0'
     
-    #Layers to exclude on very first training with a new weights file                          
+    #Numbers of threads
+    NUMBER_THREADS=32
+    #Layers to exclude on very first training with a new weights file
+    EXCLUDE=None
+    """                          
     EXCLUDE=["robotvqa_class_logits0", "robotvqa_class_logits1","robotvqa_class_logits2","robotvqa_class_logits3","robotvqa_class_logits4",
                                         "robotvqa_class_logits5_1",'robotvqa_class_logits5_2','robotvqa_class_bn2','robotvqa_class_conv2',
                                         "mrcnn_bbox_fc","mrcnn_bbox","robotvqa_poses_fc", "robotvqa_poses",
                                         "robotvqa_poses_fc0","robotvqa_poses_fc1","robotvqa_poses_fc2",
                                         "mrcnn_mask","robotvqa_class0","robotvqa_class1","robotvqa_class2","robotvqa_class3","robotvqa_class4","robotvqa_class5"]
+    """
 
 ################ Task Manager Class(TMC)##############
 class TaskManager(object):
@@ -412,14 +449,14 @@ class TaskManager(object):
     
     
     
-    def getDataset(self,folder=DatasetClasses.DATASET_FOLDER, imgNameRoot=DatasetClasses.LIT_IMAGE_NAME_ROOT, annotNameRoot=DatasetClasses.ANNOTATION_IMAGE_NAME_ROOT,depthNameRoot=DatasetClasses.DEPTH_IMAGE_NAME_ROOT,binary_dataset=os.path.join(DatasetClasses.DATASET_FOLDER,DatasetClasses.DATASET_BINARY_FILE)):
+    def getDataset(self,folder=[DatasetClasses.DATASET_FOLDER], imgNameRoot=DatasetClasses.LIT_IMAGE_NAME_ROOT, annotNameRoot=DatasetClasses.ANNOTATION_IMAGE_NAME_ROOT,depthNameRoot=DatasetClasses.DEPTH_IMAGE_NAME_ROOT,binary_dataset=os.path.join(DatasetClasses.DATASET_FOLDER,DatasetClasses.DATASET_BINARY_FILE), with_depth=True,high_depth=True):
         try:
             with open(binary_dataset,'rb') as f:
                 return pickle.load(f)
         except Exception as exc:
                 try:
                     dataset=ExtendedDatasetLoader()
-                    dataset.register_images(folder,imgNameRoot,annotNameRoot,depthNameRoot,self.config)
+                    dataset.register_images(folder,imgNameRoot,annotNameRoot,depthNameRoot,self.config,with_depth=with_depth,high_depth=high_depth)
                     dataset.prepare()
                     return dataset
                 except Exception as e:
@@ -437,10 +474,12 @@ class TaskManager(object):
         except Exception as e:
             print('Error-Could not visualize dataset: '+str(e))
     
-    def train(self,dataset,init_with='coco'):
+    def train(self,train_set,val_set,init_with='last',depth='float32',op_type='training'):
         #config= should be adequately set for training
+	#op_type= training or validation.
         model = modellib.RobotVQA(mode="training", config=self.config,
                           model_dir=self.MODEL_DIR)
+	self.model=model
                           
         #Weights initialization imagenet, coco, or last
         if init_with == "imagenet":
@@ -459,22 +498,27 @@ class TaskManager(object):
             model.load_weights(model_path, by_name=True)
         print('Weights loaded successfully from '+str(model_path))
                           
-        #first training phase: only dataset specific layers(error) are trained
-        #the second dataset is dedicated to evaluation and consequenty needs to be set differently than the first one
-        model.train(dataset, dataset,learning_rate=self.config.LEARNING_RATE, epochs=self.config.NUM_EPOCHS,layers='heads')
-        #second training phase:all layers are revisited for fine-tuning
-        #the second dataset is dedicated to evaluation and consequenty needs to be set differently than the first one
-        #model.train(dataset, dataset,learning_rate=self.config.LEARNING_RATE/10, epochs=1,layers='all')
+        #Train progressively all the segments of the networks
+
+        #Training loop
+	model.train(train_set, val_set,learning_rate=self.config.LEARNING_RATE, epochs=self.config.NUM_EPOCHS,layers='all',depth=depth,op_type=op_type)
+        
+
+
+
+
+
         #save weights after training
         model_path = os.path.join(self.MODEL_DIR, "robotVQA.h5")
         model.keras_model.save_weights(model_path)
         print('Training terminated successfully!')
     
-    def inference(self,input_image_path,init_with='last'):
+    def inference(self,dst,input_image_paths,init_with='last',result_path=None):
         #set config for inference properly
         self.config.GPU_COUNT = 1
         self.config.IMAGES_PER_GPU = 1
         model = modellib.RobotVQA(mode="inference",config=self.config,model_dir=self.MODEL_DIR)
+	self.model=model
         #Weights initialization imagenet, coco, or last
         if init_with == "imagenet":
             model_path=model.get_imagenet_weights()
@@ -492,16 +536,16 @@ class TaskManager(object):
             model.load_weights(model_path, by_name=True)
         print('Weights loaded successfully from '+str(model_path))
         #load image
-        image = utils.load_image(input_image_path[0],input_image_path[1],self.config.MAX_CAMERA_CENTER_TO_PIXEL_DISTANCE)
-        #predict
-        results = model.detect([image], verbose=1)
-        r = results[0]
-        dst=self.getDataset()
-        class_ids=[r['class_cat_ids'],r['class_col_ids'],r['class_sha_ids'],r['class_mat_ids'],r['class_opn_ids'],r['class_rel_ids']]
-        scores=[r['scores_cat'],r['scores_col'],r['scores_sha'],r['scores_mat'],r['scores_opn'],r['scores_rel']]
-        visualize.display_instances(image[:,:,:3], r['rois'], r['masks'], class_ids, dst.class_names,r['poses'], scores=scores, axs=get_ax(cols=2),\
-        title='Object description',title1='Object relationships')
+	for input_image_path in input_image_paths:
+		image = utils.load_image(input_image_path[0],input_image_path[1],self.config.MAX_CAMERA_CENTER_TO_PIXEL_DISTANCE)
+                #predict
+                results = model.detect([image], verbose=0)
+	        r=results[0]
+		class_ids=[r['class_cat_ids'],r['class_col_ids'],r['class_sha_ids'],r['class_mat_ids'],r['class_opn_ids'],r['class_rel_ids']]
+		scores=[r['scores_cat'],r['scores_col'],r['scores_sha'],r['scores_mat'],r['scores_opn'],r['scores_rel']]
+		visualize.display_instances(image[:,:,:3], r['rois'], r['masks'], class_ids, dst.class_names,r['poses'], scores=scores, axs=get_ax(cols=2),\
+		title='Object description',title1='Object relationships',result_path=result_path+'/'+input_image_path[0].split('/').pop())
 
-
+	print('Inference terminated!!!')
 
 

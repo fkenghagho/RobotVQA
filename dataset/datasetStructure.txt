@@ -1,6 +1,6 @@
 In this file we present the structure of our dataset
 
-Each Image has 5# copies namely:
+Each image has 5# copies namely:
 
 -A RGB Image: colorImageName.jpg
 -A Depth Image: depthImageName.jpg
