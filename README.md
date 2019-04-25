@@ -3,7 +3,7 @@
 # RobotVQA: Scene-graph-oriented Visual Scene Understanding for Complex Robot Manipulation Tasks based on Deep Learning Architectures and Virtual Reality
 </center>
    
-# 0. Introduction 
+# Introduction 
  
 
    EASE is the initiative of the interdisciplinary research center EASE at the University of Bremen that aims at enabling robots to competently perform human-scale daily manipulation activities such as cooking in an ordinary kitchen. However, to complete such tasks, robots should not only exhibit standard visual perception capabilities such as captioning, detection, localization or recognition, but also demonstrate some cognitive vision, in which all these capabilities including considerable reasoning are integrated together, so that semantically deep understanding of the unstructured and dynamic scene can be reached.
@@ -25,7 +25,7 @@ The contribution of this thesis is twofold:
 
 - **Demonstration of full machine learning transferability from virtual worlds to real worlds:**  the real world is virtualized, a big rich dataset is collected from the virtual world, the above model is trained on and tested in the real world.
 
-The pdf-version of the thesis can be found at [thesis.pdf](https://github.com/fkenghagho/RobotVQA/blob/feature-background-in-object-integration/Literature/thesis.pdf)
+The pdf-version of the thesis can be found at [thesis.pdf](Literature/thesis.pdf)
 
 
 
