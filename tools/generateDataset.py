@@ -1,9 +1,17 @@
+"""
+#@Author:   Frankln Kenghagho
+#@Date:     04.04.2019
+#@Project:  RobotVA
+"""
+
+
+
 import numpy as np
 import os 
 import glob
 import sys
 import time
-import StringIO, PIL.Image
+import cStringIO, PIL.Image
 from unrealcv import client
 import json
 import cv2
@@ -22,6 +30,8 @@ def randomIndex(N):
 
 objectColor=DatasetClasses.OBJECT_COLOR_DICO
 class Dataset(object):
+    """Dataset Generation
+    """
     #mode=offline(without connection to image server. Used when processing existing data)/online(With connection to image server)
     #state=continue/restart
     def __init__(self):
@@ -365,13 +375,13 @@ class Dataset(object):
     
     #convert from raw to RGB image matrix
     def read_png(self,res):
-        img = PIL.Image.open(StringIO.StringIO(res))
+        img = PIL.Image.open(cStringIO.StringIO(res))
         return np.asarray(img)
         
     #convert from raw to  float depth image matrix
     def read_npy(self,res):
-        import StringIO
-        return np.load(StringIO.StringIO(res))
+        import cStringIO
+        return np.load(cStringIO.StringIO(res))
         
     #get key from dictionnary given value
     def getKey(self,val):
@@ -1218,90 +1228,101 @@ class Dataset(object):
     
     
     
-    def cleanRelation(self):
-        """make the relations consistent """
-        try:
-            #load annotation files
-            annotation_files=glob.glob(self.folder+'/*.json')
-            print annotation_files
-           
-            #Initialize counter for number of relations group by relation types
-            self.rel_count={'left':0,'right':0,'front':0,'behind':0,'over':0,'under':0,'valign':0,'in':0,'on':0}
+    def cleanRelation(self,folders):
+        """make the relations consistent
+           inputs: list of folders containing the data
+        """
+        folder_index=0
+        for folder in folders:
+            try:
+                file_index=0
+                folder_index+=1
+                #load annotation files
+                annotation_files=glob.glob(folder+'/*.json')
+                print annotation_files
+            
+                #Initialize counter for number of relations group by relation types
+                self.rel_count={'left':0,'right':0,'front':0,'behind':0,'over':0,'under':0,'valign':0,'in':0,'on':0}
+                            
+                #process each file
+                for jsonFile in annotation_files:
+                    try:
+                        file_index+=1
+                        print('-------Processing Status------------------')
+                        print('Folder:'+str(folder)+': '+str(folder_index)+'/'+str(len(folders)))
+                        print('File:'+str(jsonFile)+': '+str(file_index)+'/'+str(len(annotation_files)))
+                        print()
+                        print()
+                        #open json file
+                        with open(jsonFile,'r') as infile:
+                            jsonImage=json.load(infile)
+                        infile.close()
                         
-            #process each file
-            for jsonFile in annotation_files:
-                try:
-                    
-                    #open json file
-                    with open(jsonFile,'r') as infile:
-                        jsonImage=json.load(infile)
-                    infile.close()
-                    
-                    #Modify json file
-                    if jsonImage['objectRelationship']!=[]:
-                        #invalid indices
-                        invalid_rel_indices=[]
-                        #List of valid objects
-                        list_of_valid_objects=[]
-                        for obj in jsonImage['objects']:
-                            try:
-                                list_of_valid_objects.append(obj['objectId'])
-                            except Exception,e:
-                                print('An object processing failed: '+str(e))
-                                
-                        #Remove all the relations involving invalid objects
-                        relId=0
-                        while relId<len(jsonImage['objectRelationship']):
-                            try:
-                                #get the next relation
-                                rel=jsonImage['objectRelationship'][relId]
-                                #check whether the involved objects are valid
-                                if (rel['object1'] not in list_of_valid_objects)  or (rel['object2'] not in list_of_valid_objects):
-                                    #check whether the involved object 1 is valid
-                                    if (rel['object1'] not in list_of_valid_objects):
-                                        objId=0
-                                        while(objId<len(jsonImage['objectRelationship'])):
-                                            rel1=jsonImage['objectRelationship'][objId]
-                                            if rel1['object2']==rel['object1'] and rel1['relation'] in DatasetClasses.CONTENANCE_RELATIONSHIPS and rel1['object1'] in list_of_valid_objects:
-                                                jsonImage['objectRelationship'].append({"object1": rel1['object1'], "object2": rel['object2'], "relation": rel['relation']})
-                                            objId+=1
-                                    #check whether the involved object 2 is valid
-                                    if (rel['object2'] not in list_of_valid_objects):
-                                        #Avoid self-contenance relation
-                                        if(rel['relation'] not in DatasetClasses.CONTENANCE_RELATIONSHIPS):
+                        #Modify json file
+                        if jsonImage['objectRelationship']!=[]:
+                            #invalid indices
+                            invalid_rel_indices=[]
+                            #List of valid objects
+                            list_of_valid_objects=[]
+                            for obj in jsonImage['objects']:
+                                try:
+                                    list_of_valid_objects.append(obj['objectId'])
+                                except Exception,e:
+                                    print('An object processing failed: '+str(e))
+                                    
+                            #Remove all the relations involving invalid objects
+                            relId=0
+                            while relId<len(jsonImage['objectRelationship']):
+                                try:
+                                    #get the next relation
+                                    rel=jsonImage['objectRelationship'][relId]
+                                    #check whether the involved objects are valid
+                                    if (rel['object1'] not in list_of_valid_objects)  or (rel['object2'] not in list_of_valid_objects):
+                                        #check whether the involved object 1 is valid
+                                        if (rel['object1'] not in list_of_valid_objects):
                                             objId=0
                                             while(objId<len(jsonImage['objectRelationship'])):
                                                 rel1=jsonImage['objectRelationship'][objId]
-                                                if rel1['object2']==rel['object2'] and rel1['relation'] in DatasetClasses.CONTENANCE_RELATIONSHIPS and rel1['object1'] in list_of_valid_objects:
-                                                    jsonImage['objectRelationship'].append({"object1": rel['object1'], "object2": rel1['object1'], "relation": rel['relation']})
-                                                objId+=1   
-                                    #Save the invalid relations
-                                    invalid_rel_indices.append(relId)
-                                else:
-                                    #Actualise the relation counter
-                                    self.rel_count[rel['relation']]+=1
-                                #Move forward in the list with normalization(consistency)
-                                relId+=1
-                            except Exception,e:
-                                print('Failed to process relation ',rel,': '+str(e))
-                        
-                        #Remove the invalid relations
-                        step=0
-                        for invalid_rel_indice in range(len(invalid_rel_indices)):
-                            jsonImage['objectRelationship'].pop(invalid_rel_indices[invalid_rel_indice]-step)
-                            step+=1
-                        #Free memory space
-                        del invalid_rel_indices[:]
-                        #Save changes committed in the json file
-                        print('Saving changes ...')
-                        with open(jsonFile,'w') as infile:
-                            json.dump(jsonImage,infile)
-                        infile.close()   
-                except Exception,e:
-                    print('Failed to clean up '+jsonFile+': '+str(e))
-            print('Relation clean-up successfully terminated!')
-        except Exception,e:
-            print('\n\n Failed to clean up relations among objects: '+str(e))
+                                                if rel1['object2']==rel['object1'] and rel1['relation'] in DatasetClasses.CONTENANCE_RELATIONSHIPS and rel1['object1'] in list_of_valid_objects:
+                                                    jsonImage['objectRelationship'].append({"object1": rel1['object1'], "object2": rel['object2'], "relation": rel['relation']})
+                                                objId+=1
+                                        #check whether the involved object 2 is valid
+                                        if (rel['object2'] not in list_of_valid_objects):
+                                            #Avoid self-contenance relation
+                                            if(rel['relation'] not in DatasetClasses.CONTENANCE_RELATIONSHIPS):
+                                                objId=0
+                                                while(objId<len(jsonImage['objectRelationship'])):
+                                                    rel1=jsonImage['objectRelationship'][objId]
+                                                    if rel1['object2']==rel['object2'] and rel1['relation'] in DatasetClasses.CONTENANCE_RELATIONSHIPS and rel1['object1'] in list_of_valid_objects:
+                                                        jsonImage['objectRelationship'].append({"object1": rel['object1'], "object2": rel1['object1'], "relation": rel['relation']})
+                                                    objId+=1   
+                                        #Save the invalid relations
+                                        invalid_rel_indices.append(relId)
+                                    else:
+                                        #Actualise the relation counter
+                                        self.rel_count[rel['relation']]+=1
+                                    #Move forward in the list with normalization(consistency)
+                                    relId+=1
+                                except Exception,e:
+                                    print('Failed to process relation ',rel,': '+str(e))
+                            
+                            #Remove the invalid relations
+                            step=0
+                            for invalid_rel_indice in range(len(invalid_rel_indices)):
+                                jsonImage['objectRelationship'].pop(invalid_rel_indices[invalid_rel_indice]-step)
+                                step+=1
+                            #Free memory space
+                            del invalid_rel_indices[:]
+                            #Save changes committed in the json file
+                            print('Saving changes ...')
+                            with open(jsonFile,'w') as infile:
+                                json.dump(jsonImage,infile)
+                            infile.close()   
+                    except Exception,e:
+                        print('Failed to clean up '+jsonFile+': '+str(e))
+                print('Relation clean-up successfully terminated!')
+            except Exception,e:
+                print('\n\n Failed to clean up relations among objects: '+str(e))
     
     
     def BigNum(self,x):

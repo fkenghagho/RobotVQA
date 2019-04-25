@@ -1,9 +1,24 @@
+"""
+#@Author:   Frankln Kenghagho
+#@Date:     04.04.2019
+#@Project:  RobotVA
+#Extends the work below Mask R-CNN
+"""
+
+"""
+Mask R-CNN
+Common utility functions and classes.
+
+Copyright (c) 2017 Matterport, Inc.
+Licensed under the MIT License (see LICENSE for details)
+Written by Waleed Abdulla
+"""
+
 #This program manages the configuration of our modelk, namely
 #   1- Setting of model hyperparameters
 #   2- Content visualization
 
-#@Author:   Frankln Kenghagho
-#@Date:     20.03.2018
+
 
 import math
 import numpy as np
@@ -149,7 +164,7 @@ class RobotVQAConfig(object):
 
         # Input image size
         self.IMAGE_SHAPE = np.array(
-            [self.IMAGE_MAX_DIM, self.IMAGE_MAX_DIM, 6])
+            [self.IMAGE_MAX_DIM, self.IMAGE_MAX_DIM, 7])
 
         # Compute backbone size from input image size
         self.BACKBONE_SHAPES = np.array(

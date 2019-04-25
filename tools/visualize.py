@@ -1,4 +1,13 @@
 """
+#@Author:   Frankln Kenghagho
+#@Date:     04.04.2019
+#@Project:  RobotVA
+#Extends the work below Mask R-CNN
+"""
+
+
+
+"""
 Mask R-CNN
 Display and Visualization Functions.
 
@@ -10,21 +19,25 @@ Written by Waleed Abdulla
 import random
 import itertools
 import colorsys
+import skimage.io
 import numpy as np
 from skimage.measure import find_contours
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import matplotlib.lines as lines
 from matplotlib.patches import Polygon
-import IPython.display
-
+#import IPython.display
+import matplotlib
+matplotlib.use('Agg')
 import utils
+from generateDataset import Dataset
 
+FIGURE=None
 
 ############################################################
 #  Visualization
 ############################################################
-def get_ax(rows=1, cols=1, size=8):
+def get_ax(rows=1, cols=1, size=6,size1=6):
     """Return a Matplotlib Axes array to be used in
     all visualizations in the notebook. Provide a
     central point to control graph sizes.
@@ -32,7 +45,9 @@ def get_ax(rows=1, cols=1, size=8):
     Change the default size attribute to control the size
     of rendered images
     """
-    _, ax = plt.subplots(rows, cols, figsize=(size*cols, size*rows))
+
+    fig, ax = plt.subplots(rows, cols,gridspec_kw = {'width_ratios':[3, 1]}, figsize=(size1*cols, size*rows))
+    FIGURE=fig
     return ax
     
     
@@ -71,13 +86,14 @@ def random_colors(N, bright=True):
     convert to RGB.
     """
     brightness = 1.0 if bright else 0.7
-    hsv = [(i / N, 1, brightness) for i in range(N)]
+    hsv = [(i*1.0 / N, 1.0, brightness) for i in range(N)]
     colors = list(map(lambda c: colorsys.hsv_to_rgb(*c), hsv))
     random.shuffle(colors)
+   
     return colors
 
 
-def apply_mask(image, mask, color, alpha=0.5):
+def apply_mask(image, mask, color, alpha=0.2):
     """Apply the given mask to the image.
     """
     for c in range(3):
@@ -90,7 +106,7 @@ def apply_mask(image, mask, color, alpha=0.5):
 
 def display_instances(image, boxes, masks, class_ids, class_names,poses,
                       scores=None, title="",title1='',
-                      figsize=(16, 16), axs=None):
+                      figsize=(16, 16), axs=None,result_path=None):
     """
     boxes: [num_instance, (y1, x1, y2, x2, class_id)] in image coordinates.
     poses: [num_instance, (tetax,tetay,tetaz,x,y,z)] in radians and cm.
@@ -101,10 +117,13 @@ def display_instances(image, boxes, masks, class_ids, class_names,poses,
     figsize: (optional) the size of the image.
     """
     
+    
     # Number of instances
     N = boxes.shape[0]
     if not N:
         print("\n*** No instances to display *** \n")
+	if result_path:
+	    skimage.io.imsave(result_path,image.astype(np.uint8))
         return 0
     else:
         assert boxes.shape[0] == masks.shape[-1] == class_ids[0].shape[0]==class_ids[1].shape[0]==class_ids[2].shape[0]==\
@@ -115,6 +134,8 @@ def display_instances(image, boxes, masks, class_ids, class_names,poses,
         _, axs = plt.subplots(1,2, figsize=figsize)
     ax=axs[0]
     ax1=axs[1]
+
+    dataset=Dataset()
 
     # Generate random colors
     colors = random_colors(N)
@@ -144,6 +165,54 @@ def display_instances(image, boxes, masks, class_ids, class_names,poses,
                               alpha=0.7, linestyle="dashed",
                               edgecolor=color, facecolor='none')
         ax.add_patch(p)
+	
+	#Draw poses
+	AXIS_LENGTH=20	
+	
+	orientation=np.array([poses[i][0],poses[i][1],poses[i][2]],dtype='float32')
+	position=np.array([poses[i][3],poses[i][4],poses[i][5]],dtype='float32')
+	#position=np.array([1.7107088e+02,9.0871674e+01, 6.2195825e+02],dtype='float32')
+	#orientation=np.array([5.4416003e+00, 3.3464733e-01, 4.9978323e+00],dtype='float32')
+
+	#Get rotation matrix for the corresponding Euler's angles orientation
+	rotation=dataset.eulerAnglesToRotationMatrix(orientation)
+
+	#Rotated axes
+	VZ=np.dot(rotation,np.array([0.,0.,1.]))[1:]
+	VY=np.dot(rotation,np.array([0.,1.,0.]))[1:]
+	VX=np.dot(rotation,np.array([1.,0.,0.]))[1:]
+	if  np.linalg.norm(VZ)!=0:
+		VZ/=np.linalg.norm(VZ)
+	if  np.linalg.norm(VY)!=0:
+		VY/=np.linalg.norm(VY)
+	if  np.linalg.norm(VX)!=0:
+			VX/=np.linalg.norm(VX)
+
+	#exact object position
+	X=x1+(x2 - x1)/2
+	Y=y1+(y2 - y1)/2
+	
+	#Draw axis Y in green
+	Xc=np.maximum(np.minimum(X+VY[0]*(AXIS_LENGTH),image.shape[1]),0)
+	Yc=np.maximum(np.minimum(Y+VY[1]*(-AXIS_LENGTH),image.shape[0]),0)
+	QY=patches.Arrow(X, Y, Xc-X, Yc-Y, width=18.0, color='green')
+	ax.add_patch(QY)
+
+	#Draw axis X in red
+	Xc=np.maximum(np.minimum(X+VX[0]*(AXIS_LENGTH),image.shape[1]),0)
+	Yc=np.maximum(np.minimum(Y+VX[1]*(-AXIS_LENGTH),image.shape[0]),0)
+	QX=patches.Arrow(X, Y, Xc-X, Yc-Y, width=18.0, color='red')
+	ax.add_patch(QX)
+
+	#Draw axis Z in blue
+	Xc=np.maximum(np.minimum(X+VZ[0]*(AXIS_LENGTH),image.shape[1]),0)
+	Yc=np.maximum(np.minimum(Y+VZ[1]*(-AXIS_LENGTH),image.shape[0]),0)
+	QZ=patches.Arrow(X, Y, Xc-X, Yc-Y, width=18.0, color='blue')
+	ax.add_patch(QZ)
+	
+	#Identify poses
+	Center=patches.Circle((X,Y), radius=5, fill=True,edgecolor=color, facecolor=color)
+	ax.add_patch(Center)	
 
         # Label
         caption=str(i)+'. '
@@ -154,23 +223,60 @@ def display_instances(image, boxes, masks, class_ids, class_names,poses,
             for j in range(len(class_ids)-1):
                 caption=caption+class_names[j][class_ids[j][i]]+'\n'
         caption=caption+'Orientation: ('+str(poses[i][0])+','+str(poses[i][1])+','+str(poses[i][2])+')\n'
-        caption=caption+'Position: ('+str(poses[i][3])+','+str(poses[i][4])+','+str(poses[i][5])+')'
+        caption=caption+'Position: ('+str(X)+','+str(Y)+','+str(poses[i][5])+')'
         x = random.randint(x1, (x1 + x2) // 2)
         ax.text(x1, y1 + 8, caption,
-                color='black', size=7, backgroundcolor="none")
+                color=colors[i], size=9, backgroundcolor="none")
                 
         #object relationship
+	
+	#left
+        kleft=0
+        sleft=-1
+
+	#left
+        kfront=0
+        sfront=-1
         for k in range(N):
             #k=best_relations[i]
-            if(class_ids[len(class_ids)-1][i][k]!=0 and i!=k):
-                caption=str(i)+'.'+class_names[0][class_ids[0][i]]+' is '+class_names[5][class_ids[len(class_ids)-1][i][k]]+' '+str(k)+\
-                '.'+class_names[0][class_ids[0][k]]+': '+str((scores[len(class_ids)-1][i][k]))+'.'
-                print('RELATION:'+caption)
-                ax1.text(x3, y3, caption,color='black', size=8, backgroundcolor="none")
-                y3+=30
+            if(class_ids[len(class_ids)-1][i][k]!=0 and i!=k and (class_ids[len(class_ids)-1][k][i]==0 or (class_ids[len(class_ids)-1][k][i]!=0  and scores[len(class_ids)-1][i][k]>scores[len(class_ids)-1][k][i]))):
+		rel_name=class_names[5][class_ids[len(class_ids)-1][i][k]]
+                if rel_name not in ['Front', 'Left']:
+		        caption=str(i)+'.'+class_names[0][class_ids[0][i]]+' is '+class_names[5][class_ids[len(class_ids)-1][i][k]]+' '+str(k)+\
+		        '.'+class_names[0][class_ids[0][k]]+': '+str((scores[len(class_ids)-1][i][k]))+'.'
+		        #print('RELATION:'+caption)
+		        ax1.text(x3, y3, caption,color='black', size=10, backgroundcolor="none")
+		        y3+=20
+		if class_names[5][class_ids[len(class_ids)-1][i][k]]=='Front':
+			if scores[len(class_ids)-1][i][k]>sfront:
+				sfront=scores[len(class_ids)-1][i][k]
+				kfront=k
+		if class_names[5][class_ids[len(class_ids)-1][i][k]]=='Left':
+			if scores[len(class_ids)-1][i][k]>sleft:
+				sleft=scores[len(class_ids)-1][i][k]
+				kleft=k
+	if sleft!=-1:
+		k=kleft
+ 		caption=str(i)+'.'+class_names[0][class_ids[0][i]]+' is '+class_names[5][class_ids[len(class_ids)-1][i][k]]+' '+str(k)+\
+		        '.'+class_names[0][class_ids[0][k]]+': '+str((scores[len(class_ids)-1][i][k]))+'.'
+		#print('RELATION:'+caption)
+	        ax1.text(x3, y3, caption,color='black', size=10, backgroundcolor="none")
+	        y3+=20	
+
+	if sfront!=-1:
+		k=kfront
+ 		caption=str(i)+'.'+class_names[0][class_ids[0][i]]+' is '+class_names[5][class_ids[len(class_ids)-1][i][k]]+' '+str(k)+\
+		        '.'+class_names[0][class_ids[0][k]]+': '+str((scores[len(class_ids)-1][i][k]))+'.'
+		#print('RELATION:'+caption)
+	        ax1.text(x3, y3, caption,color='black', size=10, backgroundcolor="none")
+	        y3+=30	
+
+		
      
         # Mask
         mask = masks[:, :, i]
+	#print('******************** ERROR TRACKER *****************')
+	#print(mask.shape,mask.sum())
         masked_image = apply_mask(masked_image, mask, color)
 
         # Mask Polygon
@@ -184,9 +290,14 @@ def display_instances(image, boxes, masks, class_ids, class_names,poses,
             verts = np.fliplr(verts) - 1
             p = Polygon(verts, facecolor="none", edgecolor=color)
             ax.add_patch(p)
-    ax.imshow(masked_image.astype(np.uint8))
-    ax1.imshow(back_img)
+    ax.imshow(masked_image.astype(np.uint8),aspect='auto')
+    ax1.imshow(back_img.astype(np.uint8),aspect='auto')
+    
+    if result_path:
+	    plt.savefig(result_path)
     plt.show()
+    print('ok')
+   
     
 
 def draw_rois(image, rois, refined_rois, mask, class_ids, class_names, limit=10):
