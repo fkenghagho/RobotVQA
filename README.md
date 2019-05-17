@@ -160,7 +160,7 @@ To watch the results video, please click on ***the following image link and then
 [![Results video1](images/tests1.png)](images/test7.mp4 "Results video1")
 [![Results video2](images/tests3.png)](images/test3.mp4 "Results video2")
 [![Results video3](images/tests4.png)](images/test8.mp4 "Results video3")
-[![Results video4](images/tests5.png)](images/final_5cdeb4585c5c0a0014a5cf0e_549557.mp4 "Results video4")
+[![Results video4](images/Kazam_screenshot_00002.png)](images/final_5cdeb4585c5c0a0014a5cf0e_549557.mp4 "Results video4")
 ![Results](images/results.png "Results")
 ![Results1](images/results1.png "Results1")
 ![Results2](images/results2.png "Results2")
