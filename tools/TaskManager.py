@@ -404,7 +404,7 @@ class ExtendedRobotVQAConfig(RobotVQAConfig):
     CPU0='/cpu:0'
     
     #Numbers of threads
-    NUMBER_THREADS=32
+    NUMBER_THREADS=16
     #Layers to exclude on very first training with a new weights file
     EXCLUDE=None
     """                          
