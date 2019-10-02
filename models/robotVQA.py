@@ -1451,7 +1451,7 @@ def robotvqa_class_rel_loss_graph(target_class_ids, pred_class_logits,
     loss2 = tf.reduce_sum(loss2)/ (tf.reduce_sum(pred_active2))
     #loss= tf.reduce_sum(pred_active)
     loss=loss2_i*loss2+loss1_i*loss1
-    return loss2
+    return loss
 
 
 
@@ -1542,7 +1542,7 @@ def robotvqa_class_rel_accuracy_graph(target_class_ids, pred_class_logits,
 
 
     accuracy=acc2_i*acc2+acc1_i*acc1
-    return acc
+    return accuracy
 
 
 
