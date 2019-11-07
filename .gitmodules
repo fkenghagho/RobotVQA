@@ -1,0 +1,3 @@
+[submodule "rs_robotvqa_msgs"]
+	path = rs_robotvqa_msgs
+	url = https://github.com/fkenghagho/rs_robotvqa_msgs.git

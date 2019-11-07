@@ -216,7 +216,7 @@ def display_instances(image, boxes, masks, class_ids, class_names,poses,
 
         # Label
         caption=str(i)+'. '
-        if scores!=None and False:
+        if scores!=None or True:
             for j in range(len(class_ids)-1):
                 caption=caption+class_names[j][class_ids[j][i]]+' '+str(scores[j][i])+'\n'
         else:
@@ -295,7 +295,6 @@ def display_instances(image, boxes, masks, class_ids, class_names,poses,
     
     if result_path:
 	    plt.savefig(result_path)
-    plt.show()
     print('ok')
    
     

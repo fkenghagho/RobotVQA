@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """
 #@Author:   Frankln Kenghagho
 #@Date:     04.04.2019
@@ -16,9 +17,6 @@
 #   7- Testing
 #   8- Result visualization
 
-
-
-from DatasetClasses import DatasetClasses
 import pickle
 import glob
 import os
@@ -31,6 +29,24 @@ import numpy as np
 import cv2
 import matplotlib
 import matplotlib.pyplot as plt
+
+import rospy
+from PIL import Image
+from std_msgs.msg import( String )
+import cv_bridge
+from sensor_msgs.msg import Image
+from sensor_msgs.msg import CompressedImage
+from cv_bridge import CvBridge
+import roslib
+import rospkg
+rospack = rospkg.RosPack()
+packname=''
+packname=rospack.get_path('robotvqa_visualizer')
+
+#setting python paths
+sys.path.append(os.path.join(packname,'../models'))
+sys.path.append(os.path.join(packname,'../tools'))
+from DatasetClasses import DatasetClasses
 from  robotVQAConfig import RobotVQAConfig
 import utils
 import visualize
@@ -38,11 +54,18 @@ from visualize import get_ax
 import skimage
 import json
 
-#setting python paths
-sys.path.append('../models')
+#Select a GPU if working on Multi-GPU Systems
+#Several GPUs can also be selected
+os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID" 
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+import glob
+
+ 
+from keras import backend as K
 import robotVQA as modellib
 
-
+#Scene Graph Server
+from rs_robotvqa_msgs.srv import *
 
         
 
@@ -78,7 +101,7 @@ class ExtendedDatasetLoader(utils.Dataset):
 		annotation_filter=folder+'/'+annotNameRoot+'*.json'
 		annotations=glob.glob(annotation_filter)
 		#Add classes
-		print('\nLoading classes from dataset ...\n')
+		rospy.loginfo('\nLoading classes from dataset ...\n')
 		for anot in annotations:
 		    try:
 		        with open(anot,'r') as infile:
@@ -106,31 +129,31 @@ class ExtendedDatasetLoader(utils.Dataset):
 		                                classes[4].append(opn)
 		                            nbsuccess+=1
 		            except Exception as e:
-		                print('Data '+str(anot)+': An object could not be processed:'+str(e))
+		                rospy.loginfo('Data '+str(anot)+': An object could not be processed:'+str(e))
 		                nbfails+=1    
 		    except Exception as e:
-		        print('Data '+str(anot)+' could not be processed:'+str(e))
+		        rospy.loginfo('Data '+str(anot)+' could not be processed:'+str(e))
 		        nbfails+=1
-        print('\n',nbsuccess,' Objects successfully found and ',nbfails,' Objects failed!', '\n')
-        print('\nClasses found:',classes, '\n')
-        print('\nRegistering classes ...\n')
+        rospy.loginfo('\n',nbsuccess,' Objects successfully found and ',nbfails,' Objects failed!', '\n')
+        rospy.loginfo('\nClasses found:',classes, '\n')
+        rospy.loginfo('\nRegistering classes ...\n')
         for feature_id in range(config.NUM_FEATURES-2):
             for i in range(len(classes[feature_id])):
                 self.add_class(feature_id,"robotVQA",i+1,classes[feature_id][i])
         
-        print('\nAdding object relationships ...\n')        
+        rospy.loginfo('\nAdding object relationships ...\n')        
         #Add relationships
         feature_id=5
         for i in range(config.NUM_CLASSES[feature_id]-1):
                  self.add_class(feature_id,"robotVQA",i+1,self.normalize(list(config.OBJECT_RELATION_DICO.keys())[i]))
                  
-        print('\nAdding relationship categories ...\n')        
+        rospy.loginfo('\nAdding relationship categories ...\n')        
         #Add relationship categories
         feature_id=6
         for i in range(config.NUM_CLASSES[feature_id]-1):
                  self.add_class(feature_id,"robotVQA",i+1,self.normalize(list(config.RELATION_CATEGORY_DICO.values())[i]))
         
-        print('\nAdding images ...\n')
+        rospy.loginfo('\nAdding images ...\n')
 	k=-1
 	for folder in folders:
 		image_filter=folder+'/'+imgNameRoot+'*.*'
@@ -149,8 +172,8 @@ class ExtendedDatasetLoader(utils.Dataset):
 		        if (os.path.exists(depthPath) or (not with_depth) ) and os.path.exists(annotationPath):
 		            self.add_image("robotVQA",k,images[i],depthPath=depthPath,annotPath=annotationPath,dataFolder=folder,shape=image.shape)
 		    except Exception as e:
-		        print('Image '+str(images[i])+' could not be registered:'+str(e))
-		print('\nImages found in'+folder+':',len(images), '\n')
+		        rospy.logerr('Image '+str(images[i])+' could not be registered:'+str(e))
+		rospy.loginfo('\nImages found in'+folder+':',len(images), '\n')
         del classes[:]
         
     
@@ -227,10 +250,10 @@ class ExtendedDatasetLoader(utils.Dataset):
                                     nbsuccess+=1
                 except Exception as e:
                                     nbfail+=1
-            print('\n\n',nbsuccess,'/',nbsuccess+nbfail,' Object(s) found!')
+            rospy.loginfo('\n\n',nbsuccess,'/',nbsuccess+nbfail,' Object(s) found!')
             nbInstances=len(mask)
             shape.append(nbInstances)
-            print('\nShape:\n',shape)
+            rospy.loginfo('\nShape:\n',shape)
             masks=np.zeros(shape,dtype='uint8')
             poses=np.zeros([nbInstances,6],dtype='float32')
             relations=np.zeros([nbInstances,nbInstances,DatasetClasses.NUM_CLASSES[6]-1],dtype='int32')
@@ -249,7 +272,7 @@ class ExtendedDatasetLoader(utils.Dataset):
                         relations[id_name_map.index(rel['object1'])][id_name_map.index(rel['object2'])][self.class_names[6].index(config.OBJECT_RELATION_DICO[self.normalize(rel['relation'])])-1]=self.class_names[5].index(self.normalize(rel['relation']))
                    
                 except Exception as e:
-                    print('An object relationship could not be processed: '+str(e))
+                    rospy.logerr('An object relationship could not be processed: '+str(e))
             del id_name_map[:]
             #Further processing if there are relations
             if relations.sum()!=0.:
@@ -270,7 +293,7 @@ class ExtendedDatasetLoader(utils.Dataset):
                 relations[:,:,0][z]=(relations[:,:,1][z])
             return masks,classes,poses,relations[:,:,0]
         except Exception as e:
-            print('\n\n Data '+str(annotationPath)+' could not be processed:'+str(e))
+            rospy.logerr('\n\n Data '+str(annotationPath)+' could not be processed:'+str(e))
             return super(self.__class__,self).load_mask(image_id)
       
 
@@ -417,37 +440,107 @@ class ExtendedRobotVQAConfig(RobotVQAConfig):
 
 ################ Task Manager Class(TMC)##############
 class TaskManager(object):
-    def __init__(self,modeldir=None,rootdir=None,weightpath=None,pythonpath=None):
+    ###################################################################
+    def __init__(self):
 
         try:
+               
+            #Ros Node
+	    	
+            rospy.init_node('robotvqa')
+	    rospy.loginfo('Starting Ros Node RobotVQA ...')
+	    rospy.on_shutdown(self.cleanup)  
+            self.TempImageFile=rospy.get_param('sharedImageFile','TempImageFile.jpg')         
+	    
+	    #attributes
+	    self.cvImageBuffer=[]
+	    self.INDEX=-1
+	    self.INSTANCEINDEX=0
+	    if rospy.get_param('videomode','local')=='local':
+			self.cvMode='rgb8'
+	    else:
+			self.cvMode='bgr8'
+	    self.total=0
+	    self.success=0
+	    self.currentImage=[]#current image
+	    self.iheight=rospy.get_param('input_height',480)
+	    self.iwidth=rospy.get_param('input_width',640)
+	    self.height=rospy.get_param('output_height',1000)
+	    self.width=rospy.get_param('output_width',1000)
+            self.color_hint=rospy.get_param('color_hint',"")
+            self.model=None
+            self.color_hints={"":Image, "Compressed":CompressedImage, "raw":Image, "Raw":Image, "compressed":CompressedImage}
+	    self.bridge = CvBridge()
+	    rospy.logwarn('RobotVQA initialized!!!')
             
+
             # Root directory of the project
-            if rootdir==None:
-                self.ROOT_DIR = os.getcwd()
-            else:
-                self.ROOT_DIR=rootdir
+            self.ROOT_DIR = rospy.get_param('root_dir',os.path.join(packname,'../../RobotVQA'))
+          
             # Directory to save logs and trained model
-            if modeldir==None:
-                modeldir='logs'
-            self.MODEL_DIR = os.path.join(self.ROOT_DIR, modeldir)
+            self.MODEL_DIR = rospy.get_param('model_dir',os.path.join(self.ROOT_DIR, 'logs1'))
             
             # Local path to trained weights file
-            if weightpath==None:
-                weightpath="mask_rcnn_coco.h5"
-            self.ROBOTVQA_WEIGHTS_PATH = os.path.join(self.ROOT_DIR,weightpath)
+            self.ROBOTVQA_WEIGHTS_PATH =  rospy.get_param('weight_path',os.path.join(self.ROOT_DIR,"mask_rcnn_coco.h5"))
+
             self.config = ExtendedRobotVQAConfig()#Model config
             if not os.path.exists(self.ROBOTVQA_WEIGHTS_PATH):
-               print('\nThe weight path '+str(self.ROBOTVQA_WEIGHTS_PATH)+' does not exists!!!\n')
-            print('Root directory:'+str(self.ROOT_DIR) ) 
-            print('Model directory:'+str(self.MODEL_DIR) ) 
-            print('Weight path:'+str(self.ROBOTVQA_WEIGHTS_PATH)) 
+               rospy.loginfo('\nThe weight path '+str(self.ROBOTVQA_WEIGHTS_PATH)+' does not exists!!!\n')
+            rospy.loginfo('Root directory:'+str(self.ROOT_DIR) ) 
+            rospy.loginfo('Model directory:'+str(self.MODEL_DIR) ) 
+            rospy.loginfo('Weight path:'+str(self.ROBOTVQA_WEIGHTS_PATH)) 
             self.config.display()
-            print('\nTaskManager started successfully\n')
+
+            #load the training set's cartography
+	    rospy.loginfo('Getting Dataset ...')
+            binary_dataset_path=rospy.get_param('binary_dataset_path',os.path.join(self.ROOT_DIR,'dataset/virtual_training_dataset(51000_Images).data'))
+	    self.train_set=self.getDataset(binary_dataset=binary_dataset_path)
+            #result_path: Where should the output of RobotVQA be saved?
+	    self.result_path=rospy.get_param('result_path',self.ROOT_DIR+'/result')
+
+            rospy.loginfo('Starting RobotVQA core ...')
+	    #Start Inference
+	    self.inference(self.train_set,result_path=self.result_path)
+            #service
+            self.getSceneGraph=rospy.Service('/get_scene_graph', GetSceneGraph, self.syncImageProcessing)
+	    #subscribers
+            topic=rospy.get_param('input_topic','/RoboSherlock/input_image')
+	    self.sub = rospy.Subscriber(topic,self.color_hints[self.color_hint],self.asyncImageProcessing)
+            rospy.loginfo('\nTaskManager started successfully\n')
+            rospy.logwarn('\nWaiting for images ... '+str(topic)+'\n')
         except Exception as e:
-            print('\n Starting TaskManager failed: ',e.args[0],'\n')
+            rospy.loginfo('\n Starting TaskManager failed: ',e.args[0],'\n')
             sys.exit(-1)
     
-    
+    ###################################################################
+    def resize(self,images,meanSize1,meanSize2):
+		normImages=[]
+		try:		
+			for i in range(len(images)):
+				if(images[i].shape[0]*images[i].shape[1]<meanSize1*meanSize2):
+					normImages.append(np.array(cv2.resize(images[i].copy(),(meanSize1,meanSize2),
+		                                          interpolation=cv2.INTER_LINEAR),dtype='uint8'))#enlarge
+				else:
+					normImages.append(np.array(cv2.resize(images[i].copy(),(meanSize1,meanSize2),
+		                                          interpolation=cv2.INTER_AREA),dtype='uint8'))#shrink
+			rospy.loginfo('Resizing of images successful')
+		except:
+			rospy.logwarn('Failed to normalize/resize dataset')
+		return normImages
+
+  
+    ###################################################################
+    def cleanup(self):
+	rospy.logwarn('Shutting down RobotVQA node ...')	
+
+	
+    ###################################################################
+    def showImages(self):
+	if len(self.currentImage)>0:
+		cv2.imshow("Streaming-World",self.currentImage)
+		k = cv2.waitKey(1) & 0xFF
+
+    ###################################################################
     
     def getDataset(self,folder=[DatasetClasses.DATASET_FOLDER], imgNameRoot=DatasetClasses.LIT_IMAGE_NAME_ROOT, annotNameRoot=DatasetClasses.ANNOTATION_IMAGE_NAME_ROOT,depthNameRoot=DatasetClasses.DEPTH_IMAGE_NAME_ROOT,binary_dataset=os.path.join(DatasetClasses.DATASET_FOLDER,DatasetClasses.DATASET_BINARY_FILE), with_depth=True,high_depth=True):
         try:
@@ -460,9 +553,9 @@ class TaskManager(object):
                     dataset.prepare()
                     return dataset
                 except Exception as e:
-                    print('Dataset creation failed: '+str(e))
+                    rospy.logerr('Dataset creation failed: '+str(e))
                     return None
-            
+    ###################################################################        
     
     def visualize_dataset(self,dataset,nbImages):
         try:
@@ -472,7 +565,9 @@ class TaskManager(object):
                 mask, class_ids = dataset.load_mask(image_id)
                 visualize.display_top_masks(image, mask, class_ids, dataset.class_names)
         except Exception as e:
-            print('Error-Could not visualize dataset: '+str(e))
+            rospy.logerr('Error-Could not visualize dataset: '+str(e))
+
+    ###################################################################
     
     def train(self,train_set,val_set,init_with='last',depth='float32',op_type='training'):
         #config= should be adequately set for training
@@ -496,56 +591,119 @@ class TaskManager(object):
             # Load the last model you trained and continue training
             model_path=model.find_last()[1]
             model.load_weights(model_path, by_name=True)
-        print('Weights loaded successfully from '+str(model_path))
+        rospy.loginfo('Weights loaded successfully from '+str(model_path))
                           
         #Train progressively all the segments of the networks
 
         #Training loop
 	model.train(train_set, val_set,learning_rate=self.config.LEARNING_RATE, epochs=self.config.NUM_EPOCHS,layers='all',depth=depth,op_type=op_type)
-        
-
-
-
-
-
         #save weights after training
         model_path = os.path.join(self.MODEL_DIR, "robotVQA.h5")
         model.keras_model.save_weights(model_path)
-        print('Training terminated successfully!')
-    
-    def inference(self,dst,input_image_paths,init_with='last',result_path=None):
+        rospy.loginfo('Training terminated successfully!')
+
+    ###################################################################    
+    def inference(self,dst,init_with='last',result_path=None):
         #set config for inference properly
         self.config.GPU_COUNT = 1
         self.config.IMAGES_PER_GPU = 1
-        model = modellib.RobotVQA(mode="inference",config=self.config,model_dir=self.MODEL_DIR)
-	self.model=model
+        self.model = modellib.RobotVQA(mode="inference",config=self.config,model_dir=self.MODEL_DIR)
         #Weights initialization imagenet, coco, or last
         if init_with == "imagenet":
-            model_path=model.get_imagenet_weights()
-            model.load_weights(model_path, by_name=True,exclude=ExtendedRobotVQAConfig.EXCLUDE)
+            model_path=self.model.get_imagenet_weights()
+            self.model.load_weights(model_path, by_name=True,exclude=ExtendedRobotVQAConfig.EXCLUDE)
         elif init_with == "coco":
             # Load weights trained on MS COCO, but skip layers that
             # are different due to the different number of classes
             # See README for instructions to download the COCO weights
             model_path=self.ROBOTVQA_WEIGHTS_PATH
-            model.load_weights(model_path, by_name=True,
+            self.model.load_weights(model_path, by_name=True,
                             exclude=ExtendedRobotVQAConfig.EXCLUDE)
         elif init_with == "last":
             # Load the last model you trained and continue training
-            model_path=model.find_last()[1]
-            model.load_weights(model_path, by_name=True)
-        print('Weights loaded successfully from '+str(model_path))
-        #load image
-	for input_image_path in input_image_paths:
-		image = utils.load_image(input_image_path[0],input_image_path[1],self.config.MAX_CAMERA_CENTER_TO_PIXEL_DISTANCE)
-                #predict
-                results = model.detect([image], verbose=0)
-	        r=results[0]
+            model_path=self.model.find_last()[1]
+            self.model.load_weights(model_path, by_name=True)
+	self.model.keras_model._make_predict_function()
+        rospy.loginfo('Weights loaded successfully from '+str(model_path))
+   
+
+
+  ###################################################################
+    def asyncImageProcessing(self,image):
+		
+	try:
+		dst=self.train_set
+		self.currentImage = self.bridge.imgmsg_to_cv2(image, self.cvMode)
+                b=self.currentImage[:,:,0].copy()
+		self.currentImage[:,:,0]=self.currentImage[:,:,2].copy()
+		self.currentImage[:,:,2]=b.copy()
+		self.currentImage = self.resize([self.currentImage],self.iwidth,self.iheight)[0]
+                cv2.imwrite(self.TempImageFile,self.currentImage)
+		rospy.loginfo('Buffering of current image successful')
+		image = utils.load_image(self.TempImageFile,None,self.config.MAX_CAMERA_CENTER_TO_PIXEL_DISTANCE)
+	        #predict
+                rospy.logwarn(image.shape)
+	        results = self.model.detect([image], verbose=0)
+		r=results[0]
 		class_ids=[r['class_cat_ids'],r['class_col_ids'],r['class_sha_ids'],r['class_mat_ids'],r['class_opn_ids'],r['class_rel_ids']]
 		scores=[r['scores_cat'],r['scores_col'],r['scores_sha'],r['scores_mat'],r['scores_opn'],r['scores_rel']]
-		visualize.display_instances(image[:,:,:3], r['rois'], r['masks'], class_ids, dst.class_names,r['poses'], scores=scores, axs=get_ax(cols=2),\
-		title='Object description',title1='Object relationships',result_path=result_path+'/'+input_image_path[0].split('/').pop())
+		resImage=visualize.display_instances(image[:,:,:3], r['rois'], r['masks'], class_ids, dst.class_names,r['poses'], scores=scores, axs=get_ax(cols=2),\
+		title='Object description',title1='Object relationships',result_path=self.result_path+'/'+self.TempImageFile)
+                resImage=cv2.imread(self.result_path+'/'+self.TempImageFile)
+		if(len(resImage)>0):
+			self.currentImage =resImage.copy()
+		#self.currentImage = self.resize([self.currentImage],self.width,self.height)[0]
+		self.showImages()
+		rospy.loginfo('Inference terminated!!!')
+	except Exception as e:
+		rospy.logwarn(' Failed to buffer image '+str(e))
 
-	print('Inference terminated!!!')
 
+ ################################################################################################
+    def syncImageProcessing(self,request):
+		
+	try:
+                image=request.query
+		dst=self.train_set
+		self.currentImage = self.bridge.imgmsg_to_cv2(image, self.cvMode)
+                b=self.currentImage[:,:,0].copy()
+		self.currentImage[:,:,0]=self.currentImage[:,:,2].copy()
+		self.currentImage[:,:,2]=b.copy()
+		self.currentImage = self.resize([self.currentImage],self.iwidth,self.iheight)[0]
+                cv2.imwrite(self.TempImageFile,self.currentImage)
+		rospy.loginfo('Buffering of current image successful')
+		image = utils.load_image(self.TempImageFile,None,self.config.MAX_CAMERA_CENTER_TO_PIXEL_DISTANCE)
+	        #predict
+                rospy.logwarn(image.shape)
+	        results = self.model.detect([image], verbose=0)
+		r=results[0]
+		class_ids=[r['class_cat_ids'],r['class_col_ids'],r['class_sha_ids'],r['class_mat_ids'],r['class_opn_ids'],r['class_rel_ids']]
+		scores=[r['scores_cat'],r['scores_col'],r['scores_sha'],r['scores_mat'],r['scores_opn'],r['scores_rel']]
+		resImage=visualize.display_instances(image[:,:,:3], r['rois'], r['masks'], class_ids, dst.class_names,r['poses'], scores=scores, axs=get_ax(cols=2),\
+		title='Object description',title1='Object relationships',result_path=self.result_path+'/'+self.TempImageFile)
+                resImage=cv2.imread(self.result_path+'/'+self.TempImageFile)
+		if(len(resImage)>0):
+			self.currentImage =resImage.copy()
+		#self.currentImage = self.resize([self.currentImage],self.width,self.height)[0]
+		self.showImages()
+		rospy.loginfo('Inference terminated!!!')
+                return GetSceneGraphResponse()
+	except Exception as e:
+		rospy.logwarn(' Failed to buffer image '+str(e))
+                return GetSceneGraphResponse()
+###################################################################################################
+
+
+
+if __name__=="__main__":
+    
+    try:
+        #start the model loader
+	tkm=TaskManager()
+	
+	#Infinite Loop
+	rospy.spin()
+       
+    except Exception as e:
+	rospy.logwarn('Shutting down RobotVQA node ...'+str(e))
 

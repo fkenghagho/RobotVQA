@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<package>
+  <name>robotvqa_visualizer</name>
+  <version>0.0.1</version>
+  <description>The robotvqa_visualizer package</description>
+  <author email="fkenghag@cs.uni-bremen.de"> Franklin Kenghagho Kenfack </author>
+  <maintainer email="fkenghag@cs.uni-bremen.de"> Franklin Kenghagho Kenfack </maintainer>
+  <license>BSD2</license>
+  <buildtool_depend>catkin</buildtool_depend>
+  <build_depend>rs_robotvqa_msgs</build_depend>
+  <run_depend>rs_robotvqa_msgs</run_depend>
+</package>

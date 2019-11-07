@@ -1,0 +1,20 @@
+<launch>
+ <arg name="input_topic"   default="/RoboSherlock/input_image"/>
+ <arg name="color_hint"   default=""/>
+ <param name="topic" type="str" value="/kinect_head/rgb/image_color/compressed"/>
+ <param name="input_topic" type="str" value="$(arg input_topic)"/>
+ <param name="color_hint" type="str" value="$(arg color_hint)"/>
+ <param name="videomode" type="str" value="local"/>
+ <param name="sharedImageFile" type="str" value="TempImageFile.jpg"/>
+ <param name="input_height" type="int" value="480" />
+ <param name="input_width" type="int" value="640" />
+ <param name="output_height" type="int" value="1000" />
+ <param name="output_width" type="int" value="1000" />
+ <!-- param name="root_dir" type="str" value="os.getcd()" / -->
+ <!-- param name="model_dir" type="str" value="os.getcd()" / -->
+ <!-- param name="weight_path" type="str" value="os.getcd()" / -->
+ <!-- param name="binary_dataset_path" type="str" value="os.getcd()" / -->
+ <!-- param name="result_path" type="str" value="os.getcd()" / -->
+ <!-- node name="robotvqa_visualizer" pkg="robotvqa_visualizer" type="robotvqa_visualizer.py" output="screen" /-->
+ <node name="robotvqa" pkg="robotvqa_visualizer" type="TaskManager.py" output="screen" />
+</launch>
