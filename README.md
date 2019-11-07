@@ -221,7 +221,7 @@ To test RobotVQA: inference on images in folder  testsamples.
 
 4. The results will be graphically displayed and subsequently saved into the subfolder result of the folder RobotVQA
 
-Note:  * RobotVQA's parameter files (.h5) are stored in the subfolders logs (RGBD mode) and logs1 (RGB mode). They are not uploaded yet *
+Note:  * RobotVQA's parameter files (.h5) are stored in the subfolders logs (RGBD mode) and logs1 (RGB mode). 
 
 
 
@@ -245,7 +245,7 @@ Note:
 
 - *The first two parameter of train(...) are respectively the training dataset (train_set) and the validation dataset (val_set)*
 	  
-- *RobotVQA's parameter files (.h5) are stored in the subfolders logs (RGBD mode) and logs1 (RGB mode). They are not uploaded yet*
+- *RobotVQA's parameter files (.h5) are stored in the subfolders logs (RGBD mode) and logs1 (RGB mode). 
 
 
 
@@ -269,7 +269,7 @@ Note:
 
 - *The first two parameter of train(...) are identical (val_set), (val_set).*
 	  
-- *RobotVQA's parameter files (.h5) are stored in the subfolders logs (RGBD mode) and logs1 (RGB mode). They are not uploaded yet* 
+- *RobotVQA's parameter files (.h5) are stored in the subfolders logs (RGBD mode) and logs1 (RGB mode). 
 
 3. At the end of the evaluation, the results are appended to a binary file named validation.data and located in the folder RobotVQA
 
