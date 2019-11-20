@@ -17,19 +17,29 @@
 #   7- Testing
 #   8- Result visualization
 
+#setting python paths
+import sys
+import os
+import roslib
+import rospkg
+rospack = rospkg.RosPack()
+packname=''
+packname=rospack.get_path('robotvqa_visualizer')
+sys.path.append(os.path.join(packname,'../models'))
+sys.path.append(os.path.join(packname,'../tools'))
+
+import visualize
+from visualize import get_ax
 import pickle
 import glob
-import os
-import sys
+
 import random
 import math
 import re
 import time
 import numpy as np
 import cv2
-import matplotlib
-import matplotlib.pyplot as plt
-
+import mutex
 import rospy
 from PIL import Image
 from std_msgs.msg import( String )
@@ -37,20 +47,11 @@ import cv_bridge
 from sensor_msgs.msg import Image
 from sensor_msgs.msg import CompressedImage
 from cv_bridge import CvBridge
-import roslib
-import rospkg
-rospack = rospkg.RosPack()
-packname=''
-packname=rospack.get_path('robotvqa_visualizer')
 
-#setting python paths
-sys.path.append(os.path.join(packname,'../models'))
-sys.path.append(os.path.join(packname,'../tools'))
+
 from DatasetClasses import DatasetClasses
 from  robotVQAConfig import RobotVQAConfig
 import utils
-import visualize
-from visualize import get_ax
 import skimage
 import json
 
@@ -460,6 +461,9 @@ class TaskManager(object):
 			self.cvMode='rgb8'
 	    else:
 			self.cvMode='bgr8'
+            self.wait=True
+            self.mutex=mutex.mutex()
+            self.mutex2=mutex.mutex()
 	    self.total=0
 	    self.success=0
 	    self.currentImage=[]#current image
@@ -536,9 +540,23 @@ class TaskManager(object):
 	
     ###################################################################
     def showImages(self):
+        k=0
+        while self.mutex.testandset():
+              pass
 	if len(self.currentImage)>0:
 		cv2.imshow("Streaming-World",self.currentImage)
-		k = cv2.waitKey(1) & 0xFF
+                while True:
+                        while self.mutex2.testandset():
+                               k = cv2.waitKey(1) & 0xFF
+                               if k==27:
+		                    cv2.destroyWindow("Streaming-World")
+                        if not self.wait:
+                           break
+                        self.mutex2.unlock()
+		       
+        self.mutex.unlock()
+              
+                
 
     ###################################################################
     
@@ -631,8 +649,14 @@ class TaskManager(object):
   ###################################################################
     def asyncImageProcessing(self,image):
 		
-	try:
-		dst=self.train_set
+	#try:    
+                while self.mutex2.testandset():
+                      pass   
+		self.wait=False
+                self.mutex2.unlock()
+		while self.mutex.testandset():
+                      pass  
+                dst=self.train_set
 		self.currentImage = self.bridge.imgmsg_to_cv2(image, self.cvMode)
                 b=self.currentImage[:,:,0].copy()
 		self.currentImage[:,:,0]=self.currentImage[:,:,2].copy()
@@ -653,16 +677,19 @@ class TaskManager(object):
 		if(len(resImage)>0):
 			self.currentImage =resImage.copy()
 		#self.currentImage = self.resize([self.currentImage],self.width,self.height)[0]
-		self.showImages()
+		#self.showImages()
 		rospy.loginfo('Inference terminated!!!')
-	except Exception as e:
-		rospy.logwarn(' Failed to buffer image '+str(e))
+                self.wait=True
+                self.mutex.unlock()
+	#except Exception as e:
+		#rospy.logwarn(' Failed to buffer image '+str(e))
 
 
  ################################################################################################
     def syncImageProcessing(self,request):
 		
-	try:
+	try:     
+               
                 image=request.query
 		dst=self.train_set
 		self.currentImage = self.bridge.imgmsg_to_cv2(image, self.cvMode)
@@ -702,7 +729,9 @@ if __name__=="__main__":
 	tkm=TaskManager()
 	
 	#Infinite Loop
-	rospy.spin()
+	#rospy.spin()
+        while not rospy.is_shutdown():
+           tkm.showImages()
        
     except Exception as e:
 	rospy.logwarn('Shutting down RobotVQA node ...'+str(e))

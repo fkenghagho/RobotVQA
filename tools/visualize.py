@@ -15,6 +15,12 @@ Copyright (c) 2017 Matterport, Inc.
 Licensed under the MIT License (see LICENSE for details)
 Written by Waleed Abdulla
 """
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+import matplotlib.lines as lines
+from matplotlib.patches import Polygon
 
 import random
 import itertools
@@ -22,13 +28,7 @@ import colorsys
 import skimage.io
 import numpy as np
 from skimage.measure import find_contours
-import matplotlib.pyplot as plt
-import matplotlib.patches as patches
-import matplotlib.lines as lines
-from matplotlib.patches import Polygon
 #import IPython.display
-import matplotlib
-matplotlib.use('Agg')
 import utils
 from generateDataset import Dataset
 
