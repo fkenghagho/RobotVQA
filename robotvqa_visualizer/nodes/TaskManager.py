@@ -400,7 +400,7 @@ class ExtendedRobotVQAConfig(RobotVQAConfig):
     RPN_NMS_THRESHOLD = 0.6
 
     # Non-maximum suppression threshold for detection
-    DETECTION_NMS_THRESHOLD = 0.1
+    DETECTION_NMS_THRESHOLD = 0.01
 
     
     # Input image size:RGBD-Images
@@ -649,7 +649,7 @@ class TaskManager(object):
   ###################################################################
     def asyncImageProcessing(self,image):
 		
-	#try:    
+	try:    
                 while self.mutex2.testandset():
                       pass   
 		self.wait=False
@@ -667,13 +667,28 @@ class TaskManager(object):
 		image = utils.load_image(self.TempImageFile,None,self.config.MAX_CAMERA_CENTER_TO_PIXEL_DISTANCE)
 	        #predict
                 rospy.logwarn(image.shape)
-	        results = self.model.detect([image], verbose=0)
-		r=results[0]
-		class_ids=[r['class_cat_ids'],r['class_col_ids'],r['class_sha_ids'],r['class_mat_ids'],r['class_opn_ids'],r['class_rel_ids']]
-		scores=[r['scores_cat'],r['scores_col'],r['scores_sha'],r['scores_mat'],r['scores_opn'],r['scores_rel']]
-		resImage=visualize.display_instances(image[:,:,:3], r['rois'], r['masks'], class_ids, dst.class_names,r['poses'], scores=scores, axs=get_ax(cols=2),\
-		title='Object description',title1='Object relationships',result_path=self.result_path+'/'+self.TempImageFile)
-                resImage=cv2.imread(self.result_path+'/'+self.TempImageFile)
+                R=image[:,:,0].copy()
+                G=image[:,:,1].copy()
+                B=image[:,:,2].copy()
+                image0=np.stack((R.copy()*0,G.copy(),B.copy(),image[:,:,3].copy(),image[:,:,4].copy(),image[:,:,5].copy(),image[:,:,6]),axis=2)#image0=np.flip(image,0)
+                image1=np.stack((R.copy(),B.copy(),G.copy(),image[:,:,3].copy(),image[:,:,4].copy(),image[:,:,5].copy(),image[:,:,6]),axis=2)#image1=np.flip(image,1)
+                image2=np.stack((B.copy(),G.copy(),R.copy(),image[:,:,3].copy(),image[:,:,4].copy(),image[:,:,5].copy(),image[:,:,6]),axis=2)#image2=np.flip(image1,0)
+                image3=np.stack((B.copy(),R.copy(),G.copy(),image[:,:,3].copy(),image[:,:,4].copy(),image[:,:,5].copy(),image[:,:,6]),axis=2)#image3=np.flip(image0,1)
+                image4=np.stack((G.copy(),R.copy(),B.copy(),image[:,:,3].copy(),image[:,:,4].copy(),image[:,:,5].copy(),image[:,:,6]),axis=2)#image4=self.resize([np.rot90(image,1)],self.iwidth,self.iheight)[0]
+                image5=np.stack((G.copy(),B.copy(),R.copy(),image[:,:,3].copy(),image[:,:,4].copy(),image[:,:,5].copy(),image[:,:,6]),axis=2)#image5=self.resize([np.rot90(image,3)],self.iwidth,self.iheight)[0]
+                image6=np.stack((R.copy(),G.copy()*0,B.copy(),image[:,:,3].copy(),image[:,:,4].copy(),image[:,:,5].copy(),image[:,:,6]),axis=2)#image6=image-30
+                image7=np.stack((R.copy(),G.copy(),B.copy()*0,image[:,:,3].copy(),image[:,:,4].copy(),image[:,:,5].copy(),image[:,:,6]),axis=2)#image7=image+30
+                images=[image0,image1,image2,image3,image,image4,image5,image6,image7]
+                rImages=[]
+                for image in images:
+			results = self.model.detect([image], verbose=0)
+			r=results[0]
+			class_ids=[r['class_cat_ids'],r['class_col_ids'],r['class_sha_ids'],r['class_mat_ids'],r['class_opn_ids'],r['class_rel_ids']]
+			scores=[r['scores_cat'],r['scores_col'],r['scores_sha'],r['scores_mat'],r['scores_opn'],r['scores_rel']]
+			resImage=visualize.display_instances(image[:,:,:3], r['rois'], r['masks'], class_ids, dst.class_names,r['poses'], scores=scores, axs=get_ax(cols=2),\
+			title='Object description',title1='Object relationships',result_path=self.result_path+'/'+self.TempImageFile)
+                	rImages.append(self.resize([cv2.imread(self.result_path+'/'+self.TempImageFile)],self.width/3,self.height/3)[0])
+                resImage=np.concatenate(( np.concatenate((rImages[0],rImages[1],rImages[4]),axis=0) , np.concatenate((rImages[2],rImages[3],rImages[7]),axis=0),np.concatenate((rImages[5],rImages[6],rImages[8]),axis=0) ),axis=1)       
 		if(len(resImage)>0):
 			self.currentImage =resImage.copy()
 		#self.currentImage = self.resize([self.currentImage],self.width,self.height)[0]
@@ -681,8 +696,8 @@ class TaskManager(object):
 		rospy.loginfo('Inference terminated!!!')
                 self.wait=True
                 self.mutex.unlock()
-	#except Exception as e:
-		#rospy.logwarn(' Failed to buffer image '+str(e))
+	except Exception as e:
+		rospy.logwarn(' Failed to buffer image '+str(e))
 
 
  ################################################################################################
@@ -735,4 +750,10 @@ if __name__=="__main__":
        
     except Exception as e:
 	rospy.logwarn('Shutting down RobotVQA node ...'+str(e))
+
+
+
+
+
+
 

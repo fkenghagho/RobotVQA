@@ -31,6 +31,7 @@ from skimage.measure import find_contours
 #import IPython.display
 import utils
 from generateDataset import Dataset
+from  robotVQAConfig import  RobotVQAConfig
 
 FIGURE=None
 
@@ -154,9 +155,20 @@ def display_instances(image, boxes, masks, class_ids, class_names,poses,
     #class_ids[len(class_ids)-1]=class_ids[len(class_ids)-1]+1
     #best_relations=np.argmax(scores[len(class_ids)-1],axis=1)
     #best_relations=utils.relation_graph(boxes)
+    object_filter=[]
+    config=RobotVQAConfig()
     for i in range(N):
+         for j in range(len(class_ids)-1):
+             if scores[j][i]<config.OBJECT_PROP_THRESHOLD:
+			object_filter.append(i)
+                        break
+    for i in range(N):
+
+        if i in object_filter:
+		continue
+             
+        # Bounding box##################################################################
         color = colors[i]
-        # Bounding box
         if not np.any(boxes[i]):
             # Skip this instance. Has no bbox. Likely lost in image cropping.
             continue
@@ -212,9 +224,9 @@ def display_instances(image, boxes, masks, class_ids, class_names,poses,
 	
 	#Identify poses
 	Center=patches.Circle((X,Y), radius=5, fill=True,edgecolor=color, facecolor=color)
-	ax.add_patch(Center)	
+	ax.add_patch(Center)
 
-        # Label
+        # Label#######################################################################
         caption=str(i)+'. '
         if scores!=None or True:
             for j in range(len(class_ids)-1):
@@ -225,10 +237,12 @@ def display_instances(image, boxes, masks, class_ids, class_names,poses,
         caption=caption+'Orientation: ('+str(poses[i][0])+','+str(poses[i][1])+','+str(poses[i][2])+')\n'
         caption=caption+'Position: ('+str(X)+','+str(Y)+','+str(poses[i][5])+')'
         x = random.randint(x1, (x1 + x2) // 2)
+	
+        #adding labels
         ax.text(x1, y1 + 8, caption,
                 color=colors[i], size=9, backgroundcolor="none")
                 
-        #object relationship
+        #object relationship#############################################################################
 	
 	#left
         kleft=0
@@ -239,6 +253,8 @@ def display_instances(image, boxes, masks, class_ids, class_names,poses,
         sfront=-1
         for k in range(N):
             #k=best_relations[i]
+            if k in object_filter:
+		continue
             if(class_ids[len(class_ids)-1][i][k]!=0 and i!=k and (class_ids[len(class_ids)-1][k][i]==0 or (class_ids[len(class_ids)-1][k][i]!=0  and scores[len(class_ids)-1][i][k]>scores[len(class_ids)-1][k][i]))):
 		rel_name=class_names[5][class_ids[len(class_ids)-1][i][k]]
                 if rel_name not in ['Front', 'Left']:

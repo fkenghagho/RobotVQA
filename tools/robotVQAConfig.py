@@ -156,7 +156,8 @@ class RobotVQAConfig(object):
     # the RPN. For example, to debug the classifier head without having to
     # train the RPN.
     USE_RPN_ROIS = True
-
+    # Threshold for Object Property's Belief Probability
+    OBJECT_PROP_THRESHOLD=0.9
     def __init__(self):
         """Set values of computed attributes."""
         # Effective batch size

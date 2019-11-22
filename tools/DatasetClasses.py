@@ -122,6 +122,24 @@ class DatasetClasses(object):
 	    #Actor common temporary pose
 	    ACTOR_COMMON_TEMP_LOCATION='-651 -701 30'
 	    ACTOR_COMMON_TEMP_ROTATION='0 0 0'
+
+            #Semantic Color Mappings from RGB to ["0GB","RBG","BGR","BRG","RGB","GRB","GBR","R0B","RG0"]
+            CVTCOLOR=[
+          ["0GB","RBG","BGR","BRG","RGB","GRB","GBR","R0B","RG0"],
+        
+          [
+            {"Red":"Black","Orange":"Green","Brown":"Green","Yellow":"Green","Green":"Green","Blue":"Blue","White":"Blue","Gray":"Green","Black":"Black","Violet":"Blue","Pink":"Blue"},         
+            {"Red":"Red","Orange":"Red","Brown":"Violet","Yellow":"Violet","Green":"Blue","Blue":"Green","White":"White","Gray":"Gray","Black":"Black",'Pink':"Yellow"},
+            {"Red":"Blue" ,"Orange":"Blue","Brown":"Blue","Yellow":"Green","Green":"Green","Blue":"Red","White":"White","Gray":"Gray","Black":"Black",'Pink':"Pink"},
+            {"Red":"Green","Orange":"Green","Brown":"Green","Yellow":"Green","Green":"Blue","Blue":"Red","White":"White","Gray":"Gray","Black":"Black",'Violet':"Brown",'Pink':"Yellow"},
+            {"Red":"Red" ,"Orange":"Orange","Brown":"Brown","Yellow":"Yellow","Green":"Green","Blue":"Blue","White":"White","Gray":"Gray","Black":"Black",'Violet':"Violet",'Pink':"Pink"},
+            {"Red":"Green","Orange":"Green","Brown":"Green","Yellow":"Yellow","Green":"Red","Blue":"Blue","White":"White","Gray":"Gray","Black":"Black",'Violet':"Green",'Pink':"Green"},
+            {"Red":"Blue","Orange":"Violet","Brown":"Violet","Yellow":"Pink","Green":"Red","Blue":"Green","White":"White","Gray":"Gray","Black":"Black",'Violet':"Green",'Pink':"Green"},
+            {"Red":"Red" ,"Orange":"Red","Brown":"Red","Yellow":"Red","Green":"Black","Blue":"Blue","White":"Violet","Gray":"Violet","Black":"Black",'Violet':"Violet",'Pink':"Violet"},
+            {"Red":"Red" ,"Orange":"Orange","Brown":"Brown","Yellow":"Yellow","Green":"Green","Blue":"Black","White":"Yellow","Gray":"Yellow","Black":"Black",'Violet':"Red",'Pink':"Orange"}
+          ]
+         ]
+            
 	    
 	    
 	    def __init__(self):
