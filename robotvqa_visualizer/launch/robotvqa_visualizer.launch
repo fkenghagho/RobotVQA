@@ -1,11 +1,12 @@
 <launch>
- <arg name="input_topic"   default="/RoboSherlock/input_image"/>
+ <arg name="input_topic"   default="none"/>
  <arg name="color_hint"   default=""/>
- <param name="topic" type="str" value="/kinect_head/rgb/image_color/compressed"/>
+ <param name="topic" type="str" value="none"/>
  <param name="input_topic" type="str" value="$(arg input_topic)"/>
  <param name="color_hint" type="str" value="$(arg color_hint)"/>
  <param name="videomode" type="str" value="local"/>
  <param name="sharedImageFile" type="str" value="TempImageFile.jpg"/>
+ <param name="sharedmainImageFile" type="str" value="mainTempImageFile.jpg"/>
  <param name="input_height" type="int" value="480" />
  <param name="input_width" type="int" value="640" />
  <param name="output_height" type="int" value="1000" />
