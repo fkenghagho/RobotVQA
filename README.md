@@ -19,7 +19,7 @@ As output, the system returns a scene graph. A scene graph is a directed graph, 
 
 <p align=center>
 	
-![concept](images/Concept.png "concept")
+<img src="mages/Concept.png"></img>
 
 </p>
 
