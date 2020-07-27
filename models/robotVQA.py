@@ -1154,17 +1154,17 @@ def fpn_classifier_graph(rois, feature_maps,image_shape, pool_size, num_classes,
                            name='robotvqa_poses_fc2')(shared)
     
     x2 = KL.TimeDistributed(KL.Dense(1028, activation='linear'),
-                           name='robotvqa_poses_fc03')(KL.Average()([shared,x1]))
+                           name='robotvqa_poses_fc3')(KL.Average()([shared,x1]))
 
     x3 = KL.TimeDistributed(KL.Dense(1028, activation='relu'),
-                           name='robotvqa_poses_fc00')(KL.Average()([x1, x2]))
+                           name='robotvqa_poses_fc0')(KL.Average()([x1, x2]))
     
     x4 = KL.TimeDistributed(KL.Dense(1028, activation='linear'),
-                           name='robotvqa_poses_fc01')(KL.Average()([x2, x3]))
+                           name='robotvqa_poses_fc1')(KL.Average()([x2, x3]))
    
 
     x = KL.TimeDistributed(KL.Dense(num_classes[0] * 6, activation='relu'),
-                           name='robotvqa_poses_fc04')(KL.Average()([x3, x4]))
+                           name='robotvqa_poses_fc4')(KL.Average()([x3, x4]))
     # Reshape to [batch, boxes, num_classes, (tx,ty,tz,x,y,z)]
     s = K.int_shape(x)
     robotvqa_poses = KL.Reshape((s[1], num_classes[0], 6), name="robotvqa_poses")(x)
@@ -1614,37 +1614,33 @@ def robotvqa_poses_loss_graph(target_poses, target_class_ids, pred_poses):
 
     #remove x,y coordinates which are directly infered from bounding box
 
-    target_poses=KL.Lambda(lambda x:tf.reshape(x[:,5],shape=[-1,1]))(target_poses)
+    #target_poses=KL.Lambda(lambda x:tf.reshape(x[:,5],shape=[-1,1]))(target_poses)
 
-    pred_poses=KL.Lambda(lambda x:tf.reshape(x[:,5],shape=[-1,1]))(pred_poses)
+    #pred_poses=KL.Lambda(lambda x:tf.reshape(x[:,5],shape=[-1,1]))(pred_poses)
 
     # Smooth-L1 Loss
 
     
 
-    loss = K.switch(tf.size(target_poses) > 0,
+    #loss = K.switch(tf.size(target_poses) > 0,
 
+    #                K.abs(target_poses-pred_poses),
+
+    #                tf.constant(0.0))
+    
+    target_poses=KL.Lambda(lambda x: x[:,:3])(target_poses)
+    pred_poses=KL.Lambda(lambda x: x[:,:3])(pred_poses)
+    # Smooth-L1 Loss
+    
+    loss = K.switch(tf.size(target_poses) > 0,
                     K.abs(target_poses-pred_poses),
-
-                    tf.constant(0.0))
-    """
-    target_poses=KL.Lambda(lambda x:tf.concat([x[:,:3],tf.reshape(x[:,5],shape=[-1,1])],axis=1))(target_poses)
-    pred_poses=KL.Lambda(lambda x:tf.concat([x[:,:3],tf.reshape(x[:,5],shape=[-1,1])],axis=1))(pred_poses)
-    # Smooth-L1 Loss
-    
-    loss = K.switch(tf.size(target_poses) > 0,
-                    smooth_l1_loss(y_true=target_poses,y_pred=pred_poses),
                     tf.constant(0.0))
    
-    loss = K.switch(tf.size(target_poses) > 0,
-
-                    tf.constant(0.149),
-
-                    tf.constant(0.0))
-    """
+    
+    
     loss = K.mean(loss)
     loss = K.reshape(loss, [1, 1])
-    return loss
+    return loss*0.0
 
 
 
