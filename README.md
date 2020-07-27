@@ -70,16 +70,21 @@ The pdf-version of the thesis can be found at [thesis.pdf](Literature/thesis.pdf
 
    The above picture shows how realistic the unreal scene can be:
    
-![Scene Realisticness](images/sceneRealisticness1.png "Scene Realisticness")   
-  
-  
+<p align=center>
+<img src="images/sceneRealisticness1.png"></img>
+</p>
+
    The following images depict the annotation of a typical scene from objects to relationships description:
 
 ![Typical scene](images/dataset1.png "Typical scene")   
 
 ![Objects in the scene](images/objects.png "Objects in the scene")   
 
-![Relationships among Objects in the scene](images/relationAnnotation.PNG "Relationships among Objects in the scene") 
+The following image gives an overview of the collected dataset.
+
+<p align=center>
+<img src="images/dataset5.png"></img>
+</p>
 
 # 7. Object Color Estimation: Learning vs Engineering
 
@@ -162,12 +167,23 @@ We distinguish almost 8 types of relations namely {left, rigth, over, under, on,
 ![Relation Annotation](images/relationAnnotation.png "Relation Annotation")
 
 
-# 12. Some Provisional Results
+# 12. Visual Question Answering
+
+ToDo
+
+# 13. ROS Interface
+
+ToDo
+
+# 14. Full Video Demonstration
 
 To watch the results video, please click on ***the following image link and then on View Raw***.
 
+[![Results video2](images/tests3.png)](images/test13.mp4 "Results video2")
+
+# 15. Other Demonstrations
+
 [![Results video1](images/tests1.png)](images/test7.mp4 "Results video1")
-[![Results video2](images/tests3.png)](images/test3.mp4 "Results video2")
 [![Results video3](images/tests4.png)](images/test8.mp4 "Results video3")
 [![Results video4](images/Kazam_screenshot_00002.png)](images/final_5cdeb4585c5c0a0014a5cf0e_549557.mp4 "Results video4")
 ![Results](images/results.png "Results")
@@ -178,7 +194,7 @@ To watch the results video, please click on ***the following image link and then
 
 
 
-# 13. Installation 
+# 16. Installation 
 
 
 
@@ -217,7 +233,7 @@ To watch the results video, please click on ***the following image link and then
 
 
 
-# 14 Test                     
+# 17 Test                     
 
 
 To test RobotVQA: inference on images in folder  testsamples.
@@ -234,7 +250,7 @@ Note:  * RobotVQA's parameter files (.h5) are stored in the subfolders logs (RGB
 
 
 
-# 15. Training  
+# 18. Training  
 
 
 
@@ -258,7 +274,7 @@ Note:
 
 
 
-# 16. Evaluation 
+# 19. Evaluation 
 
 
 
