@@ -17,7 +17,7 @@ For achieving a good reasoning about scenes, the first two tasks including objec
 
 As output, the system returns a scene graph. A scene graph is a directed graph, whose nodes and edges respectively encode objects description and relationships among objects in the scene. This scene graph is then used as informational basis to solve the third task. The figure below illustrates the concept. 
 
-![concept](images/intro.pdf "concept")
+![concept](images/Concept.png "concept")
 
 # 1. Contribution
 
@@ -28,7 +28,7 @@ The contribution of this thesis is twofold:
 
 The following figure graphically illustrates and summarizes our contributions.
 
-![contribution](images/contribution.png "contribution")
+![contribution](images/Contribution.png "contribution")
 
 The pdf-version of the thesis can be found at [thesis.pdf](Literature/thesis.pdf)
 
