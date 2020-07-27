@@ -478,6 +478,7 @@ class TaskManager(object):
 	    self.height=rospy.get_param('output_height',1000)
 	    self.width=rospy.get_param('output_width',1000)
             self.color_hint=rospy.get_param('color_hint',"")
+	    self.server_name=rospy.get_param('server_name',"/get_scene_graph")
             self.model=None
             self.color_hints={"":Image, "Compressed":CompressedImage, "raw":Image, "Raw":Image, "compressed":CompressedImage}
 	    self.bridge = CvBridge()
@@ -512,7 +513,7 @@ class TaskManager(object):
 	    #Start Inference
 	    self.inference(self.train_set,result_path=self.result_path)
             #service
-            self.getSceneGraph=rospy.Service('/get_scene_graph', GetSceneGraph, self.syncImageProcessing)
+            self.getSceneGraph=rospy.Service(self.server_name, GetSceneGraph, self.syncImageProcessing)
 	    #subscribers
             topic=rospy.get_param('input_topic','/RoboSherlock/input_image')
 	    self.sub = rospy.Subscriber(topic,self.color_hints[self.color_hint],self.asyncImageProcessing)
