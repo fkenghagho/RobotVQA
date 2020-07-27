@@ -172,7 +172,21 @@ ToDo
 
 # 13. ROS Interface
 
-ToDo
+ROS is a middleware a.k.a. operating system that support the development of highly robot distributed systems. Since RobotVQA is dedicated to robot, we also provided a ros interface that will allow ros application to interact with RobotVQA. In the ROS ecosystem, RobotVQA can either run as:
+
+- **Server:** where a ROS rgb-image message is sent to it as input and a ROS SceneGraph message is returned as output.
+
+- **Topic:** where RobotVQA subscribes to ROS rgb-image topic and publishes results to a ROS SceneGraph topic.
+
+- **Server and Topic:** where the above mode are simultaneously available
+
+The specification for the ROS messages and servers can be found at [ROS interfaces](https://github.com/fkenghagho/rs_robotvqa_msgs), whereas the implentation is located at [ROS implementation](robotvqa_visualizer).
+
+To start a RobotVQA ROS node, just run the following command:
+
+*roslaunch robotvqa_visualizer robotvqa_visualizer.launch input_topic:=<topic name> server_name:=<server name>*. You can disable an operating mode just by giving a wrong value to the corresponding parameter. Since RobotVQA is computation-intensive and therefore intended to run on a separate computer, make sure that the ROS environment variables such as ROSIP and ROS_MASTER_URI are set correctly.
+
+
 
 # 14. Full Video Demonstration
 
