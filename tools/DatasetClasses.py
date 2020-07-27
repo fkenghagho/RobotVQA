@@ -117,22 +117,24 @@ class DatasetClasses(object):
 	    #Actors' stacking graph: shows how actors are stacked in the scene
 	    ACTOR_STACKING_GRAPH={0:0,1:0,2:1,3:3,4:3}#i:j means actor i is directly contained(on/in) by actor j. j=i implies no contenance.
 	    
+	    CB_OBJECT_FILTER={"Muesli":{"col":["Green","Orange", "Yellow","Brown","Blue"]},"Spoon":{"col":["Blue", "Orange", "Red", "Violet"]}, "Milk":{"col":["Blue", "White"]}, "Mug":{"col":["Brown", "Orange", "Red", "White", "Black","Gray","Yellow"]},  "Bowl":{"col":["Orange", "Red", "White"]}}
 	    #Contenance relationships
 	    CONTENANCE_RELATIONSHIPS=['on','in']
 	    #Actor common temporary pose
 	    ACTOR_COMMON_TEMP_LOCATION='-651 -701 30'
 	    ACTOR_COMMON_TEMP_ROTATION='0 0 0'
-
+            #Objects that are poorly featured
+            POOR_FEATURED_OBJECTS=["Tray"]
             #Semantic Color Mappings from RGB to ["0GB","RBG","BGR","BRG","RGB","GRB","GBR","R0B","RG0"]
             CVTCOLOR=[
           ["0GB","RBG","BGR","BRG","RGB","GRB","GBR","R0B","RG0"],
         
-          [
-            {"Red":"Black","Orange":"Green","Brown":"Green","Yellow":"Green","Green":"Green","Blue":"Blue","White":"Blue","Gray":"Green","Black":"Black","Violet":"Blue","Pink":"Blue"},         
-            {"Red":"Red","Orange":"Red","Brown":"Violet","Yellow":"Violet","Green":"Blue","Blue":"Green","White":"White","Gray":"Gray","Black":"Black",'Pink':"Yellow"},
-            {"Red":"Blue" ,"Orange":"Blue","Brown":"Blue","Yellow":"Green","Green":"Green","Blue":"Red","White":"White","Gray":"Gray","Black":"Black",'Pink':"Pink"},
-            {"Red":"Green","Orange":"Green","Brown":"Green","Yellow":"Green","Green":"Blue","Blue":"Red","White":"White","Gray":"Gray","Black":"Black",'Violet':"Brown",'Pink':"Yellow"},
+          [  
             {"Red":"Red" ,"Orange":"Orange","Brown":"Brown","Yellow":"Yellow","Green":"Green","Blue":"Blue","White":"White","Gray":"Gray","Black":"Black",'Violet':"Violet",'Pink':"Pink"},
+            {"Red":"Black","Orange":"Green","Brown":"Green","Yellow":"Green","Green":"Green","Blue":"Blue","White":"Blue","Gray":"Green","Black":"Black","Violet":"Blue","Pink":"Blue"},         
+            {"Red":"Red","Orange":"Red","Brown":"Violet","Yellow":"Violet","Green":"Blue","Blue":"Green","White":"White","Gray":"Gray","Black":"Black","Violet":"Green",'Pink':"Yellow"},
+            {"Red":"Blue" ,"Orange":"Blue","Brown":"Blue","Yellow":"Green","Green":"Green","Blue":"Red","White":"White","Gray":"Gray","Black":"Black","Violet":"Pink",'Pink':"Pink"},
+            {"Red":"Green","Orange":"Green","Brown":"Green","Yellow":"Green","Green":"Blue","Blue":"Red","White":"White","Gray":"Gray","Black":"Black",'Violet':"Brown",'Pink':"Yellow"},
             {"Red":"Green","Orange":"Green","Brown":"Green","Yellow":"Yellow","Green":"Red","Blue":"Blue","White":"White","Gray":"Gray","Black":"Black",'Violet':"Green",'Pink':"Green"},
             {"Red":"Blue","Orange":"Violet","Brown":"Violet","Yellow":"Pink","Green":"Red","Blue":"Green","White":"White","Gray":"Gray","Black":"Black",'Violet':"Green",'Pink':"Green"},
             {"Red":"Red" ,"Orange":"Red","Brown":"Red","Yellow":"Red","Green":"Black","Blue":"Blue","White":"Violet","Gray":"Violet","Black":"Black",'Violet':"Violet",'Pink':"Violet"},
