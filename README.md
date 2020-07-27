@@ -30,7 +30,7 @@ The contribution of this thesis is twofold:
 
 The following figure graphically illustrates and summarizes our contributions.
 
-![contribution](images/Contribution.png "contribution")
+![contribution](images/Contribution1.png "contribution")
 
 The pdf-version of the thesis can be found at [thesis.pdf](Literature/thesis.pdf)
 
