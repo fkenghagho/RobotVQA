@@ -34,7 +34,6 @@ The following figure graphically illustrates and summarizes our contributions.
 
 ![contribution](images/Contribution1.png "contribution")
 
-The pdf-version of the thesis can be found at [thesis.pdf](Literature/thesis.pdf)
 
 
 
@@ -300,3 +299,6 @@ Note:
 
 4. To read the content of that file in text form on the screen, use the function loadFile(...) within RobotVQA/tools/utils.py.
 
+# 20.  References
+
+The pdf-version of the thesis can be found at [thesis.pdf](Literature/thesis.pdf)
