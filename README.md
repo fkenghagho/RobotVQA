@@ -1,6 +1,6 @@
 <center>
-   
-# RobotVQA: Scene-graph-oriented Visual Scene Understanding for Complex Robot Manipulation Tasks based on Deep Learning Architectures and Virtual Reality
+	
+# RobotVQA: A Scene-Graph- and Deep-Learning-based Visual Question Answering System for Robot Manipulation
 </center>
    
 # Introduction 
@@ -8,15 +8,16 @@
 
    EASE is the initiative of the interdisciplinary research center EASE at the University of Bremen that aims at enabling robots to competently perform human-scale daily manipulation activities such as cooking in an ordinary kitchen. However, to complete such tasks, robots should not only exhibit standard visual perception capabilities such as captioning, detection, localization or recognition, but also demonstrate some cognitive vision, in which all these capabilities including considerable reasoning are integrated together, so that semantically deep understanding of the unstructured and dynamic scene can be reached.
    
-   In this thesis, we formulate the underlying perception problem of scene understanding as two subproblems:
+   In this thesis, we formulate the underlying perception problem of scene understanding as three subproblems:
 - **Objects description:** we design and train a deep convo-neural network to provide an end-to-end dense description of objects in the scene. 
 - **Relationships description:** we design and train a relational neural network for computing relationships among objects in the scene. Relationships essentially encode scale-invariant relative positioning (on-the, in-the, left-of, under-the, ...) as well as composition (has-a). The network takes as inputs the input image code(Referential) and the codes(Mask(local infos)+Pose) of two objects in the image, then outputs the most likely relationship between both objects. Note that this can be regarded as a soft or more semantical variant of the hard object pose estimation performed by the object describer mentioned above. 
+- **Visual Question Answering:** Allowing the robot control program to only access needed information eases programming, boosts realtimeness and makes robot control program further independent of the perception system and therefore more generic. Moreover, answering question based on structured queries and structured complete information (scene graph) is more robust and efficient than brute force approaches that tend to take unstructured queries as input to to output unstructured answers.
 
-For achieving a good reasoning about scenes, both tasks including object description task's subtasks are integrated together into a single multi-task deep convo-neural network where training and inference take place end-to-end. 
+For achieving a good reasoning about scenes, the first two tasks including object description task's subtasks are integrated together into a single multi-task deep convo-neural network where training and inference take place end-to-end. 
 
-As output, the system returns a scene graph. A scene graph is a directed graph, whose nodes and edges respectively encode objects description and relationships among objects in the scene.  
+As output, the system returns a scene graph. A scene graph is a directed graph, whose nodes and edges respectively encode objects description and relationships among objects in the scene. This scene graph is then used as informatioa basis to solve the third task. The figure below illustrates the concept. 
 
-
+![concept](images/concept.png "concept")
 
 # 1. Contribution
 
@@ -24,6 +25,10 @@ The contribution of this thesis is twofold:
 - **A single novel Model that massively describes visual scenes to be able to address general visual question answering tasks for robots during manipulation tasks**: given a scene, the model outputs each object's category, color, shape, material, pose, bounding box, mask, openability and spatial relationships to other objects.
 
 - **Demonstration of full machine learning transferability from virtual worlds to real worlds:**  the real world is virtualized, a big rich dataset is collected from the virtual world, the above model is trained on and tested in the real world.
+
+The following figure graphically illustrates and summarizes our contributions.
+
+![contribution](images/contribution.png "contribution")
 
 The pdf-version of the thesis can be found at [thesis.pdf](Literature/thesis.pdf)
 
