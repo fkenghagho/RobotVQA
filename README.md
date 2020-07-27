@@ -180,7 +180,7 @@ ROS is a middleware a.k.a. operating system that support the development of high
 
 - **Server and Topic:** where the above mode are simultaneously available
 
-The specification for the ROS messages and servers can be found at [ROS interfaces](https://github.com/fkenghagho/rs_robotvqa_msgs), whereas the implentation is located at [ROS implementation](robotvqa_visualizer).
+The specification of the ROS messages and servers can be found at [ROS interfaces](https://github.com/fkenghagho/rs_robotvqa_msgs), whereas the implementation is located at [ROS implementation](robotvqa_visualizer).
 
 To start a RobotVQA ROS node, just run the following command:
 
