@@ -1,8 +1,10 @@
 <launch>
  <arg name="input_topic"   default="none"/>
+ <arg name="server_name"   default="/get_scene_graph"/>
  <arg name="color_hint"   default=""/>
  <param name="topic" type="str" value="none"/>
  <param name="input_topic" type="str" value="$(arg input_topic)"/>
+ <param name="server_name" type="str" value="$(arg server_name)"/>
  <param name="color_hint" type="str" value="$(arg color_hint)"/>
  <param name="videomode" type="str" value="local"/>
  <param name="sharedImageFile" type="str" value="TempImageFile.jpg"/>
