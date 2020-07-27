@@ -224,6 +224,7 @@ To test RobotVQA: inference on images in folder  testsamples.
 Note:  * RobotVQA's parameter files (.h5) are stored in the subfolders logs (RGBD mode) and logs1 (RGB mode). 
 
 
+
 # 15. Training  
 
 
