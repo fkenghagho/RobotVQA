@@ -168,7 +168,13 @@ We distinguish almost 8 types of relations namely {left, rigth, over, under, on,
 
 # 12. Visual Question Answering
 
-ToDo
+To demonstrate the ability of RobotVQA to visually answer questions, we consider the formal query language of [Robosherlock](http://robosherlock.org/) which is made up of three directives namely **detect**, **examine** and **track** defined as follows:
+
+- **(”detect”, {prop 1 : val 1 , prop 2 : val 2 ,..., prop n : val n })**: this query returns the unique identifiers and 6D-poses of all scene objects whose each property prop i takes the values val i . For instance, (”detect”,{”type” : ”spoon”, ”color” : ”red”, ”material” : ”plastic”}) localizes and uniquely identifies all red plastic spoons.
+
+- **(”examine”, object id, {prop 1 , prop 2 ,..., prop n })**: this query returns the values of each property prop i of the scene object with identifier object id. For instance, (”examine”,”spoon 1”,{”color”, ”material”}) returns the color and material of the object with identifier spoon 1.
+
+- **(”track”, object 1, object 2)**: this query checks whether the scene objects with identifiers object 1, object 2 are same. It is a query for tracking scene objects and can be achieved by comparing the visual and spatial properties of both objects
 
 # 13. ROS Interface
 
