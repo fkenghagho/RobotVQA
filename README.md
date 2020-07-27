@@ -166,7 +166,7 @@ We distinguish almost 8 types of relations namely {left, rigth, over, under, on,
 ![Relation Annotation](images/relationAnnotation.png "Relation Annotation")
 
 
-# 12. Visual Question Answering
+# 13. Visual Question Answering
 
 To demonstrate the ability of RobotVQA to visually answer questions, we consider the formal query language of [Robosherlock](http://robosherlock.org/) which is made up of three directives namely **detect**, **examine** and **track** defined as follows:
 
@@ -176,7 +176,7 @@ To demonstrate the ability of RobotVQA to visually answer questions, we consider
 
 - **(”track”, object 1, object 2)**: this query checks whether the scene objects with identifiers object 1, object 2 are same. It is a query for tracking scene objects and can be achieved by comparing the visual and spatial properties of both objects
 
-# 13. ROS Interface
+# 14. ROS Interface
 
 ROS is a middleware a.k.a. operating system that support the development of highly robot distributed systems. Since RobotVQA is dedicated to robot, we also provided a ros interface that will allow ros application to interact with RobotVQA. In the ROS ecosystem, RobotVQA can either run as:
 
@@ -194,13 +194,13 @@ To start a RobotVQA ROS node, just run the following command:
 
 
 
-# 14. Full Video Demonstration
+# 15. Full Video Demonstration
 
 To watch the results video, please click on ***the following image link and then on View Raw***.
 
 [![Results video2](images/tests3.png)](images/test13.mp4 "Results video2")
 
-# 15. Other Demonstrations
+# 16. Other Demonstrations
 
 [![Results video1](images/tests1.png)](images/test7.mp4 "Results video1")
 [![Results video3](images/tests4.png)](images/test8.mp4 "Results video3")
@@ -213,7 +213,7 @@ To watch the results video, please click on ***the following image link and then
 
 
 
-# 16. Installation 
+# 17. Installation 
 
 
 
@@ -252,7 +252,7 @@ To watch the results video, please click on ***the following image link and then
 
 
 
-# 17 Test                     
+# 18. Test                     
 
 
 To test RobotVQA: inference on images in folder  testsamples.
@@ -269,7 +269,7 @@ Note:  * RobotVQA's parameter files (.h5) are stored in the subfolders logs (RGB
 
 
 
-# 18. Training  
+# 19. Training  
 
 
 
@@ -293,7 +293,7 @@ Note:
 
 
 
-# 19. Evaluation 
+# 20. Evaluation 
 
 
 
@@ -319,6 +319,6 @@ Note:
 
 4. To read the content of that file in text form on the screen, use the function loadFile(...) within RobotVQA/tools/utils.py.
 
-# 20.  References
+# 21.  References
 
 The pdf-version of the thesis can be found at [thesis.pdf](Literature/thesis.pdf)
