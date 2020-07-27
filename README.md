@@ -11,11 +11,11 @@
    In this thesis, we formulate the underlying perception problem of scene understanding as three subproblems:
 - **Objects description:** we design and train a deep convo-neural network to provide an end-to-end dense description of objects in the scene. 
 - **Relationships description:** we design and train a relational neural network for computing relationships among objects in the scene. Relationships essentially encode scale-invariant relative positioning (on-the, in-the, left-of, under-the, ...) as well as composition (has-a). The network takes as inputs the input image code(Referential) and the codes(Mask(local infos)+Pose) of two objects in the image, then outputs the most likely relationship between both objects. Note that this can be regarded as a soft or more semantical variant of the hard object pose estimation performed by the object describer mentioned above. 
-- **Visual Question Answering:** Allowing the robot control program to only access needed information eases programming, boosts realtimeness and makes robot control program further independent of the perception system and therefore more generic. Moreover, answering question based on structured queries and structured complete information (scene graph) is more robust and efficient than brute force approaches that tend to take unstructured queries as input to to output unstructured answers.
+- **Visual Question Answering:** Allowing the robot control program to only access needed information eases programming, boosts realtimeness and makes robot control program further independent of the perception system and therefore more generic. Moreover, answering structured queries based on structured and complete information (scene graph) is more robust and efficient than brute force approaches that tend to take unstructured queries as input to to output unstructured answers.
 
 For achieving a good reasoning about scenes, the first two tasks including object description task's subtasks are integrated together into a single multi-task deep convo-neural network where training and inference take place end-to-end. 
 
-As output, the system returns a scene graph. A scene graph is a directed graph, whose nodes and edges respectively encode objects description and relationships among objects in the scene. This scene graph is then used as informatioa basis to solve the third task. The figure below illustrates the concept. 
+As output, the system returns a scene graph. A scene graph is a directed graph, whose nodes and edges respectively encode objects description and relationships among objects in the scene. This scene graph is then used as informational basis to solve the third task. The figure below illustrates the concept. 
 
 ![concept](images/concept.png "concept")
 
