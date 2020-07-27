@@ -57,8 +57,8 @@ import json
 
 #Select a GPU if working on Multi-GPU Systems
 #Several GPUs can also be selected
-os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID" 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+#os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID" 
+#os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 import glob
 
  
@@ -130,10 +130,10 @@ class ExtendedDatasetLoader(utils.Dataset):
 		                                classes[4].append(opn)
 		                            nbsuccess+=1
 		            except Exception as e:
-		                rospy.loginfo('Data '+str(anot)+': An object could not be processed:'+str(e))
+		                rospy.logwarn('Data '+str(anot)+': An object could not be processed:'+str(e))
 		                nbfails+=1    
 		    except Exception as e:
-		        rospy.loginfo('Data '+str(anot)+' could not be processed:'+str(e))
+		        rospy.logwarn('Data '+str(anot)+' could not be processed:'+str(e))
 		        nbfails+=1
         rospy.loginfo('\n',nbsuccess,' Objects successfully found and ',nbfails,' Objects failed!', '\n')
         rospy.loginfo('\nClasses found:',classes, '\n')
@@ -400,7 +400,7 @@ class ExtendedRobotVQAConfig(RobotVQAConfig):
     RPN_NMS_THRESHOLD = 0.6
 
     # Non-maximum suppression threshold for detection
-    DETECTION_NMS_THRESHOLD = 0.01
+    DETECTION_NMS_THRESHOLD = 0.3
 
     
     # Input image size:RGBD-Images
@@ -428,7 +428,7 @@ class ExtendedRobotVQAConfig(RobotVQAConfig):
     CPU0='/cpu:0'
     
     #Numbers of threads
-    NUMBER_THREADS=16
+    NUMBER_THREADS=14
     #Layers to exclude on very first training with a new weights file
     EXCLUDE=None
     """                          
@@ -451,8 +451,9 @@ class TaskManager(object):
             rospy.init_node('robotvqa')
 	    rospy.loginfo('Starting Ros Node RobotVQA ...')
 	    rospy.on_shutdown(self.cleanup)  
-            self.TempImageFile=rospy.get_param('sharedImageFile','TempImageFile.jpg')         
-	    
+            self.TempImageFile=rospy.get_param('sharedImageFile','TempImageFile.jpg')
+            self.TempImageFile1=rospy.get_param('sharedImageFile1','TempImageFile1.jpg')         
+	    self.mainTempImageFile=rospy.get_param('sharedmainImageFile','mainTempImageFile.jpg')
 	    #attributes
 	    self.cvImageBuffer=[]
 	    self.INDEX=-1
@@ -464,9 +465,14 @@ class TaskManager(object):
             self.wait=True
             self.mutex=mutex.mutex()
             self.mutex2=mutex.mutex()
+            self.mutex3=mutex.mutex()
+            self.mutex4=mutex.mutex()
 	    self.total=0
+	    self.frequency=30
+            self.counter=0
 	    self.success=0
-	    self.currentImage=[]#current image
+            self.currentImage1=[] #current image: Server
+	    self.currentImage =[] #current image: Pervasive
 	    self.iheight=rospy.get_param('input_height',480)
 	    self.iwidth=rospy.get_param('input_width',640)
 	    self.height=rospy.get_param('output_height',1000)
@@ -644,27 +650,292 @@ class TaskManager(object):
 	self.model.keras_model._make_predict_function()
         rospy.loginfo('Weights loaded successfully from '+str(model_path))
    
+   
 
 
   ###################################################################
+	"""
+	    def asyncImageProcessing(self,image):
+		
+		try:    
+		        if self.counter<self.frequency:
+		                self.counter+=1
+		        else:
+		                self.counter=0
+				while self.mutex2.testandset():
+				      pass   
+				self.wait=False
+				self.mutex2.unlock()
+				while self.mutex.testandset():
+				      pass  
+				dst=self.train_set
+				self.currentImage = self.bridge.imgmsg_to_cv2(image, self.cvMode)
+				while self.mutex3.testandset():
+				      pass 
+				self.currentImage1=self.currentImage[:]
+				self.mutex3.unlock() 
+				b=self.currentImage[:,:,0].copy()
+				self.currentImage[:,:,0]=self.currentImage[:,:,2].copy()
+				self.currentImage[:,:,2]=b.copy()
+				self.currentImage = self.resize([self.currentImage],self.iwidth,self.iheight)[0]
+				cv2.imwrite(self.TempImageFile,self.currentImage)
+				rospy.loginfo('Buffering of current image successful')
+				image = utils.load_image(self.TempImageFile,None,self.config.MAX_CAMERA_CENTER_TO_PIXEL_DISTANCE)
+				#predict
+				rospy.logwarn(image.shape)
+			       
+			        results = self.model.detect([image], verbose=0)
+			        
+			        r=results[0]
+				class_ids=[r['class_cat_ids'],r['class_col_ids'],r['class_sha_ids'],r['class_mat_ids'],r['class_opn_ids'],r['class_rel_ids']]
+				scores=[r['scores_cat'],r['scores_col'],r['scores_sha'],r['scores_mat'],r['scores_opn'],r['scores_rel']]
+			       
+				visualize.display_instances(image[:,:,:3], r['rois'], r['masks'], class_ids, dst.class_names,r['poses'],[],[],get_ax(cols=2), scores=scores,\
+					title='Object description',title1='Object relationships',result_path=self.result_path+'/'+self.TempImageFile)
+			       
+				resImage=cv2.imread(self.result_path+'/'+self.TempImageFile)    
+				if(len(resImage)>0):
+					self.currentImage =resImage.copy()
+				#self.currentImage = self.resize([self.currentImage],self.width,self.height)[0]
+				#self.showImages()
+				rospy.loginfo('Inference terminated!!!')
+				self.wait=True
+				self.mutex.unlock()
+		except Exception as e:
+		    rospy.logwarn(' Failed to buffer image '+str(e))
+	""" 
+  ###################################################################
+	    
     def asyncImageProcessing(self,image):
+	
+		try:    
+			if self.counter<self.frequency:
+			        self.counter+=1
+			else:
+			        self.counter=0
+				while self.mutex2.testandset():
+				      pass   
+				self.wait=False
+				self.mutex2.unlock()
+				while self.mutex.testandset():
+				      pass  
+				dst=self.train_set
+				self.currentImage = self.bridge.imgmsg_to_cv2(image, self.cvMode)
+				while self.mutex3.testandset():
+				      pass 
+				self.currentImage1=self.currentImage[:]
+				self.mutex3.unlock() 
+				b=self.currentImage[:,:,0].copy()
+				self.currentImage[:,:,0]=self.currentImage[:,:,2].copy()
+				self.currentImage[:,:,2]=b.copy()
+				self.currentImage = self.resize([self.currentImage],self.iwidth,self.iheight)[0]
+				cv2.imwrite(self.TempImageFile,self.currentImage)
+				rospy.loginfo('Buffering of current image successful')
+				image = utils.load_image(self.TempImageFile,None,self.config.MAX_CAMERA_CENTER_TO_PIXEL_DISTANCE)
+				#predict
+				rospy.logwarn(image.shape)
+				R=image[:,:,0].copy()
+				G=image[:,:,1].copy()
+				B=image[:,:,2].copy()
+				image0=np.stack((R.copy()*0,G.copy(),B.copy(),image[:,:,3].copy(),image[:,:,4].copy(),image[:,:,5].copy(),image[:,:,6]),axis=2)#image0=np.flip(image,0)
+				image1=np.stack((R.copy(),B.copy(),G.copy(),image[:,:,3].copy(),image[:,:,4].copy(),image[:,:,5].copy(),image[:,:,6]),axis=2)#image1=np.flip(image,1)
+				image2=np.stack((B.copy(),G.copy(),R.copy(),image[:,:,3].copy(),image[:,:,4].copy(),image[:,:,5].copy(),image[:,:,6]),axis=2)#image2=np.flip(image1,0)
+				image3=np.stack((B.copy(),R.copy(),G.copy(),image[:,:,3].copy(),image[:,:,4].copy(),image[:,:,5].copy(),image[:,:,6]),axis=2)#image3=np.flip(image0,1)
+				image4=np.stack((G.copy(),R.copy(),B.copy(),image[:,:,3].copy(),image[:,:,4].copy(),image[:,:,5].copy(),image[:,:,6]),axis=2)#image4=self.resize([np.rot90(image,1)],self.iwidth,self.iheight)[0]
+				image5=np.stack((G.copy(),B.copy(),R.copy(),image[:,:,3].copy(),image[:,:,4].copy(),image[:,:,5].copy(),image[:,:,6]),axis=2)#image5=self.resize([np.rot90(image,3)],self.iwidth,self.iheight)[0]
+				image6=np.stack((R.copy(),G.copy()*0,B.copy(),image[:,:,3].copy(),image[:,:,4].copy(),image[:,:,5].copy(),image[:,:,6]),axis=2)#image6=image-30
+				image7=np.stack((R.copy(),G.copy(),B.copy()*0,image[:,:,3].copy(),image[:,:,4].copy(),image[:,:,5].copy(),image[:,:,6]),axis=2)#image7=image+30
+				#images=[image0.copy(),image1.copy(),image2.copy(),image3.copy(),image.copy(),image4.copy(),image5.copy(),image6.copy(),image7.copy()]
+				images=[image]
+				rImages=[]
+				main_ax=get_ax(cols=2)
+				main_mask=[]
+				main_back=[]
+				list_results=[]
+				merge_results={"class_ids":[],"scores":[],"boxes":[],"poses":[],"masks":[]}
+				while self.mutex4.testandset():
+				      pass  
+                                for image in images:
+					results = self.model.detect([image], verbose=0)
+					list_results.append(results)
+					r=results[0]
+					class_ids=[r['class_cat_ids'],r['class_col_ids'],r['class_sha_ids'],r['class_mat_ids'],r['class_opn_ids'],r['class_rel_ids']]
+					scores=[r['scores_cat'],r['scores_col'],r['scores_sha'],r['scores_mat'],r['scores_opn'],r['scores_rel']]
+					merge_results["class_ids"].append(class_ids)
+					merge_results["scores"].append(scores) 
+					merge_results["boxes"].append(r['rois'])
+					merge_results["poses"].append(r['poses'])
+					merge_results["masks"].append(r['masks'])
+				#        visualize.display_instances(image[:,:,:3], r['rois'], r['masks'], class_ids, dst.class_names,r['poses'],[],[],get_ax(cols=2), scores=scores,\
+				#        title='Object description',title1='Object relationships',result_path=self.result_path+'/'+self.TempImageFile)
+				#	title='Object description',title1='Object relationships',result_path=self.result_path+'/'+self.TempImageFile)
+                                self.mutex4.unlock()
+				rospy.loginfo("****************************** BEGIN MERGING **************************************************")
+				listOfObjects,spatialRelations=self.merge_results_fct(merge_results,dst.class_names)
+				print(listOfObjects,spatialRelations)
+				rospy.loginfo("****************************** END MERGING **************************************************")
+				visualize.display_instances_v2(images[0][:,:,:3], listOfObjects, spatialRelations,main_ax,score=True,title="",title1='',
+					figsize=(16, 16),result_path=self.result_path+'/'+self.mainTempImageFile)
+				
+				#for i in range(len(list_results)):
+				#        results=list_results[i]
+				#        image=images[i]
+				#	r=results[0]
+				#	class_ids=[r['class_cat_ids'],r['class_col_ids'],r['class_sha_ids'],r['class_mat_ids'],r['class_opn_ids'],r['class_rel_ids']]
+				#	scores=[r['scores_cat'],r['scores_col'],r['scores_sha'],r['scores_mat'],r['scores_opn'],r['scores_rel']]
+				#	visualize.display_instances(image[:,:,:3], r['rois'], r['masks'], class_ids, dst.class_names,r['poses'],[],[],get_ax(cols=2), scores=scores,\
+				#	title='Object description',title1='Object relationships',result_path=self.result_path+'/'+self.TempImageFile)
+				#	rImages.append(self.resize([cv2.imread(self.result_path+'/'+self.TempImageFile)],self.width/3,self.height/3)[0])
+				#rImages.append(self.resize([cv2.imread(self.result_path+'/'+self.mainTempImageFile)],3*(self.width/3),3*(self.height/3))[0])
+				#resImage=np.concatenate(( np.concatenate((rImages[0],rImages[1],rImages[4]),axis=0) , np.concatenate((rImages[2],rImages[3],rImages[7]),axis=0),np.concatenate((rImages[5],rImages[6],rImages[8]),axis=0) ),axis=1) 
+				#resImage= rImages[0].copy() 
+				resImage=cv2.imread(self.result_path+'/'+self.mainTempImageFile)    
+				if(len(resImage)>0):
+					self.currentImage =resImage.copy()
+				#self.currentImage = self.resize([self.currentImage],self.width,self.height)[0]
+				#self.showImages()
+				rospy.loginfo('Inference terminated!!!')
+				self.wait=True
+				self.mutex.unlock()
+		except Exception as e:
+			rospy.logwarn(' Failed to buffer image '+str(e))
+	
+
+ ################################################################################################
+    def IOU(self,r1,r2):
+        y1,x1,y2,x2=map(float,r1)
+        yp1,xp1,yp2,xp2=map(float,r2)
+        
+        if abs(x1-x2)==0 or abs(y1-y2)==0 or abs(xp1-xp2)==0 or abs(yp1-yp2)==0:
+           return 0
+        if yp1>=y2 or y1>=yp2 or xp1>=x2 or x1>=xp2:
+             return 0.0 #no intersection
+        if y1>=yp1:
+             if x1<=xp1:
+             	return (abs(y1-min([y2,yp2]))*abs(xp1-min([x2,xp2])))/(abs(x1-x2)*abs(y1-y2)+abs(xp1-xp2)*abs(yp1-yp2)-abs(y1-min([y2,yp2]))*abs(xp1-min([x2,xp2])))
+             else: 
+                return (abs(y1-min([y2,yp2]))*abs(x1-min([x2,xp2])))/(abs(x1-x2)*abs(y1-y2)+abs(xp1-xp2)*abs(yp1-yp2)-abs(y1-min([y2,yp2]))*abs(x1-min([x2,xp2])))
+        if yp1>=y1:
+             if xp1<=x1:
+             	return (abs(yp1-min([yp2,y2]))*abs(x1-min([xp2,x2])))/(abs(xp1-xp2)*abs(yp1-yp2)+abs(x1-x2)*abs(y1-y2)-abs(yp1-min([yp2,y2]))*abs(x1-min([xp2,x2])))
+             else: 
+                return (abs(yp1-min([yp2,y2]))*abs(xp1-min([xp2,x2])))/(abs(xp1-xp2)*abs(yp1-yp2)+abs(x1-x2)*abs(y1-y2)-abs(yp1-min([yp2,y2]))*abs(xp1-min([xp2,x2])))
+
+
+ ################################################################################################
+    def merge_results_fct(self,results,class_names,mainSource=0):
+         listOfObjects=[]
+         #get all objects
+         n=len(results["class_ids"])
+         m=max([-1]+map((lambda x:x.shape[0]),results["poses"]))
+         if m<0:
+            m=0
+         mapObjectTocluster=np.zeros([n,m],dtype="int")
+         for i in range(len(results["class_ids"])):
+            for j in range(results["poses"][i].shape[0]):
+            	listOfObjects.append({"cat":(results["class_ids"][i][0][j],results["scores"][i][0][j]),
+                                      "col":(results["class_ids"][i][1][j],results["scores"][i][1][j]),
+                                      "sha":(results["class_ids"][i][2][j],results["scores"][i][2][j]),
+                                      "mat":(results["class_ids"][i][3][j],results["scores"][i][3][j]),
+                                      "opn":(results["class_ids"][i][4][j],results["scores"][i][4][j]),
+                                      "poses":results["poses"][i][j],
+                                      "boxes":results["boxes"][i][j],
+                                      "masks":results["masks"][i][:, :, j],
+                                      "source":i,
+                                      "position":j
+                                     }
+                                    )
+         clusters=[]
+         listOfclusters=[]
+         #cluster the set of objects
+         while listOfObjects!=[]:
+             cluster=listOfObjects[0]
+             del clusters[:]
+             for elem in listOfObjects:
+                 distance= self.IOU(cluster["boxes"],elem["boxes"])
+                 rospy.loginfo(str(cluster["boxes"])+" "+str(elem["boxes"])+" distance:"+str(distance))
+                 if (distance >= self.config.CLUSTER_RADIUS and cluster["cat"][0]!=elem["cat"][0]) or (distance >= self.config.CLUSTER_RADIUS1 and cluster["cat"][0]==elem["cat"][0]):
+                    mapObjectTocluster[elem["source"]][elem["position"]]=len(listOfclusters)
+                    clusters.append(elem)
+             for elem in clusters:
+                 listOfObjects.remove(elem)
+             listOfclusters.append(clusters[:])
+         #merging clusters into objects
+         del listOfObjects[:]
+         for cluster in listOfclusters:
+
+             catVal=map((lambda x: x["cat"][0]),cluster)
+             catProb=map((lambda x: x["cat"][1]),cluster)
+             argmaxCat=catVal[np.argmax(catProb)]
+              
+             colorList=np.concatenate(map((lambda x: filter((lambda y: DatasetClasses.CVTCOLOR[1][x["source"]][y]==class_names[1][x["col"][0]]), DatasetClasses.CVTCOLOR[1][x["source"]].keys())),cluster))             
+
+             colVal=map((lambda x: x["col"][0]),cluster)
+             colProb=map((lambda x: x["col"][1]),cluster)
+             if list(colorList)!=[]:
+             	argmaxCol=max(set(list(colorList)),key=list(colorList).count)
+             else:
+                 argmaxCol=class_names[1][colVal[np.argmax(colProb)]]
+      
+             shaVal=map((lambda x: x["sha"][0]),cluster)
+             shaProb=map((lambda x: x["sha"][1]),cluster)
+             argmaxSha=shaVal[np.argmax(shaProb)]
+             
+             matVal=map((lambda x: x["mat"][0]),cluster)
+             matProb=map((lambda x: x["mat"][1]),cluster)
+             argmaxMat=matVal[np.argmax(matProb)]
+         
+             opnVal=map((lambda x: x["opn"][0]),cluster)
+             opnProb=map((lambda x: x["opn"][1]),cluster)
+             argmaxOpn=opnVal[np.argmax(opnProb)]
+
+             poseVal=map((lambda x: x["poses"]),cluster)
+             poseVal=sum(poseVal)/len(poseVal)
+             
+             boxVal=map((lambda x: x["boxes"]),cluster)
+             boxVal=sum(boxVal)*1.0/len(boxVal)
+
+             maskVal=map((lambda x: x["masks"]),cluster)
+             maskVal=np.array(np.ceil(sum(maskVal)*1.0/len(boxVal)),dtype="uint8")
+
+             listOfObjects.append({   "cat":(class_names[0][argmaxCat],np.max(catProb)),
+                                      "col":(argmaxCol,np.max(colProb)),
+                                      "sha":(class_names[2][argmaxSha],np.max(shaProb)),
+                                      "mat":(class_names[3][argmaxMat],np.max(matProb)),
+                                      "opn":(class_names[4][argmaxOpn],np.max(opnProb)),
+                                      "poses":(poseVal,1.),
+                                      "boxes":(boxVal,1.),
+                                      "masks":(maskVal,1.),
+                                      "source":(mainSource,1.)
+                                   }
+                                  )
+         rospy.loginfo("Return merged objects: "+str(len(listOfObjects))+" objects")
+
+         #spatial relationship resolution
+         spatialRelations=(np.array([["BG"]*len(listOfObjects) for i in range(len(listOfObjects))],dtype="|S5"),np.ones([len(listOfObjects),len(listOfObjects)],dtype="float"))
+         
+         for i in range(len(results["class_ids"])):
+            for j in range(results["poses"][i].shape[0]):
+		for k in range(results["poses"][i].shape[0]):
+                	spatialRelations[0][mapObjectTocluster[i][j]][mapObjectTocluster[i][k]]=class_names[5][results["class_ids"][i][5][j][k]]
+                        spatialRelations[1][mapObjectTocluster[i][j]][mapObjectTocluster[i][k]]=results["scores"][i][5][j][k]
+
+         del listOfclusters[:]
+         return listOfObjects,spatialRelations
+  
+ ################################################################################################
+    def syncImageProcessing(self,request):
 		
 	try:    
-                while self.mutex2.testandset():
-                      pass   
-		self.wait=False
-                self.mutex2.unlock()
-		while self.mutex.testandset():
-                      pass  
-                dst=self.train_set
-		self.currentImage = self.bridge.imgmsg_to_cv2(image, self.cvMode)
-                b=self.currentImage[:,:,0].copy()
-		self.currentImage[:,:,0]=self.currentImage[:,:,2].copy()
-		self.currentImage[:,:,2]=b.copy()
-		self.currentImage = self.resize([self.currentImage],self.iwidth,self.iheight)[0]
-                cv2.imwrite(self.TempImageFile,self.currentImage)
+                image = self.bridge.imgmsg_to_cv2(request.query, self.cvMode)
+	        b=image[:,:,0].copy()
+		image[:,:,0]=image[:,:,2].copy()
+		image[:,:,2]=b.copy()
+		image = self.resize([image],self.iwidth,self.iheight)[0]
+	        cv2.imwrite(self.TempImageFile1,image)
 		rospy.loginfo('Buffering of current image successful')
-		image = utils.load_image(self.TempImageFile,None,self.config.MAX_CAMERA_CENTER_TO_PIXEL_DISTANCE)
+		image = utils.load_image(self.TempImageFile1,None,self.config.MAX_CAMERA_CENTER_TO_PIXEL_DISTANCE)
+                dst=self.train_set
 	        #predict
                 rospy.logwarn(image.shape)
                 R=image[:,:,0].copy()
@@ -678,61 +949,41 @@ class TaskManager(object):
                 image5=np.stack((G.copy(),B.copy(),R.copy(),image[:,:,3].copy(),image[:,:,4].copy(),image[:,:,5].copy(),image[:,:,6]),axis=2)#image5=self.resize([np.rot90(image,3)],self.iwidth,self.iheight)[0]
                 image6=np.stack((R.copy(),G.copy()*0,B.copy(),image[:,:,3].copy(),image[:,:,4].copy(),image[:,:,5].copy(),image[:,:,6]),axis=2)#image6=image-30
                 image7=np.stack((R.copy(),G.copy(),B.copy()*0,image[:,:,3].copy(),image[:,:,4].copy(),image[:,:,5].copy(),image[:,:,6]),axis=2)#image7=image+30
-                images=[image0,image1,image2,image3,image,image4,image5,image6,image7]
+                #images=[image0.copy(),image1.copy(),image2.copy(),image3.copy(),image.copy(),image4.copy(),image5.copy(),image6.copy(),image7.copy()]
+                images=[image.copy()]
                 rImages=[]
+                main_ax=get_ax(cols=2)
+                main_mask=[]
+                main_back=[]
+                list_results=[]
+                merge_results={"class_ids":[],"scores":[],"boxes":[],"poses":[],"masks":[]}
+                while self.mutex4.testandset():
+		      pass 
                 for image in images:
-			results = self.model.detect([image], verbose=0)
-			r=results[0]
-			class_ids=[r['class_cat_ids'],r['class_col_ids'],r['class_sha_ids'],r['class_mat_ids'],r['class_opn_ids'],r['class_rel_ids']]
+                        results = self.model.detect([image], verbose=0)
+                        list_results.append(results)
+                        r=results[0]
+                        class_ids=[r['class_cat_ids'],r['class_col_ids'],r['class_sha_ids'],r['class_mat_ids'],r['class_opn_ids'],r['class_rel_ids']]
 			scores=[r['scores_cat'],r['scores_col'],r['scores_sha'],r['scores_mat'],r['scores_opn'],r['scores_rel']]
-			resImage=visualize.display_instances(image[:,:,:3], r['rois'], r['masks'], class_ids, dst.class_names,r['poses'], scores=scores, axs=get_ax(cols=2),\
-			title='Object description',title1='Object relationships',result_path=self.result_path+'/'+self.TempImageFile)
-                	rImages.append(self.resize([cv2.imread(self.result_path+'/'+self.TempImageFile)],self.width/3,self.height/3)[0])
-                resImage=np.concatenate(( np.concatenate((rImages[0],rImages[1],rImages[4]),axis=0) , np.concatenate((rImages[2],rImages[3],rImages[7]),axis=0),np.concatenate((rImages[5],rImages[6],rImages[8]),axis=0) ),axis=1)       
-		if(len(resImage)>0):
-			self.currentImage =resImage.copy()
-		#self.currentImage = self.resize([self.currentImage],self.width,self.height)[0]
-		#self.showImages()
+                        merge_results["class_ids"].append(class_ids)
+                        merge_results["scores"].append(scores) 
+			merge_results["boxes"].append(r['rois'])
+                        merge_results["poses"].append(r['poses'])
+                        merge_results["masks"].append(r['masks'])
+                self.mutex4.unlock()
+                rospy.loginfo("****************************** BEGIN MERGING **************************************************")
+                listOfObjects,spatialRelations=self.merge_results_fct(merge_results,dst.class_names)
+                print(listOfObjects,spatialRelations)
+                rospy.loginfo("****************************** END MERGING **************************************************")
+		scenegraph=visualize.display_instances_v3(images[0][:,:,:3], listOfObjects, spatialRelations,main_ax,score=True,title="",title1='',
+                         figsize=(16, 16),result_path=self.result_path+'/'+self.TempImageFile1)	
+                
 		rospy.loginfo('Inference terminated!!!')
-                self.wait=True
-                self.mutex.unlock()
+                return scenegraph
 	except Exception as e:
 		rospy.logwarn(' Failed to buffer image '+str(e))
+		return GetSceneGraphResponse()
 
-
- ################################################################################################
-    def syncImageProcessing(self,request):
-		
-	try:     
-               
-                image=request.query
-		dst=self.train_set
-		self.currentImage = self.bridge.imgmsg_to_cv2(image, self.cvMode)
-                b=self.currentImage[:,:,0].copy()
-		self.currentImage[:,:,0]=self.currentImage[:,:,2].copy()
-		self.currentImage[:,:,2]=b.copy()
-		self.currentImage = self.resize([self.currentImage],self.iwidth,self.iheight)[0]
-                cv2.imwrite(self.TempImageFile,self.currentImage)
-		rospy.loginfo('Buffering of current image successful')
-		image = utils.load_image(self.TempImageFile,None,self.config.MAX_CAMERA_CENTER_TO_PIXEL_DISTANCE)
-	        #predict
-                rospy.logwarn(image.shape)
-	        results = self.model.detect([image], verbose=0)
-		r=results[0]
-		class_ids=[r['class_cat_ids'],r['class_col_ids'],r['class_sha_ids'],r['class_mat_ids'],r['class_opn_ids'],r['class_rel_ids']]
-		scores=[r['scores_cat'],r['scores_col'],r['scores_sha'],r['scores_mat'],r['scores_opn'],r['scores_rel']]
-		resImage=visualize.display_instances(image[:,:,:3], r['rois'], r['masks'], class_ids, dst.class_names,r['poses'], scores=scores, axs=get_ax(cols=2),\
-		title='Object description',title1='Object relationships',result_path=self.result_path+'/'+self.TempImageFile)
-                resImage=cv2.imread(self.result_path+'/'+self.TempImageFile)
-		if(len(resImage)>0):
-			self.currentImage =resImage.copy()
-		#self.currentImage = self.resize([self.currentImage],self.width,self.height)[0]
-		self.showImages()
-		rospy.loginfo('Inference terminated!!!')
-                return GetSceneGraphResponse()
-	except Exception as e:
-		rospy.logwarn(' Failed to buffer image '+str(e))
-                return GetSceneGraphResponse()
 ###################################################################################################
 
 
