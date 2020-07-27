@@ -201,9 +201,12 @@ class ExtendedDatasetLoader(utils.Dataset):
                         opn=self.normalize(obj['objectOpenability'])
                         ori=np.array(obj['objectLocalOrientation'],dtype='float32')
                         #normalize angles to principal ones
-                        ori[0]=utils.principal_angle(ori[0])
-                        ori[1]=utils.principal_angle(ori[1])
-                        ori[2]=utils.principal_angle(ori[2])
+                        #ori[0]=utils.principal_angle(ori[0])
+                        #ori[1]=utils.principal_angle(ori[1])
+                        #ori[2]=utils.principal_angle(ori[2])
+			ori[0]=0.
+                        ori[1]=0.
+                        ori[2]=0.
                         pos=np.array(obj['objectLocalPosition'],dtype='float32')
                         opn=self.normalize(config.OBJECT_OPENABILITY_DICO[opn])
                         #check that objects are defined in the right bound
@@ -223,7 +226,8 @@ class ExtendedDatasetLoader(utils.Dataset):
                                             img[cord[0]][cord[1]]=1
                                     mask.append(img.copy())
                                     #register poses with normalization
-                                    pose.append(np.array(list(ori)+list(utils.getPositionFromCamToImg(pos)),dtype='float32'))
+                                    #pose.append(np.array(list(ori)+list(utils.getPositionFromCamToImg(pos)),dtype='float32'))
+				    pose.append(np.array(list(ori)+list(pos),dtype='float32'))
                                     nbsuccess+=1
                 except Exception as e:
                                     nbfail+=1
@@ -268,6 +272,7 @@ class ExtendedDatasetLoader(utils.Dataset):
                 relations[:,:,1][z]=(relations[:,:,2][z])
                 z=np.where(relations[:,:,1]>0)
                 relations[:,:,0][z]=(relations[:,:,1][z])
+	    ##################################### POSES FORCED TO ZEROS####################################
             return masks,classes,poses,relations[:,:,0]
         except Exception as e:
             print('\n\n Data '+str(annotationPath)+' could not be processed:'+str(e))
@@ -320,7 +325,7 @@ class ExtendedRobotVQAConfig(RobotVQAConfig):
     # The Mask RCNN paper uses lr=0.02, but on TensorFlow it causes
     # weights to explode. Likely due to differences in optimzer
     # implementation.
-    LEARNING_RATE = 0.001
+    LEARNING_RATE = 0.0001
     LEARNING_MOMENTUM = 0.9
 
     # Weight decay regularization
@@ -350,7 +355,7 @@ class ExtendedRobotVQAConfig(RobotVQAConfig):
     POST_NMS_ROIS_INFERENCE = 1000
 
     # Use a small epoch since the data is simple
-    STEPS_PER_EPOCH = 10
+    STEPS_PER_EPOCH = 52000
     
     #Number of epochs
     NUM_EPOCHS=1000
@@ -373,10 +378,10 @@ class ExtendedRobotVQAConfig(RobotVQAConfig):
 
     # Non-max suppression threshold to filter RPN proposals.
     # You can reduce this during training to generate more propsals.
-    RPN_NMS_THRESHOLD = 0.6
+    RPN_NMS_THRESHOLD = 0.7
 
     # Non-maximum suppression threshold for detection
-    DETECTION_NMS_THRESHOLD = 0.1
+    DETECTION_NMS_THRESHOLD = 0.3
 
     
     # Input image size:RGBD-Images
@@ -406,7 +411,7 @@ class ExtendedRobotVQAConfig(RobotVQAConfig):
     #Numbers of threads
     NUMBER_THREADS=16
     #Layers to exclude on very first training with a new weights file
-    EXCLUDE=None
+    EXCLUDE=["robotvqa_poses_fc0", "robotvqa_poses","robotvqa_poses_fc1","robotvqa_poses_fc2","robotvqa_poses_fc3","robotvqa_poses_fc4"]
     """                          
     EXCLUDE=["robotvqa_class_logits0", "robotvqa_class_logits1","robotvqa_class_logits2","robotvqa_class_logits3","robotvqa_class_logits4",
                                         "robotvqa_class_logits5_1",'robotvqa_class_logits5_2','robotvqa_class_bn2','robotvqa_class_conv2',
@@ -501,7 +506,7 @@ class TaskManager(object):
         #Train progressively all the segments of the networks
 
         #Training loop
-	model.train(train_set, val_set,learning_rate=self.config.LEARNING_RATE, epochs=self.config.NUM_EPOCHS,layers='all',depth=depth,op_type=op_type)
+	model.train(train_set, val_set,learning_rate=self.config.LEARNING_RATE, epochs=self.config.NUM_EPOCHS,layers='heads',depth=depth,op_type=op_type)
         
 
 
