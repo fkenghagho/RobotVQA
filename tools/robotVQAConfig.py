@@ -157,7 +157,11 @@ class RobotVQAConfig(object):
     # train the RPN.
     USE_RPN_ROIS = True
     # Threshold for Object Property's Belief Probability
-    OBJECT_PROP_THRESHOLD=0.9
+    OBJECT_PROP_THRESHOLD=0.7
+    # Distance between two object candidates of # natures
+    CLUSTER_RADIUS=0.5
+    # Distance between two object candidates of same nature
+    CLUSTER_RADIUS1=0.45
     def __init__(self):
         """Set values of computed attributes."""
         # Effective batch size
