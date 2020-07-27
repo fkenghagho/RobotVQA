@@ -11,7 +11,7 @@ os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 #select a GPU if working on Multi-GPU Systems
 #Several GPUs can also be selected
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 from TaskManager import *
 
 """Template To Train RobotVQA
