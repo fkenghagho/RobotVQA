@@ -184,7 +184,7 @@ The specification for the ROS messages and servers can be found at [ROS interfac
 
 To start a RobotVQA ROS node, just run the following command:
 
-*roslaunch robotvqa_visualizer robotvqa_visualizer.launch input_topic:=<topic name> server_name:=<server name>*. You can disable an operating mode just by giving a wrong value to the corresponding parameter. Since RobotVQA is computation-intensive and therefore intended to run on a separate computer, make sure that the ROS environment variables such as ROSIP and ROS_MASTER_URI are set correctly.
+**roslaunch robotvqa_visualizer robotvqa_visualizer.launch input_topic:=(topic name) server_name:=(server name)**. You can disable an operating mode just by giving a wrong value to the corresponding parameter. Since RobotVQA is computation-intensive and therefore intended to run on a separate computer, make sure that the ROS environment variables such as *ROS_IP* and *ROS_MASTER_URI* are set correctly.
 
 
 
