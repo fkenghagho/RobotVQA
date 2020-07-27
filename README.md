@@ -23,10 +23,12 @@ As output, the system returns a scene graph. A scene graph is a directed graph, 
 
 # 1. Contribution
 
-The contribution of this thesis is twofold:
-- **A single novel Model that massively describes visual scenes to be able to address general visual question answering tasks for robots during manipulation tasks**: given a scene, the model outputs each object's category, color, shape, material, pose, bounding box, mask, openability and spatial relationships to other objects.
+The contribution of this thesis is manifold:
+- **Design and implementation of a kitchen-activity-related dataset synthesizer**: It defines a scene representation, noted as Scene Graph, for autonomous manipulation robots. Then, it generates robot scene images and annotates them with respect to this representation.
 
-- **Demonstration of full machine learning transferability from virtual worlds to real worlds:**  the real world is virtualized, a big rich dataset is collected from the virtual world, the above model is trained on and tested in the real world.
+- **Synthesis of a big set of kitchen-activity-related RGBD-images:**  annotated with corresponding scene graphs and augmented with real images.
+
+- **Design and implementation of a unified deep learning model,coined as RobotVQA:**  that takes a scene RGB(D) image as input and outputs the corresponding scene graph. RobotVQA stands for Visual Question Answering for Robots. We demonstrate transferability of RobotVQA’s knowledge from virtual to real worlds and suitability to robot control programs
 
 The following figure graphically illustrates and summarizes our contributions.
 
