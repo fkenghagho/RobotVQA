@@ -321,4 +321,4 @@ Note:
 
 # 21.  References
 
-The pdf-version of the thesis can be found at [thesis.pdf](Literature/thesis.pdf)
+The pdf-version of the thesis can be found at [thesis.pdf](Literature/thesis.pdf) and the published version at [IROS2020](http://ras.papercept.net/images/temp/IROS/files/1245.pdf)
